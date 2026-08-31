@@ -1,0 +1,98 @@
+import type { Locale } from './types';
+
+export type MsgKey =
+  | 'hud.round' | 'hud.stamina' | 'hud.hint'
+  | 'qte.title' | 'qte.instruction' | 'qte.progress'
+  | 'result.recorded'
+  | 'result.escaped.title' | 'result.escaped.body'
+  | 'result.exhausted.title' | 'result.exhausted.body'
+  | 'btn.next' | 'btn.retry' | 'btn.guide' | 'btn.back'
+  | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded' | 'codex.times';
+
+export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
+  en: {
+    'hud.round': 'Round {n}',
+    'hud.stamina': 'Stamina {n}',
+    'hud.hint': 'Move: click/arrow keys · Mark: Shift+click',
+    'qte.title': 'Close Encounter',
+    'qte.instruction': 'Tap or press SPACE when the needle crosses the glowing arc',
+    'qte.progress': 'Hits {hits}/{needed}   Attempts {attempt}/{rounds}',
+    'result.recorded': '{name} recorded!',
+    'result.escaped.title': 'It slipped away into the mist...',
+    'result.escaped.body': 'The trail went cold. Every clue is lost — start the tracking again.',
+    'result.exhausted.title': 'You ran out of stamina.',
+    'result.exhausted.body': 'Rest up. The mountain keeps its secrets for now.',
+    'btn.next': '[ Next Hunt ]',
+    'btn.retry': '[ Track Again ]',
+    'btn.guide': '[ Field Guide ]',
+    'btn.back': '[ Back to Trail ]',
+    'codex.title': 'Field Guide',
+    'codex.count': '{found} / {total} recorded',
+    'codex.unknown': '???',
+    'codex.notRecorded': 'Not yet recorded',
+    'codex.times': 'recorded x{n}',
+  },
+  'zh-TW': {
+    'hud.round': '第 {n} 局',
+    'hud.stamina': '體力 {n}',
+    'hud.hint': '移動：點擊/方向鍵 · 標記：Shift+點擊',
+    'qte.title': '近距離判讀',
+    'qte.instruction': '指針掃過發光弧區時點擊或按空白鍵',
+    'qte.progress': '命中 {hits}/{needed}   嘗試 {attempt}/{rounds}',
+    'result.recorded': '已記錄 {name}！',
+    'result.escaped.title': '牠溜進霧裡了……',
+    'result.escaped.body': '蹤跡已冷，線索全數消散——重新開始追蹤吧。',
+    'result.exhausted.title': '體力耗盡了。',
+    'result.exhausted.body': '休息一下，山林暫時守住了牠的祕密。',
+    'btn.next': '［下一場狩獵］',
+    'btn.retry': '［重新追蹤］',
+    'btn.guide': '［生態圖鑑］',
+    'btn.back': '［返回山徑］',
+    'codex.title': '生態圖鑑',
+    'codex.count': '已記錄 {found} / {total} 種',
+    'codex.unknown': '？？？',
+    'codex.notRecorded': '尚未記錄',
+    'codex.times': '記錄 ×{n}',
+  },
+};
+
+const STORAGE_KEY = 'rht.locale.v1';
+
+export interface I18n {
+  locale(): Locale;
+  setLocale(l: Locale): void;
+  t(key: MsgKey, vars?: Record<string, string | number>): string;
+}
+
+export function detectLocale(lang: string | undefined | null): Locale {
+  return (lang ?? '').toLowerCase().startsWith('zh') ? 'zh-TW' : 'en';
+}
+
+export function createI18n(initial: Locale, storage?: Pick<Storage, 'getItem' | 'setItem'>): I18n {
+  let current: Locale = initial;
+  if (storage) {
+    try {
+      const saved = storage.getItem(STORAGE_KEY);
+      if (saved === 'en' || saved === 'zh-TW') current = saved;
+    } catch {
+      // storage 不可用時沿用 initial
+    }
+  }
+  return {
+    locale: () => current,
+    setLocale(l: Locale) {
+      current = l;
+      if (!storage) return;
+      try {
+        storage.setItem(STORAGE_KEY, l);
+      } catch {
+        // 靜默退回記憶體
+      }
+    },
+    t(key, vars) {
+      let s = STRINGS[current][key];
+      for (const [k, v] of Object.entries(vars ?? {})) s = s.replaceAll(`{${k}}`, String(v));
+      return s;
+    },
+  };
+}
