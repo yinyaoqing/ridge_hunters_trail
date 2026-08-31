@@ -51,13 +51,25 @@ export function createCodex(storage?: Store): CodexStore {
 
   const load = (): Record<string, CodexEntry> => {
     if (!storage) return mem;
+
+    // Try to read v2 data from storage
+    let raw: string | null;
     try {
-      const raw = storage.getItem(V2_KEY);
-      if (raw === null) return migrateV1(storage);
+      raw = storage.getItem(V2_KEY);
+    } catch {
+      // Storage read failed (SecurityError etc), fall back to in-memory data
+      return mem;
+    }
+
+    // If no v2 data stored, try v1 migration
+    if (raw === null) return migrateV1(storage);
+
+    // Parse v2 data (return {} if corrupted)
+    try {
       const parsed = JSON.parse(raw);
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch {
-      return {};
+      return {}; // Corrupted JSON, return empty
     }
   };
 

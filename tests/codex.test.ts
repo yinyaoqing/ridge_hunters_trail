@@ -67,6 +67,25 @@ describe('createCodex v2', () => {
     codex.addRecord('plumetail', 'bronze');
     expect(codex.counts()).toEqual({ plumetail: 1 });
   });
+
+  it('keeps in-memory data warm when storage reads throw after a successful write', () => {
+    const throwingStorage = {
+      getItem: (): string | null => {
+        throw new Error('SecurityError');
+      },
+      setItem: (): void => {
+        // pretend writes succeed but are not actually persisted/readable back
+      },
+    };
+    const codex = createCodex(throwingStorage);
+    codex.addRecord('mistfawn', 'silver');
+    codex.addRecord('mistfawn', 'bronze');
+    codex.addNotes('veilmoth', 1);
+    expect(codex.entry('mistfawn')).toEqual({
+      count: 2, research: 2 * RESEARCH_RECORD, bestQuality: 'silver',
+    });
+    expect(codex.counts()).toEqual({ mistfawn: 2 });
+  });
 });
 
 describe('notesForRun', () => {
