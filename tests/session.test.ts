@@ -22,6 +22,7 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
   return {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
     readClues: new Set(), marks: new Set(), phase: 'explore',
+    steps: 0, mode: 'run', resolved: false,
     ...overrides,
   };
 }
@@ -131,5 +132,26 @@ describe('resolveQte / nextSession', () => {
     const next = nextSession(s, mulberry32(5));
     expect(next.round).toBe(1);
     expect(next.readClues.size).toBe(0);
+  });
+});
+
+describe('steps / mode / resolved', () => {
+  it('new session starts with zero steps, run mode, unresolved', () => {
+    const s = newSession(1, mulberry32(1));
+    expect(s.steps).toBe(0);
+    expect(s.mode).toBe('run');
+    expect(s.resolved).toBe(false);
+  });
+  it('mode can be set to daily', () => {
+    expect(newSession(5, mulberry32(1), 'daily').mode).toBe('daily');
+  });
+  it('each successful move increments steps', () => {
+    const s = newSession(1, mulberry32(2));
+    const before = s.steps;
+    const to = { x: s.player.x + (s.player.x === 0 ? 1 : -1), y: s.player.y };
+    move(s, to);
+    expect(s.steps).toBe(before + 1);
+    move(s, { x: -99, y: -99 }); // 非法移動不計步
+    expect(s.steps).toBe(before + 1);
   });
 });

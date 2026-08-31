@@ -6,6 +6,7 @@ import { key } from './clues';
 import type { Rng } from './rng';
 
 export type Phase = 'explore' | 'qte' | 'caught' | 'escaped' | 'exhausted';
+export type SessionMode = 'run' | 'daily';
 
 export const TERRAIN_COST: Record<TerrainType, number> = {
   meadow: 1, mist: 1, thicket: 2, rock: 2,
@@ -19,6 +20,9 @@ export interface SessionState {
   readClues: Set<string>; // 已判讀（踩過）的線索位置鍵
   marks: Set<string>;     // 玩家自行標記的格
   phase: Phase;
+  steps: number;          // 本局累計移動步數（分享卡用）
+  mode: SessionMode;      // 主線 run / 每日挑戰 daily
+  resolved: boolean;      // Result 已記帳（防場景重啟重複記錄）
 }
 
 function startPos(level: Level): Vec2 {
@@ -27,7 +31,7 @@ function startPos(level: Level): Vec2 {
   return corners.reduce((a, b) => (dist(b, level.targetPos) > dist(a, level.targetPos) ? b : a));
 }
 
-export function newSession(round: number, rng: Rng): SessionState {
+export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): SessionState {
   const level = generateLevel(round, rng);
   return {
     round,
@@ -37,6 +41,9 @@ export function newSession(round: number, rng: Rng): SessionState {
     readClues: new Set(),
     marks: new Set(),
     phase: 'explore',
+    steps: 0,
+    mode,
+    resolved: false,
   };
 }
 
@@ -61,6 +68,7 @@ export function canMove(s: SessionState, to: Vec2): boolean {
 
 export function move(s: SessionState, to: Vec2): void {
   if (!canMove(s, to)) return;
+  s.steps++;
   s.stamina -= TERRAIN_COST[s.level.terrain[to.y][to.x]];
   s.player = to;
 
