@@ -40,6 +40,18 @@ export function newSession(round: number, rng: Rng): SessionState {
   };
 }
 
+function hasAffordableMove(s: SessionState): boolean {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const to = { x: s.player.x + dx, y: s.player.y + dy };
+      if (to.x < 0 || to.y < 0 || to.x >= s.level.mapSize || to.y >= s.level.mapSize) continue;
+      if (s.stamina >= TERRAIN_COST[s.level.terrain[to.y][to.x]]) return true;
+    }
+  }
+  return false;
+}
+
 export function canMove(s: SessionState, to: Vec2): boolean {
   if (s.phase !== 'explore') return false;
   if (to.x < 0 || to.y < 0 || to.x >= s.level.mapSize || to.y >= s.level.mapSize) return false;
@@ -65,7 +77,7 @@ export function move(s: SessionState, to: Vec2): void {
     s.phase = 'qte';
     return;
   }
-  if (s.stamina <= 0) s.phase = 'exhausted';
+  if (s.stamina <= 0 || !hasAffordableMove(s)) s.phase = 'exhausted';
 }
 
 export function toggleMark(s: SessionState, p: Vec2): void {

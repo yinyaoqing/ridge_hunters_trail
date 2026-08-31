@@ -85,6 +85,23 @@ describe('move', () => {
     move(s, { x: 3, y: 4 });
     expect(s.phase).toBe('qte');
   });
+  it('exhausts on soft-lock when no remaining neighbor is affordable', () => {
+    const s = makeState({ stamina: 2, player: { x: 0, y: 0 } });
+    // Surround the destination (0,1) with rock (cost 2) so that after landing
+    // there with 1 stamina left, no Chebyshev neighbor (including origin
+    // (0,0)) is affordable. (0,1) itself stays meadow so it's cheap to enter.
+    const terrain = s.level.terrain;
+    for (let y = 0; y <= 2; y++) {
+      for (let x = 0; x <= 1; x++) {
+        if (x === 0 && y === 1) continue; // keep destination itself meadow
+        terrain[y][x] = 'rock';
+      }
+    }
+    move(s, { x: 0, y: 1 });
+    expect(s.player).toEqual({ x: 0, y: 1 });
+    expect(s.stamina).toBe(1);
+    expect(s.phase).toBe('exhausted');
+  });
 });
 
 describe('toggleMark', () => {

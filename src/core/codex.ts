@@ -12,9 +12,13 @@ export function createCodex(storage?: Pick<Storage, 'getItem' | 'setItem'>): Cod
     if (!storage) return mem;
     try {
       const parsed = JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}');
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
+      if (parsed && typeof parsed === 'object') {
+        mem = parsed;
+        return parsed;
+      }
       return {};
+    } catch {
+      return mem;
     }
   };
 

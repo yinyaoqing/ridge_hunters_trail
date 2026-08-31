@@ -34,4 +34,19 @@ describe('createCodex', () => {
     const codex = createCodex(fakeStorage({ 'rht.codex.v1': 'not-json{{{' }));
     expect(codex.counts()).toEqual({});
   });
+
+  it('keeps the in-memory count warm when reads throw after a successful write', () => {
+    const throwingStorage = {
+      getItem: (): string | null => {
+        throw new Error('SecurityError');
+      },
+      setItem: (): void => {
+        // pretend writes succeed but are not actually persisted/readable back
+      },
+    };
+    const codex = createCodex(throwingStorage);
+    codex.add('mistfawn');
+    codex.add('mistfawn');
+    expect(codex.counts()).toEqual({ mistfawn: 2 });
+  });
 });
