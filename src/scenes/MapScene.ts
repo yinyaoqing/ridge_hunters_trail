@@ -43,7 +43,32 @@ export class MapScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointer(p));
+    this.events.on(Phaser.Scenes.Events.RESUME, () => this.redraw());
     this.redraw();
+    this.maybeShowFirstRunHelp();
+  }
+
+  // 首次啟動自動彈出玩法說明（localStorage 記憶，不可用時僅本次顯示）
+  private maybeShowFirstRunHelp() {
+    const storage: Pick<Storage, 'getItem' | 'setItem'> | undefined = this.registry.get('storage');
+    let seen = false;
+    try {
+      seen = storage?.getItem('rht.help.v1') === '1';
+    } catch {
+      seen = false;
+    }
+    if (seen) return;
+    try {
+      storage?.setItem('rht.help.v1', '1');
+    } catch {
+      // 無法記憶時每次啟動都會顯示，可接受
+    }
+    this.openHelp();
+  }
+
+  private openHelp() {
+    this.scene.launch('Help');
+    this.scene.pause();
   }
 
   update() {
@@ -150,16 +175,17 @@ export class MapScene extends Phaser.Scene {
     this.hudG = this.add.graphics();
 
     // 操作提示（兩行右對齊）
-    this.hintText = this.add.text(w - 96, 15, '', {
+    this.hintText = this.add.text(w - 136, 15, '', {
       fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(pal.paperDim),
       align: 'right', lineSpacing: 4,
     }).setOrigin(1, 0);
 
-    // 語言切換鈕（設計板：金邊小chip）
+    // 語言切換鈕與玩法說明鈕（設計板：金邊小chip）
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
-    chip.strokeRoundedRect(w - 84, 13, 72, 30, BRUSH_RADIUS);
-    this.add.text(w - 48, 28, 'EN / 中', {
+    chip.strokeRoundedRect(w - 124, 13, 72, 30, BRUSH_RADIUS);
+    chip.strokeRoundedRect(w - 44, 13, 32, 30, { tl: 5, tr: 9, br: 4, bl: 8 });
+    this.add.text(w - 88, 28, 'EN / 中', {
       fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
     }).setOrigin(0.5).setLetterSpacing(1)
       .setInteractive({ useHandCursor: true })
@@ -168,6 +194,14 @@ export class MapScene extends Phaser.Scene {
         const i18n = this.i18n();
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
         this.redraw();
+      });
+    this.add.text(w - 28, 28, '?', {
+      fontFamily: FONTS.display, fontSize: '16px', color: cssHex(pal.gold),
+    }).setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (p: Phaser.Input.Pointer) => {
+        p.event.stopPropagation();
+        this.openHelp();
       });
   }
 

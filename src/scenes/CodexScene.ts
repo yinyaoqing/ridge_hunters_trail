@@ -61,7 +61,7 @@ export class CodexScene extends Phaser.Scene {
         : i18n.t('codex.notRecorded');
       this.add.text(134, y + 6, detail, {
         fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.paperDim),
-        wordWrap: { width: 470 },
+        wordWrap: { width: 470, useAdvancedWrap: true },
       }).setAlpha(discovered ? 1 : 0.6);
 
       if (discovered) {

@@ -8,6 +8,7 @@ import { MapScene } from './scenes/MapScene';
 import { QteScene } from './scenes/QteScene';
 import { ResultScene } from './scenes/ResultScene';
 import { CodexScene } from './scenes/CodexScene';
+import { HelpScene } from './scenes/HelpScene';
 
 function safeStorage(): Storage | undefined {
   try {
@@ -25,12 +26,13 @@ function launch(): void {
     height: 780,
     backgroundColor: '#131a17',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [BootScene, MapScene, QteScene, ResultScene, CodexScene],
+    scene: [BootScene, MapScene, QteScene, ResultScene, CodexScene, HelpScene],
     callbacks: {
       preBoot: (game) => {
         const rng = mulberry32(Date.now() >>> 0);
         const storage = safeStorage();
         game.registry.set('rng', rng);
+        game.registry.set('storage', storage);
         game.registry.set('codex', createCodex(storage));
         game.registry.set('i18n', createI18n(detectLocale(navigator.language), storage));
         game.registry.set('session', newSession(1, rng));

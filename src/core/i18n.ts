@@ -6,7 +6,10 @@ export type MsgKey =
   | 'result.recorded'
   | 'result.escaped.title' | 'result.escaped.body'
   | 'result.exhausted.title' | 'result.exhausted.body'
-  | 'btn.next' | 'btn.retry' | 'btn.guide' | 'btn.back'
+  | 'btn.next' | 'btn.retry' | 'btn.guide' | 'btn.back' | 'btn.start'
+  | 'help.title' | 'help.goal'
+  | 'help.footprint' | 'help.disturbance' | 'help.scent'
+  | 'help.decoy' | 'help.stamina' | 'help.mark' | 'help.qte'
   | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded' | 'codex.times';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
@@ -26,6 +29,16 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.retry': '[ Track Again ]',
     'btn.guide': '[ Field Guide ]',
     'btn.back': '[ Back to Trail ]',
+    'btn.start': '[ Begin the Hunt ]',
+    'help.title': 'How to Play',
+    'help.goal': 'Read the clues a creature leaves behind, deduce where it hides, and get close enough to record it in your field guide. No harm done — if you fail, it simply slips away.',
+    'help.footprint': 'Footprint — points roughly toward the creature, within the shown cone.',
+    'help.disturbance': 'Disturbance — the creature is somewhere inside this circle.',
+    'help.scent': 'Scent — the creature sits at this distance, along the ring.',
+    'help.decoy': 'Some trails lie. From round 4, decoy clues appear — cross-check before you commit.',
+    'help.stamina': 'Every step costs stamina; thickets and rock cost more. Mistleaf and dewfruit restore it.',
+    'help.mark': 'Shift+click marks a cell for your notes. Step onto a clue to read it.',
+    'help.qte': 'Up close, tap or press SPACE when the needle sweeps the glowing arc.',
     'codex.title': 'Field Guide',
     'codex.count': '{found} / {total} recorded',
     'codex.unknown': '???',
@@ -48,6 +61,16 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.retry': '［重新追蹤］',
     'btn.guide': '［生態圖鑑］',
     'btn.back': '［返回山徑］',
+    'btn.start': '［開始追蹤］',
+    'help.title': '玩法說明',
+    'help.goal': '判讀生物留下的線索，推理出牠的藏身處，悄悄接近並記入圖鑑。全程無傷害——失敗時牠只是悄悄溜走。',
+    'help.footprint': '足跡——大致指向生物所在，方向落在顯示的錐形範圍內。',
+    'help.disturbance': '擾動——生物就在這個圓域範圍之中。',
+    'help.scent': '氣味——生物位於這個距離的環帶上。',
+    'help.decoy': '有些蹤跡會說謊。第 4 局起會出現干擾線索，下判斷前先交叉比對。',
+    'help.stamina': '每一步都消耗體力；密叢與岩坡消耗更多。霧葉與露珠果可以回復體力。',
+    'help.mark': 'Shift+點擊可在格子上做標記筆記；踩上線索即可判讀。',
+    'help.qte': '逼近目標後，趁指針掃過發光弧區時點擊或按空白鍵。',
     'codex.title': '生態圖鑑',
     'codex.count': '已記錄 {found} / {total} 種',
     'codex.unknown': '？？？',

@@ -77,7 +77,7 @@ export class ResultScene extends Phaser.Scene {
 
     this.add.text(cx, 442, body, {
       fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.paperDim),
-      wordWrap: { width: 460 }, align: 'center', lineSpacing: 6,
+      wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 6,
     }).setOrigin(0.5);
 
     this.button(cx, 532, 250, 52, stripBrackets(action), true, () => this.scene.start('Map'));
