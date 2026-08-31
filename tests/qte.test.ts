@@ -86,3 +86,25 @@ describe('press', () => {
     expect(q.attempt).toBe(0);
   });
 });
+
+describe('offsets (hit precision)', () => {
+  const cfg = { speed: 180, arcSize: 40, rounds: 3, needed: 2 };
+  it('records offset 0 for a dead-center hit and ~1 near the edge', () => {
+    const rng = () => 0.5; // arcStart = 0.5 * (360-40) = 160, 弧心 = 180
+    const q = newQte(cfg, rng);
+    q.pointer = 180; // 正中
+    press(q, cfg, rng);
+    expect(q.offsets).toHaveLength(1);
+    expect(q.offsets[0]).toBeCloseTo(0);
+    q.pointer = 160.5; // 貼近弧緣（新弧同樣 160–200）
+    press(q, cfg, rng);
+    expect(q.offsets[1]).toBeCloseTo(0.975);
+  });
+  it('does not record offsets on misses', () => {
+    const rng = () => 0.5;
+    const q = newQte(cfg, rng);
+    q.pointer = 10; // 弧區外
+    press(q, cfg, rng);
+    expect(q.offsets).toHaveLength(0);
+  });
+});

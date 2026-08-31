@@ -9,6 +9,7 @@ export interface QteState {
   done: boolean;
   success: boolean | null; // done 前為 null
   lastHit: boolean | null; // 供渲染層做回饋
+  offsets: number[];       // 每次命中的弧心偏移（0=正中、1=弧緣），供品質判定
 }
 
 const rollArc = (cfg: QteParams, rng: Rng): number => rng() * (360 - cfg.arcSize);
@@ -17,7 +18,7 @@ export function newQte(cfg: QteParams, rng: Rng): QteState {
   return {
     attempt: 0, hits: 0,
     arcStart: rollArc(cfg, rng), pointer: 0,
-    done: false, success: null, lastHit: null,
+    done: false, success: null, lastHit: null, offsets: [],
   };
 }
 
@@ -30,7 +31,11 @@ export function press(q: QteState, cfg: QteParams, rng: Rng): void {
   if (q.done) return;
   const hit = q.pointer >= q.arcStart && q.pointer <= q.arcStart + cfg.arcSize;
   q.lastHit = hit;
-  if (hit) q.hits++;
+  if (hit) {
+    q.hits++;
+    const center = q.arcStart + cfg.arcSize / 2;
+    q.offsets.push(Math.abs(q.pointer - center) / (cfg.arcSize / 2));
+  }
   q.attempt++;
 
   if (q.hits >= cfg.needed) {
