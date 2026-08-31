@@ -225,6 +225,7 @@ function generateLevel(difficulty: number): Level {
 - v1.0 — 初版規劃，涵蓋核心迴圈、線索生成演算法、美術/技術規格、14天開發排程
 - v1.1 — 新增 §10 商業化路徑（廣告分潤策略、獎勵式廣告掛載點、每日挑戰、中期路徑）
 - v1.2 — 新增多語系需求（§6）：繁體中文／英文，瀏覽器偵測＋遊戲內切換
+- v1.3 — 新增 §11 部署與上架（itch.io／CrazyGames／Poki 提交流程、前置修改清單、發版自動化）
 - 待補：QTE小遊戲細部設計、生物圖鑑內容清單（8–12種生物的具體屬性表）、UI線框稿
 
 ---
@@ -281,4 +282,60 @@ itch.io 驗證（不求收入）
   → 每日挑戰拉留存（約 1 天）
   → Poki 多管道
   → 數據達標後評估手機版 / Steam 豪華版
+```
+
+---
+
+## 11. 部署與上架
+
+> 前提：本遊戲為純靜態前端（dist 約 1.5MB、無伺服器、無資料庫），部署本質是「將 dist 目錄放上目標平台」。重點不在基礎設施，而在各平台的提交規則與前置修改。
+
+### 11.1 階段一：itch.io（驗證期，隨時可上）
+
+**上傳流程：**
+1. 建立專案頁 → Kind of project 選 **HTML** → 上傳 `ridge-hunters-trail-itch.zip`（zip 根目錄含 index.html，路徑分隔符已確認為正斜線）
+2. 勾選「This file will be played in the browser」；Embed 設定 viewport **720×780**，建議開啟 Fullscreen button；Mobile friendly 待觸控支援完成後再勾
+3. 定價 free 或 pay-what-you-want（§10.1 驗證期不求收入）
+
+**迭代發版建議改用 butler CLI**（itch 官方工具）：`butler push dist <帳號>/ridge-hunters-trail:html5`——單指令部署、差量上傳、保留版本歷史。
+
+**上傳前人工檢查清單：**
+- 雙語各走一輪完整迴圈（地圖 → QTE → 結算 → 圖鑑）
+- 瀏覽器封鎖第三方 cookie 情境下確認可正常啟動（沙箱 iframe 的 localStorage 防護已實作，需實測）
+- 繁中系統字體渲染確認
+- 3–5 位測試者 QTE 手感實測（§8.1）後再進入階段二
+
+### 11.2 階段二：CrazyGames Basic Launch
+
+體積（1.5MB ≪ 50MB）與檔案數已達標；經 developer portal 提交並通過官方 QA。**提交前必須完成的程式修改：**
+
+| 項目 | 內容 | 預估 |
+|---|---|---|
+| CrazyGames SDK | 局間插頁廣告＋三個 rewarded 掛載點（§10.2，狀態機已預留） | 2–3 天 |
+| 字體自託管 | Google Fonts 為外部請求，portal QA 通常禁止外部資源依賴；將 Marcellus/Karla 子集化為 woff2 打進 dist（約 30–50KB，不影響體積門檻） | 0.5 天 |
+| 觸控標記 | Shift+點擊在觸控裝置不存在；HUD 增加「標記模式」切換鈕（portal 流量大宗為行動裝置） | 0.5 天 |
+
+### 11.3 階段三：Poki
+
+- **8MB 初始下載門檻現已達標**（1.5MB），原規劃的素材分包延遲載入暫不需要
+- 需整合 Poki SDK 並通過其 QA；其餘與階段二共用同一份建置
+
+### 11.4 自有版本與發版自動化（選配）
+
+- 在 portal 之外保留自控網址（供測試者/社群/媒體）：**Cloudflare Pages 或 GitHub Pages**，零成本靜態託管
+- repo 推上 GitHub 後可加 GitHub Actions：push tag → `npm ci` → 測試 → 建置 → 自動部署 Pages ＋ `butler push` 至 itch；之後每次發版即打一個 tag
+- 前置：目前 repo 尚無 remote
+
+### 11.5 本階段明確不採用
+
+- 自架伺服器／VPS：無後端需求，純增成本
+- 付費 CDN：portal 平台自帶分發
+- Steam 上架：待網頁版留存數據驗證後再評估（§10.4）
+
+### 11.6 執行順序摘要
+
+```
+人工冒煙驗證 → itch.io 上傳 → 3–5 位測試者實測 QTE
+  → 字體自託管 + 觸控標記鈕 + CrazyGames SDK（約 3–4 天）→ Basic Launch 提交
+  → 數據達標 → Poki 提交 →（選配）GitHub + Actions 自動化發版
 ```
