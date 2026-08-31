@@ -29,7 +29,7 @@ export class ResultScene extends Phaser.Scene {
     const outcome = s.phase;
     this.pal = getPalette(s.round);
 
-    if (outcome === 'caught') codex.add(creature.id);
+    if (outcome === 'caught') codex.addRecord(creature.id, 'bronze');
     // 立刻推進 session，之後所有按鈕只做場景切換，避免重複記錄
     this.registry.set('session', nextSession(s, rng));
 
