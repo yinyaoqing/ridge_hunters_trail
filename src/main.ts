@@ -4,6 +4,7 @@ import { newSession } from './core/session';
 import { createCodex } from './core/codex';
 import { createI18n, detectLocale } from './core/i18n';
 import { MapScene } from './scenes/MapScene';
+import { QteScene } from './scenes/QteScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -12,7 +13,7 @@ new Phaser.Game({
   height: 780,
   backgroundColor: '#141814',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [MapScene], // Task 10/11 依序加入 QteScene / ResultScene / CodexScene
+  scene: [MapScene, QteScene], // Task 11 依序加入 ResultScene / CodexScene
   callbacks: {
     preBoot: (game) => {
       const rng = mulberry32(Date.now() >>> 0);
