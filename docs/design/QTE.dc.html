@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&amp;family=Karla:wght@400;500;700&amp;display=swap">
+  <style>
+    body { margin: 0; background: #131a17; font-family: 'Karla', 'Segoe UI', sans-serif; }
+    a { color: #d8c874; } a:hover { color: #e8dca2; }
+  </style>
+</helmet>
+<div style="width: 720px; height: 780px; box-sizing: border-box; background: radial-gradient(90% 70% at 50% 42%, #1a241e 0%, #131a17 55%, #0d1310 100%); color: #e8e3d2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 30px;">
+
+  <div style="text-align: center;">
+    <div style="font-family: 'Marcellus', Georgia, serif; font-size: 34px; letter-spacing: 1px;">Close Encounter</div>
+    <div style="margin-top: 6px; font-size: 15px; color: #8a9a8c;">Tap when the needle crosses the glowing arc</div>
+  </div>
+
+  <svg width="440" height="440" viewBox="0 0 440 440">
+    <defs>
+      <filter id="qglow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"/></filter>
+      <radialGradient id="qbg" cx="50%" cy="50%" r="55%">
+        <stop offset="0%" stop-color="#1d2a22"/>
+        <stop offset="100%" stop-color="#131a17"/>
+      </radialGradient>
+    </defs>
+
+    <circle cx="220" cy="220" r="196" fill="url(#qbg)"/>
+    <circle cx="220" cy="220" r="170" fill="none" stroke="#5c6b73" stroke-width="5"/>
+    <circle cx="220" cy="220" r="177" fill="none" stroke="#5c6b73" stroke-width="1.3" stroke-opacity="0.5"/>
+
+    <g stroke="#e8e3d2" stroke-opacity="0.18" stroke-width="2" stroke-linecap="round">
+      <path d="M220 42 L220 56"/>
+      <path d="M220 384 L220 398"/>
+      <path d="M42 220 L56 220"/>
+      <path d="M384 220 L398 220"/>
+    </g>
+
+    <g transform="translate(220 226) scale(1.7)" opacity="0.16">
+      <g fill="#e8e3d2">
+        <path d="M-32 -4 Q-34 -14 -22 -16 Q-2 -20 12 -14 Q14 -24 20 -28 L22 -38 L25 -29 L32 -34 L30 -26 Q36 -24 34 -18 L26 -14 Q30 -6 22 -2 Q4 4 -14 2 Q-28 4 -32 -4 Z"/>
+        <rect x="-30" y="0" width="4.5" height="26" rx="2"/>
+        <rect x="-20" y="1" width="4.5" height="25" rx="2"/>
+        <rect x="8" y="0" width="4.5" height="26" rx="2"/>
+        <rect x="17" y="-2" width="4.5" height="28" rx="2"/>
+      </g>
+    </g>
+    <circle cx="260" cy="185" r="3" fill="#9ad1c8" opacity="0.85" filter="url(#qglow)"/>
+    <circle cx="260" cy="185" r="1.8" fill="#9ad1c8"/>
+
+    <path d="M379.7 161.9 A170 170 0 0 1 329.3 350.2" stroke="#d8c874" stroke-width="18" fill="none" stroke-linecap="round" filter="url(#qglow)" opacity="0.6"/>
+    <path d="M379.7 161.9 A170 170 0 0 1 329.3 350.2" stroke="#d8c874" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+    <path d="M242.6 228.2 L79.1 168.7" stroke="#e8e3d2" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="220" cy="220" r="7" fill="#e8e3d2"/>
+    <circle cx="220" cy="220" r="10.5" fill="none" stroke="#e8e3d2" stroke-opacity="0.4" stroke-width="1.2"/>
+  </svg>
+
+  <div style="display: flex; align-items: center; gap: 22px;">
+    <div style="display: flex; gap: 9px;">
+      <span style="width: 14px; height: 14px; border-radius: 50%; background: #d8c874; box-shadow: 0 0 8px rgba(216,200,116,0.7); display: inline-block;"></span>
+      <span style="width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(232,227,210,0.4); box-sizing: border-box; display: inline-block;"></span>
+      <span style="width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(232,227,210,0.4); box-sizing: border-box; display: inline-block;"></span>
+    </div>
+    <div style="font-size: 15px; letter-spacing: 1px; color: #d8c874;">Hits 1 / 2 · Attempts 1 / 3</div>
+  </div>
+
+  <div style="font-size: 12px; color: #8a9a8c;">Click anywhere or press SPACE</div>
+</div>
+</x-dc>
+</body>
+</html>

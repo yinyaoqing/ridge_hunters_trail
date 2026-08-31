@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "ArtDirection.dc.html", "x": 0, "y": 0, "w": 1180, "h": 1900, "title": "美術方向板" },
+    { "file": "Main.dc.html", "x": 1280, "y": 0, "w": 720, "h": 780, "title": "地圖場景" },
+    { "file": "QTE.dc.html", "x": 2100, "y": 0, "w": 720, "h": 780, "title": "QTE 場景" },
+    { "file": "Result.dc.html", "x": 2920, "y": 0, "w": 720, "h": 780, "title": "結算場景" },
+    { "file": "Codex.dc.html", "x": 1280, "y": 920, "w": 720, "h": 780, "title": "圖鑑場景" }
+  ],
+  "annotations": [
+    { "id": "usage-note", "x": 1280, "y": -150, "w": 430, "text": "四個場景 mockup 以「霧綠」循環（第1–3局）繪製；配色依難度層循環見美術方向板。生物剪影為概念稿，量產前需依規格書 §8.2 人工複查。" }
+  ],
+  "launch": { "view": "canvas" }
+}
