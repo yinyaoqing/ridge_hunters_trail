@@ -26,6 +26,10 @@ export class MapScene extends Phaser.Scene {
   private cell = 0;
   private ox = 0;
   private oy = 0;
+  private markMode = false;
+  private pressAt: { t: number; x: number; y: number } | null = null;
+  private markChipG?: Phaser.GameObjects.Graphics;
+  private markChipText?: Phaser.GameObjects.Text;
 
   constructor() {
     super('Map');
@@ -49,7 +53,10 @@ export class MapScene extends Phaser.Scene {
     this.g = this.add.graphics();
 
     this.cursors = this.input.keyboard?.createCursorKeys();
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointer(p));
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      this.pressAt = { t: p.time, x: p.x, y: p.y };
+    });
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
     this.events.on(Phaser.Scenes.Events.RESUME, () => this.redraw());
     this.redraw();
     restartOnResize(this);
@@ -194,14 +201,20 @@ export class MapScene extends Phaser.Scene {
       }).setOrigin(1, 0);
     }
 
-    // 語言切換鈕與玩法說明鈕（設計板：金邊小chip）
+    // 語言切換鈕、玩法說明鈕與標記模式鈕（設計板：金邊小chip，由右至左排列）
+    const chipY = 13;
+    const chipH = 30;
+    const xHelp = w - 12 - 32;        // '?' chip 左緣
+    const xLang = xHelp - 8 - 72;     // 語言 chip 左緣
+    const xMark = xLang - 8 - 60;     // 標記 chip 左緣
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
-    chip.strokeRoundedRect(w - 124, 13, 72, 30, BRUSH_RADIUS);
-    chip.strokeRoundedRect(w - 44, 13, 32, 30, { tl: 5, tr: 9, br: 4, bl: 8 });
-    this.add.text(w - 88, 28, 'EN / 中', {
+    chip.strokeRoundedRect(xLang, chipY, 72, chipH, BRUSH_RADIUS);
+    chip.strokeRoundedRect(xHelp, chipY, 32, chipH, { tl: 5, tr: 9, br: 4, bl: 8 });
+    this.add.text(xLang + 36, chipY + chipH / 2, 'EN / 中', {
       fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
-    }).setOrigin(0.5).setLetterSpacing(1)
+    }).setOrigin(0.5).setLetterSpacing(1);
+    this.add.rectangle(xLang + 36, chipY + chipH / 2, 72, 44, 0, 0) // 44px 命中區
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', (p: Phaser.Input.Pointer) => {
         p.event.stopPropagation();
@@ -209,14 +222,42 @@ export class MapScene extends Phaser.Scene {
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
         this.redraw();
       });
-    this.add.text(w - 28, 28, '?', {
+    this.add.text(xHelp + 16, chipY + chipH / 2, '?', {
       fontFamily: FONTS.display, fontSize: '16px', color: cssHex(pal.gold),
-    }).setOrigin(0.5)
+    }).setOrigin(0.5);
+    this.add.rectangle(xHelp + 16, chipY + chipH / 2, 32, 44, 0, 0) // 44px 命中區
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', (p: Phaser.Input.Pointer) => {
         p.event.stopPropagation();
         this.openHelp();
       });
+
+    // 標記模式鈕（開/關填色不同，需獨立 Graphics 供重繪）
+    this.markChipG = this.add.graphics();
+    this.markChipText = this.add.text(xMark + 30, chipY + chipH / 2, '', {
+      fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
+    }).setOrigin(0.5).setLetterSpacing(1);
+    this.drawMarkChip(xMark, chipY, 60, chipH);
+    this.add.rectangle(xMark + 30, chipY + chipH / 2, 60, 44, 0, 0) // 44px 命中區
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (p: Phaser.Input.Pointer) => {
+        p.event.stopPropagation();
+        this.markMode = !this.markMode;
+        this.drawMarkChip(xMark, chipY, 60, chipH);
+      });
+  }
+
+  private drawMarkChip(x: number, y: number, w: number, h: number) {
+    const pal = this.pal;
+    const g = this.markChipG!;
+    g.clear();
+    if (this.markMode) {
+      g.fillStyle(pal.mark, 0.85).fillRoundedRect(x, y, w, h, BRUSH_RADIUS);
+      this.markChipText!.setColor(cssHex(pal.bg)).setText(this.i18n().t('hud.mark'));
+    } else {
+      g.lineStyle(1.2, pal.mark, 0.7).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
+      this.markChipText!.setColor(cssHex(pal.mark)).setText(this.i18n().t('hud.mark'));
+    }
   }
 
   private toGrid(px: number, py: number): Vec2 | null {
@@ -226,12 +267,17 @@ export class MapScene extends Phaser.Scene {
     return x >= 0 && y >= 0 && x < size && y < size ? { x, y } : null;
   }
 
-  private onPointer(p: Phaser.Input.Pointer) {
+  private onPointerUp(p: Phaser.Input.Pointer) {
     const s = this.session();
-    if (s.phase !== 'explore') return;
+    if (s.phase !== 'explore' || !this.pressAt) return;
+    const held = p.time - this.pressAt.t;
+    const moved = Math.hypot(p.x - this.pressAt.x, p.y - this.pressAt.y);
+    this.pressAt = null;
+    if (moved > 12) return; // 拖曳不動作
     const cellPos = this.toGrid(p.x, p.y);
     if (!cellPos) return;
-    if ((p.event as MouseEvent).shiftKey) {
+    const wantMark = (p.event as MouseEvent).shiftKey || this.markMode || held >= 350;
+    if (wantMark) {
       toggleMark(s, cellPos);
       this.redraw();
       return;
