@@ -96,11 +96,11 @@ export class CampScene extends Phaser.Scene {
     by += 72;
 
     // 委託板：三則每日委託（同 dailyKey 種子，與 ResultScene 結算共用判定邏輯）；
-    // 矮視窗（h<640）已很擁擠，收合為單行「委託板 n/3」，避免與下方工具列相撞
+    // 矮視窗（h<692，見 rowH=44 換算）已很擁擠，收合為單行「委託板 n/3」，避免與下方工具列相撞
     const commStore = this.registry.get('commissions') as CommissionStore;
     const comms = dailyCommissions(today);
     const commStatus = commStore.statusFor(today);
-    if (h < 640) {
+    if (h < 692) {
       const doneCount = commStatus.filter(Boolean).length;
       this.add.text(cx, by, `${i18n.t('comm.title')} ${doneCount}/3`, {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
@@ -111,7 +111,8 @@ export class CampScene extends Phaser.Scene {
         fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
       }).setOrigin(0.5).setLetterSpacing(1.5);
       by += 20;
-      const rowH = 34;
+      // rowH 34→44：描述加上 wordWrap 後兩行文字需要更高的列高才不會貼邊（見 drawCommissionRow）
+      const rowH = 44;
       const rowGap = 6;
       comms.forEach((c, i) => {
         this.drawCommissionRow(cx, by, bw, rowH, c, commStatus[i], i18n);
@@ -174,6 +175,8 @@ export class CampScene extends Phaser.Scene {
     this.add.graphics().fillStyle(pal.panel, 0.9).fillRoundedRect(cx - w / 2, y, w, h, 6);
     this.add.text(cx - w / 2 + 12, y + h / 2, this.describeCommission(c, i18n), {
       fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(done ? pal.paperDim : pal.paper),
+      // 完成標籤（✓ 已完成／獎勵提示）保留約 110px 寬度，描述換行寬度扣除該區避免重疊
+      wordWrap: { width: w - 110, useAdvancedWrap: true },
     }).setOrigin(0, 0.5);
     if (done) {
       // comm.done 消費點：右側完成勾附上在地化文字（非純符號），符合規格要求的 i18n key 用途

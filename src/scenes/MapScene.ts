@@ -383,7 +383,7 @@ export class MapScene extends Phaser.Scene {
       const legendG = this.add.graphics();
       const legendY = 36;
       const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
-      const costs = ['1', '1', '2', '2'];
+      const costs = order.map((t) => String(TERRAIN_COST[t])); // 由 TERRAIN_COST 推導，避免與實際成本脫鉤
       let lx = 250;
       order.forEach((t, i) => {
         legendG.fillStyle(pal.terrain[t], 1).fillRect(lx, legendY, 12, 12);
