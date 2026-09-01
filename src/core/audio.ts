@@ -6,6 +6,9 @@ export interface AudioBus {
   toggle(): boolean;
   play(name: SfxName): void;
   ambient(on: boolean): void;
+  // 標記已取得使用者手勢（點擊/觸控），解除瀏覽器 autoplay 政策的靜音鎖；
+  // 冪等——重複呼叫安全。解鎖前 play()/ambient(true) 一律不建立 AudioContext。
+  unlock(): void;
 }
 
 const KEY = 'rht.audio.v1';
@@ -35,10 +38,25 @@ export function createAudio(
   let ctx: AudioContext | null = null;
   let ctxFailed = false;
   let windGain: GainNode | null = null;
+  let windSrc: AudioBufferSourceNode | null = null;
+  let windLp: BiquadFilterNode | null = null;
+  // Chrome/Safari 等瀏覽器的 autoplay 政策：AudioContext 建立時預設 suspended，
+  // 需一次使用者手勢（點擊/觸控/按鍵）才能 resume()。unlock() 前一律不建立 context、
+  // 不啟動環境音；unlock() 後若有暫存的環境音請求（pendingAmbient）立即補放。
+  let gestureSeen = false;
+  let pendingAmbient = false;
 
   const persist = () => {
     if (!storage) return;
     try { storage.setItem(KEY, on ? '1' : '0'); } catch { /* 靜默 */ }
+  };
+
+  // 部分瀏覽器會在背景分頁/閒置後自動把既有 context 轉回 suspended；
+  // 每次要出聲前都嘗試 resume 一次（reject 靜默吞掉，不影響其餘邏輯）。
+  const resumeIfSuspended = (c: AudioContext) => {
+    if (c.state === 'suspended') {
+      try { void c.resume(); } catch { /* 靜默 */ }
+    }
   };
 
   const getCtx = (): AudioContext | null => {
@@ -46,6 +64,7 @@ export function createAudio(
     if (ctxFailed || !ctxFactory) return null;
     try {
       ctx = ctxFactory();
+      resumeIfSuspended(ctx);
       return ctx;
     } catch {
       ctxFailed = true; // 記憶失敗，不重試轟炸
@@ -53,11 +72,66 @@ export function createAudio(
     }
   };
 
-  const stopAmbient = () => {
-    if (windGain && ctx) {
-      try { windGain.gain.setTargetAtTime(0, ctx.currentTime, 0.3); } catch { /* 靜默 */ }
+  const startAmbient = () => {
+    if (!on || windGain) return;
+    const c = getCtx();
+    if (!c) return;
+    resumeIfSuspended(c);
+    try {
+      // 風聲：2 秒白噪音 buffer 循環 + lowpass + 微弱增益
+      // Math.random 僅用於噪音波形——非遊戲邏輯隨機性，不受種子 RNG 約束
+      const len = c.sampleRate * 2;
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const data = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        last = last * 0.97 + (Math.random() * 2 - 1) * 0.03; // 平滑化噪音（風感）
+        data[i] = last * 6;
+      }
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 400;
+      const gain = c.createGain();
+      gain.gain.setValueAtTime(0, c.currentTime);
+      gain.gain.setTargetAtTime(0.05, c.currentTime, 0.8);
+      src.connect(lp).connect(gain).connect(c.destination);
+      src.start();
+      windGain = gain;
+      windSrc = src;
+      windLp = lp;
+    } catch {
       windGain = null;
+      windSrc = null;
+      windLp = null;
     }
+  };
+
+  // 停止環境音：淡出增益後才真正 stop() BufferSource 並在 onended 中斷開三個節點的
+  // 連線，避免每次場景循環（Camp↔Map）都留下一條仍在跑的音訊子圖（buffer + CPU 洩漏）。
+  const stopAmbient = () => {
+    pendingAmbient = false;
+    if (!windGain || !ctx) return;
+    const c = ctx;
+    const gain = windGain;
+    const src = windSrc;
+    const lp = windLp;
+    try { gain.gain.setTargetAtTime(0, c.currentTime, 0.3); } catch { /* 靜默 */ }
+    if (src) {
+      try {
+        src.stop(c.currentTime + 1);
+        src.onended = () => {
+          try { src.disconnect(); } catch { /* 靜默 */ }
+          try { lp?.disconnect(); } catch { /* 靜默 */ }
+          try { gain.disconnect(); } catch { /* 靜默 */ }
+        };
+      } catch { /* 靜默：stop 失敗時仍清空參照，避免重複嘗試關閉 */ }
+    }
+    windGain = null;
+    windSrc = null;
+    windLp = null;
   };
 
   return {
@@ -69,9 +143,12 @@ export function createAudio(
       return on;
     },
     play(name) {
-      if (!on) return;
+      // 解鎖前不建立/使用 AudioContext：所有音效皆由使用者手勢觸發（點擊/QTE 按鍵），
+      // 此處僅作防禦性保險，避免任何未來呼叫路徑繞過手勢就嘗試出聲。
+      if (!gestureSeen || !on) return;
       const c = getCtx();
       if (!c) return;
+      resumeIfSuspended(c);
       try {
         const r = RECIPES[name];
         const t0 = c.currentTime;
@@ -92,32 +169,16 @@ export function createAudio(
     },
     ambient(onOff) {
       if (!onOff) { stopAmbient(); return; }
-      if (!on || windGain) return;
-      const c = getCtx();
-      if (!c) return;
-      try {
-        // 風聲：2 秒白噪音 buffer 循環 + lowpass + 微弱增益
-        // Math.random 僅用於噪音波形——非遊戲邏輯隨機性，不受種子 RNG 約束
-        const len = c.sampleRate * 2;
-        const buf = c.createBuffer(1, len, c.sampleRate);
-        const data = buf.getChannelData(0);
-        let last = 0;
-        for (let i = 0; i < len; i++) {
-          last = last * 0.97 + (Math.random() * 2 - 1) * 0.03; // 平滑化噪音（風感）
-          data[i] = last * 6;
-        }
-        const src = c.createBufferSource();
-        src.buffer = buf;
-        src.loop = true;
-        const lp = c.createBiquadFilter();
-        lp.type = 'lowpass';
-        lp.frequency.value = 400;
-        windGain = c.createGain();
-        windGain.gain.setValueAtTime(0, c.currentTime);
-        windGain.gain.setTargetAtTime(0.05, c.currentTime, 0.8);
-        src.connect(lp).connect(windGain).connect(c.destination);
-        src.start();
-      } catch { windGain = null; }
+      if (!gestureSeen) { pendingAmbient = true; return; } // 手勢前只暫存請求，不建立 context
+      startAmbient();
+    },
+    unlock() {
+      if (gestureSeen) return; // 冪等：重複呼叫（多個 chip/場景 hook）安全
+      gestureSeen = true;
+      if (pendingAmbient) {
+        pendingAmbient = false;
+        startAmbient();
+      }
     },
   };
 }

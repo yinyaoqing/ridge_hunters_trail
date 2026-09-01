@@ -58,13 +58,25 @@ export function ensureDotTexture(scene: Phaser.Scene, key: string, color: number
   g.destroy();
 }
 
-// 低階裝置防護：建立 3 秒後若 fps 掉到 40 以下就停止並隱藏該 emitter
+// 低階裝置防護：每秒取樣一次 fps，連續 3 秒都低於 40 才停止並隱藏該 emitter
+// （單次 3 秒後取樣一次容易被瞬間掉幀誤判；改為連續採樣更能反映「持續」低幀率）
 export function guardLowFps(scene: Phaser.Scene, emitter: Phaser.GameObjects.Particles.ParticleEmitter): void {
-  scene.time.delayedCall(3000, () => {
-    if (scene.game.loop.actualFps < 40) {
-      emitter.stop();
-      emitter.setVisible(false);
-    }
+  let consecutiveLow = 0;
+  const timer = scene.time.addEvent({
+    delay: 1000,
+    repeat: -1,
+    callback: () => {
+      if (scene.game.loop.actualFps < 40) {
+        consecutiveLow++;
+        if (consecutiveLow >= 3) {
+          emitter.stop();
+          emitter.setVisible(false);
+          timer.remove();
+        }
+      } else {
+        consecutiveLow = 0;
+      }
+    },
   });
 }
 

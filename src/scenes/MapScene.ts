@@ -110,6 +110,9 @@ export class MapScene extends Phaser.Scene {
       this.pressAt = { t: p.time, x: p.x, y: p.y };
       this.clearHover(); // 按下後（可能拖曳/移動）暫時隱藏 hover，避免殘影
     });
+    // F1 audio unlock hook：任何首次指標按下即視為使用者手勢，解除 AudioContext 靜音鎖
+    // （unlock() 冪等，CampScene 亦掛同款 hook，兩邊皆可安全觸發）
+    this.input.once('pointerdown', () => this.audio.unlock());
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.clearHover(); this.redraw(); });
@@ -153,7 +156,9 @@ export class MapScene extends Phaser.Scene {
   private checkTutStep1to2(s: SessionState) {
     if (this.tutStep !== 1 || s.readClues.size < 2) return;
     this.tutStep = 2;
-    const readReal = s.level.clues.filter((c) => s.readClues.has(key(c.position)));
+    // 防禦性——round1 現無 decoy，但交集計算本應僅用真線索，避免未來若 round1 引入
+    // 幌子線索時誤把它算進交集
+    const readReal = s.level.clues.filter((c) => !c.isDecoy && s.readClues.has(key(c.position)));
     const cells = intersect(readReal, s.level.mapSize);
     const cs = this.cell;
     const g = this.add.graphics();
@@ -333,6 +338,7 @@ export class MapScene extends Phaser.Scene {
       emitZone: {
         type: 'random',
         source: {
+          // Math.random 僅用於粒子視覺散佈，非遊戲邏輯隨機性（同 audio 噪音豁免）
           getRandomPoint: (p: Phaser.Types.Math.Vector2Like) => {
             const c = centers[Math.floor(Math.random() * centers.length)];
             p.x = c.x + (Math.random() - 0.5) * cs;
@@ -455,6 +461,7 @@ export class MapScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', (p: Phaser.Input.Pointer) => {
         p.event.stopPropagation();
+        this.audio.unlock(); // 保險：確保這次手勢也算數（與 create() 的全域 hook 冪等共存）
         this.audio.toggle();
         // 重新開啟時風聲需立刻恢復，不能等到下次進場；ambient() 內建 windGain 防重入
         if (this.audio.enabled()) this.audio.ambient(true);
@@ -762,12 +769,14 @@ export class MapScene extends Phaser.Scene {
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
     if (this.bellChipG) this.drawBellChip(this.bellChipX, this.bellChipY, 60, 30);
 
-    // 置中體力條在較窄視窗會撞上右側加寬後的 chip 列（新增 ♪ chip 後 chip 列左緣
-    // 隨寬度線性變動，見 chipRowLeft）。與其疊加新斷點修修補補，改用明確規則：
-    // w<700 一律採左靠齊版面（label 於 y30、bar 於 y46，bx=50），bar 寬度依
-    // chipRowLeft 動態夾限，保證與 chip 列保持 ≥8px 間距；w≥700 時 chip 列已遠離
-    // 中線，改回置中版面（bw 固定 210，見 task-4-report.md 驗算）。
-    const barLeft = w < 700;
+    // 置中體力條在較窄視窗（或持有微光鈴、chip 列多一格時）會撞上右側 chip 列
+    // （chip 列左緣隨寬度＋是否持有鈴鐺變動，見 chipRowLeft）。固定寬度斷點（舊：w>=700）
+    // 沒考慮鈴鐺 chip 把 chipRowLeft 再往左推 68px，導致 w∈[700,~826) 持有鈴鐺時
+    // 置中版面的體力條右緣會蓋到 chip 列。改用幾何判斷：僅當置中版面（bx=w/2-105，
+    // 固定寬 210）的右緣加上 8px 安全間距仍在 chipRowLeft 之內，才採置中版面；
+    // 否則一律退回左靠齊版面（bx=50，寬度依 chipRowLeft 動態夾限，保證 ≥8px 間距）。
+    const centered = this.scale.width / 2 + 105 <= this.chipRowLeft - 8;
+    const barLeft = !centered;
     const bx = barLeft ? 50 : w / 2 - 105;
     const bw = barLeft ? Math.max(90, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
     const bh = barLeft ? 10 : 12;

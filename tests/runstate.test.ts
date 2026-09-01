@@ -29,6 +29,19 @@ describe('createRunState', () => {
     const rs = createRunState(fakeStorage({ 'rht.run.v1': '{{{' }));
     expect(rs.round()).toBe(1);
   });
+  it('recovers from a non-finite round (typeof "number" but not finite, e.g. Infinity)', () => {
+    // JSON has no NaN/Infinity literal, but `1e999` is valid JSON syntax that parses to
+    // Infinity — same bug class as a stored NaN: typeof === 'number' yet unusable as a round.
+    const rs = createRunState(fakeStorage({ 'rht.run.v1': '{"round":1e999,"wins":0}' }));
+    expect(rs.round()).toBe(1);
+    expect(rs.wins()).toBe(0);
+  });
+  it('recovers from an out-of-range round/wins', () => {
+    const negRound = createRunState(fakeStorage({ 'rht.run.v1': '{"round":0,"wins":2}' }));
+    expect(negRound.round()).toBe(1);
+    const negWins = createRunState(fakeStorage({ 'rht.run.v1': '{"round":3,"wins":-1}' }));
+    expect(negWins.round()).toBe(1);
+  });
   it('keeps in-memory state when reads throw after a write', () => {
     let armed = false;
     const rs = createRunState({

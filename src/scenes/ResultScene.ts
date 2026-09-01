@@ -52,8 +52,14 @@ export class ResultScene extends Phaser.Scene {
     const quality: Quality | null = caught && qte ? qualityFromQte(qte) : null;
     const notes = caught ? 0 : notesForRun(s.readClues.size);
     // 單一取樣：daily 的 dateKey 由 Camp 進入時取樣一次存進 registry，
-    // 記帳與分享卡都讀同一值，避免跨 UTC 午夜時分歧（沒有存到值時退回現場取樣）
-    const dk = (this.registry.get('dailyKey') as string | undefined) ?? dailyKey(new Date());
+    // 記帳與分享卡都讀同一值，避免跨 UTC 午夜時分歧（沒有存到值時退回現場取樣）。
+    // registry 的 'dailyKey' 只在啟動每日挑戰時才會被設定，且 CampScene.create()
+    // 才會清空（見該處 registry.remove 呼叫）——若在此對 run 模式沿用它，一旦玩家
+    // 「每日挑戰→未回營地→直接主線」跨過 UTC 午夜，run 模式的委託/分享會誤用到
+    // 前一天的 daily dateKey。因此非 daily 模式一律現場取樣，只有 daily 模式才讀 stash。
+    const dk = s.mode === 'daily'
+      ? ((this.registry.get('dailyKey') as string | undefined) ?? dailyKey(new Date()))
+      : dailyKey(new Date());
 
     // 記帳一次（resize 造成的場景重啟不重複）
     if (!s.resolved) {
@@ -405,7 +411,7 @@ export class ResultScene extends Phaser.Scene {
       .on('pointerover', () => draw(true))
       .on('pointerout', () => { draw(false); txt.setScale(1); })
       .on('pointerdown', () => txt.setScale(0.96))
-      .on('pointerup', () => { txt.setScale(1); this.audio.play('click'); onClick(); });
+      .on('pointerup', () => { txt.setScale(1); this.audio.unlock(); this.audio.play('click'); onClick(); });
   }
 }
 

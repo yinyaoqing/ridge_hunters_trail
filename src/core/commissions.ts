@@ -38,6 +38,7 @@ export interface ResultCtx {
   creatureId: string;
   staminaLeft: number;
   quality: Quality | null;
+  // mode 目前不參與判定——委託在 run/daily 皆可完成（保留欄位供未來模式限定委託）
   mode: 'run' | 'daily';
 }
 
@@ -77,9 +78,10 @@ export function createCommissionStore(storage?: Pick<Storage, 'getItem' | 'setIt
     if (raw === null) return null;
     try {
       const p = JSON.parse(raw);
-      return p && typeof p.date === 'string' && Array.isArray(p.done) && p.done.length === 3
-        ? p
-        : null;
+      if (!p || typeof p.date !== 'string' || !Array.isArray(p.done) || p.done.length !== 3) return null;
+      // 形狀通過後仍逐格 Boolean() 轉型：防禦 storage 被外部工具/舊版本寫入非布林值
+      // （如序列化過程中混入的 1/0/'x'），避免 statusFor 回傳非布林導致下游判斷出錯
+      return { date: p.date, done: p.done.map(Boolean) as [boolean, boolean, boolean] };
     } catch {
       return null;
     }

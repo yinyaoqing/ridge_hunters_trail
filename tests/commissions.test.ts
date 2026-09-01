@@ -136,6 +136,13 @@ describe('createCommissionStore', () => {
     expect(store.statusFor('2026-09-01')).toEqual([false, false, false]);
   });
 
+  it('sanitizes a shape-valid but non-boolean done array via Boolean()', () => {
+    const store = createCommissionStore(fakeStorage({
+      'rht.commissions.v1': '{"date":"2026-09-01","done":[1,0,"x"]}',
+    }));
+    expect(store.statusFor('2026-09-01')).toEqual([true, false, true]);
+  });
+
   it('keeps in-memory state when reads throw after a write', () => {
     let armed = false;
     const store = createCommissionStore({

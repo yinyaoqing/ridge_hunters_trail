@@ -19,12 +19,21 @@ describe('createAudio', () => {
   });
   it('play/ambient are silent no-ops without a context factory', () => {
     const a = createAudio(fakeStorage());
+    a.unlock();
     expect(() => { a.play('hit'); a.ambient(true); a.ambient(false); }).not.toThrow();
   });
-  it('does not create context until first play, and not when disabled', () => {
+  it('does not create context before unlock(), even when enabled', () => {
     let created = 0;
     const factory = () => { created++; throw new Error('no real ctx in node'); };
     const a = createAudio(fakeStorage(), factory as unknown as () => AudioContext);
+    a.play('click');
+    expect(created).toBe(0); // 手勢前一律不建立 context
+  });
+  it('does not create context until first play (post-unlock), and not when disabled', () => {
+    let created = 0;
+    const factory = () => { created++; throw new Error('no real ctx in node'); };
+    const a = createAudio(fakeStorage(), factory as unknown as () => AudioContext);
+    a.unlock();
     expect(created).toBe(0);
     a.toggle(); // off
     a.play('click');
@@ -37,5 +46,16 @@ describe('createAudio', () => {
   });
   it('ignores corrupted stored flag', () => {
     expect(createAudio(fakeStorage({ 'rht.audio.v1': 'xx' })).enabled()).toBe(true);
+  });
+  it('ambient(true) before a gesture defers and does not create a context', () => {
+    let created = 0;
+    const factory = () => { created++; throw new Error('no real ctx in node'); };
+    const a = createAudio(fakeStorage(), factory as unknown as () => AudioContext);
+    a.ambient(true);
+    expect(created).toBe(0); // 暫存請求，未建立 context
+    a.unlock();
+    expect(created).toBe(1); // 解鎖後補放一次（factory throw 仍被吞掉）
+    a.unlock(); // 冪等：不重複觸發
+    expect(created).toBe(1);
   });
 });

@@ -97,11 +97,19 @@ describe('generateLevel (property tests over 200 seeds)', () => {
   });
 
   it('scent bias points within 30° of the true bearing from clue to target', () => {
-    const level = generateLevelFor(5, mulberry32(1), 'mistfawn');
-    const scent = level.clues.find((c) => c.type === 'scent' && !c.isDecoy);
-    if (scent && scent.type === 'scent') {
-      const trueBearing = angleDeg(scent.position, level.targetPos);
-      expect(angleDiff(scent.data.biasDirection, trueBearing)).toBeLessThanOrEqual(30);
+    // 舊版只試 seed=1，若該 seed 剛好沒生出非幌子氣味線索，assertion 就被 if 悄悄跳過
+    // （測試恆為綠燈，等於沒測到）。改為掃過 seed 1..50，找到第一個有非幌子氣味線索的
+    // level 才斷言，並用 expect(found).toBe(true) 強制斷言必然執行，不會靜默通過。
+    let found = false;
+    for (let seed = 1; seed <= 50 && !found; seed++) {
+      const level = generateLevelFor(5, mulberry32(seed), 'mistfawn');
+      const scent = level.clues.find((c) => c.type === 'scent' && !c.isDecoy);
+      if (scent && scent.type === 'scent') {
+        found = true;
+        const trueBearing = angleDeg(scent.position, level.targetPos);
+        expect(angleDiff(scent.data.biasDirection, trueBearing)).toBeLessThanOrEqual(30);
+      }
     }
+    expect(found).toBe(true);
   });
 });

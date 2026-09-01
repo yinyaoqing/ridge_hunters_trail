@@ -23,7 +23,12 @@ export function createRunState(storage?: Pick<Storage, 'getItem' | 'setItem'>): 
     if (raw === null) return { ...DEFAULTS };
     try {
       const p = JSON.parse(raw);
-      return p && typeof p.round === 'number' && typeof p.wins === 'number' ? p : { ...DEFAULTS };
+      // 型別檢查僅擋 typeof !== 'number' 會漏放 NaN/負值（typeof NaN === 'number'）；
+      // 額外要求有限數且落在合理範圍（round>=1, wins>=0），避免損毀資料讓後續算式產生 NaN 擴散
+      const valid = p
+        && Number.isFinite(p.round) && p.round >= 1
+        && Number.isFinite(p.wins) && p.wins >= 0;
+      return valid ? p : { ...DEFAULTS };
     } catch {
       return { ...DEFAULTS };
     }

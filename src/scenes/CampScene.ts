@@ -38,8 +38,15 @@ export class CampScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(pal.bg);
     this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
     this.registry.set('lastComms', []); // 同上，清空委託完成行狀態
+    // 清空每日挑戰 dateKey 暫存：回到營地代表本次 daily（若有）已結算完畢；
+    // 若不清空，下一局若改走主線（run）模式，ResultScene 仍會殘留讀到舊 dailyKey，
+    // 一旦跨過 UTC 午夜就會用錯日期的委託/分享 dateKey（見 F2）
+    this.registry.remove('dailyKey');
     fadeIn(this);
     restartOnResize(this);
+    // F1 audio unlock hook：任何首次指標按下即視為使用者手勢，解除 AudioContext 靜音鎖
+    // （unlock() 冪等，MapScene 亦掛同款 hook，兩邊皆可安全觸發）
+    this.input.once('pointerdown', () => this.audio.unlock());
     this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart()); // Help 關閉後刷新語言
 
     this.drawRidges(w, h);
@@ -118,6 +125,7 @@ export class CampScene extends Phaser.Scene {
     this.add.rectangle(xSound, by, 44, 44, 0, 0)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
+        this.audio.unlock(); // 保險：確保這次手勢也算數（與 create() 的全域 hook 冪等共存）
         this.audio.toggle();
         this.scene.restart(); // 較簡單一致：與語言鈕相同，用 restart 取代局部重繪
       });
@@ -264,7 +272,7 @@ export class CampScene extends Phaser.Scene {
       .on('pointerover', () => draw(true))
       .on('pointerout', () => { draw(false); txt.setScale(1); })
       .on('pointerdown', () => txt.setScale(0.96))
-      .on('pointerup', () => { txt.setScale(1); this.audio.play('click'); onClick(); });
+      .on('pointerup', () => { txt.setScale(1); this.audio.unlock(); this.audio.play('click'); onClick(); });
   }
 }
 
