@@ -35,9 +35,16 @@ export class MapScene extends Phaser.Scene {
   private markChipText?: Phaser.GameObjects.Text;
   private markChipX = 0;
   private markChipY = 0;
+  private skipFirstRunHelp = false;
 
   constructor() {
     super('Map');
+  }
+
+  // 語言切換造成的 restart 會帶入此旗標，避免在儲存降級（無法記憶 rht.help.v1）的
+  // 情境下，每次切換語言都重新觸發 maybeShowFirstRunHelp 彈出玩法說明並暫停地圖
+  init(data: { skipFirstRunHelp?: boolean }) {
+    this.skipFirstRunHelp = data?.skipFirstRunHelp === true;
   }
 
   create() {
@@ -77,6 +84,7 @@ export class MapScene extends Phaser.Scene {
 
   // 首次啟動自動彈出玩法說明（localStorage 記憶，不可用時僅本次顯示）
   private maybeShowFirstRunHelp() {
+    if (this.skipFirstRunHelp) return;
     const storage: Pick<Storage, 'getItem' | 'setItem'> | undefined = this.registry.get('storage');
     let seen = false;
     try {
@@ -228,8 +236,9 @@ export class MapScene extends Phaser.Scene {
         const i18n = this.i18n();
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
         // roundText 的展示字體隨語系而異且僅在 create() 時設定，
-        // 用 restart（既有的 resize 重建機制）取代 redraw 以確保字體刷新
-        this.scene.restart();
+        // 用 restart（既有的 resize 重建機制）取代 redraw 以確保字體刷新；
+        // 帶入 skipFirstRunHelp 避免儲存降級時每次切語言都重新彈出玩法說明
+        this.scene.restart({ skipFirstRunHelp: true });
       });
     this.add.text(xHelp + 16, chipY + chipH / 2, '?', {
       fontFamily: FONTS.display, fontSize: '16px', color: cssHex(pal.gold),
