@@ -8,7 +8,7 @@ import type { Clue } from '../core/types';
 import type { I18n } from '../core/i18n';
 import {
   cssHex, cssRgba, dashedCircle, dashedLine, drawClueToken, drawSupply,
-  BRUSH_RADIUS, FONTS,
+  BRUSH_RADIUS, FONTS, displayFont,
 } from './paint';
 import { restartOnResize, fadeIn, fadeToScene, floatText } from './fx';
 
@@ -186,7 +186,7 @@ export class MapScene extends Phaser.Scene {
     compass.fillStyle(pal.bg, 1).fillCircle(cx, cy, 1.6);
 
     this.roundText = this.add.text(50, 8, '', {
-      fontFamily: FONTS.display, fontSize: '20px', color: cssHex(pal.paper),
+      fontFamily: displayFont(this.i18n().locale()), fontSize: '20px', color: cssHex(pal.paper),
     });
     if (!compact) {
       this.add.text(50, 34, "RIDGE HUNTER'S TRAIL", {
@@ -227,7 +227,9 @@ export class MapScene extends Phaser.Scene {
         p.event.stopPropagation();
         const i18n = this.i18n();
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
-        this.redraw();
+        // roundText 的展示字體隨語系而異且僅在 create() 時設定，
+        // 用 restart（既有的 resize 重建機制）取代 redraw 以確保字體刷新
+        this.scene.restart();
       });
     this.add.text(xHelp + 16, chipY + chipH / 2, '?', {
       fontFamily: FONTS.display, fontSize: '16px', color: cssHex(pal.gold),

@@ -6,10 +6,8 @@ import { CREATURES } from '../data/creatures';
 import type { CodexStore } from '../core/codex';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
-import { cssHex, BRUSH_RADIUS, FONTS } from './paint';
+import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
-
-const stripBrackets = (s: string) => s.replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '');
 
 export class CampScene extends Phaser.Scene {
   private pal!: Palette;

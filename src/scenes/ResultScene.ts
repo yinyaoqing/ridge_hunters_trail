@@ -12,13 +12,11 @@ import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
+  displayFont, stripBrackets,
 } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
 const GLOW_KEY = 'result-glow';
-
-// i18n 按鈕字串帶有括號（清單語境用），繪製成實體按鈕時剝除
-const stripBrackets = (s: string) => s.replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '');
 
 export class ResultScene extends Phaser.Scene {
   private pal!: Palette;
@@ -87,7 +85,7 @@ export class ResultScene extends Phaser.Scene {
     }
 
     this.add.text(cx, 336, title, {
-      fontFamily: FONTS.display, fontSize: '30px', color: cssHex(pal.paper),
+      fontFamily: displayFont(loc), fontSize: '30px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(1);
 
     this.drawCodexDots(cx, 372, codex);
@@ -189,7 +187,7 @@ export class ResultScene extends Phaser.Scene {
     const full = i18n.t(QUALITY_KEY[q]);
     const stampLabel = i18n.locale() === 'zh-TW' ? full.slice(0, 1) : full.split(' ')[0];
     const label = this.add.text(0, 0, stampLabel, {
-      fontFamily: FONTS.display, fontSize: '13px', color: cssHex(color),
+      fontFamily: displayFont(i18n.locale()), fontSize: '13px', color: cssHex(color),
     }).setOrigin(0.5);
     const holder = this.add.container(x, y, [g, label]).setScale(1.8).setAlpha(0);
     this.tweens.add({

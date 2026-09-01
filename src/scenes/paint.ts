@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { ClueType } from '../core/types';
+import type { ClueType, Locale } from '../core/types';
 import { CLUE_GOLD, type Palette } from '../core/palette';
 import type { Quality } from '../core/quality';
 
@@ -106,10 +106,20 @@ export const QUALITY_COLORS: Record<Quality, number> = {
 
 export interface Fonts {
   display: string;
+  displayZh: string;
   body: string;
 }
 
 export const FONTS: Fonts = {
   display: '"Marcellus", Georgia, "Noto Serif TC", serif',
+  displayZh: '"Noto Serif TC", "MingLiU", "Microsoft JhengHei", serif',
   body: '"Karla", "Segoe UI", "Noto Sans TC", sans-serif',
 };
+
+// 依語系挑選展示字體：zh-TW 用中文襯線堆疊，其餘沿用拉丁展示字
+export const displayFont = (locale: Locale): string =>
+  locale === 'zh-TW' ? FONTS.displayZh : FONTS.display;
+
+// 去除字串前後的方括號（含全形），用於按鈕文字裁切「[ ]」外框
+export const stripBrackets = (s: string): string =>
+  s.replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '');

@@ -5,7 +5,7 @@ import { resolveQte, type SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
-import { cssHex, FONTS } from './paint';
+import { cssHex, FONTS, displayFont } from './paint';
 import { fadeIn, fadeToScene } from './fx';
 
 const DIAL_BG_KEY = 'qte-dial-bg';
@@ -42,7 +42,7 @@ export class QteScene extends Phaser.Scene {
     this.buildDialBackdrop(cx, cy);
 
     this.add.text(cx, 78, this.i18n.t('qte.title'), {
-      fontFamily: FONTS.display, fontSize: '32px', color: cssHex(this.pal.paper),
+      fontFamily: displayFont(this.i18n.locale()), fontSize: '32px', color: cssHex(this.pal.paper),
     }).setOrigin(0.5).setLetterSpacing(1);
     this.add.text(cx, 126, this.i18n.t('qte.instruction'), {
       fontFamily: FONTS.body, fontSize: '15px', color: cssHex(this.pal.paperDim),

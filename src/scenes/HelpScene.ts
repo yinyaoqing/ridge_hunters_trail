@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
 import type { I18n } from '../core/i18n';
-import { cssHex, drawClueToken, drawSupply, BRUSH_RADIUS, FONTS } from './paint';
+import { cssHex, drawClueToken, drawSupply, BRUSH_RADIUS, FONTS, displayFont } from './paint';
 
 // 玩法說明彈窗：以並行場景疊在暫停的地圖上（半透明遮罩＋面板卡片）。
 // 首次啟動由 MapScene 自動開啟，之後可從 HUD 的「?」鈕重開。
@@ -61,7 +61,7 @@ export class HelpScene extends Phaser.Scene {
       });
 
     this.add.text(cx, py0 + 52, i18n.t('help.title'), {
-      fontFamily: FONTS.display, fontSize: '27px', color: cssHex(pal.paper),
+      fontFamily: displayFont(i18n.locale()), fontSize: '27px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(1.5);
 
     this.add.text(cx, py0 + 108, i18n.t('help.goal'), {

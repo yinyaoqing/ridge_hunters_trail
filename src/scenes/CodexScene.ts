@@ -5,7 +5,9 @@ import { getPalette, type Palette } from '../core/palette';
 import { CREATURES } from '../data/creatures';
 import type { I18n } from '../core/i18n';
 import type { Locale } from '../core/types';
-import { cssHex, BRUSH_RADIUS, FONTS, QUALITY_COLORS } from './paint';
+import {
+  cssHex, BRUSH_RADIUS, FONTS, QUALITY_COLORS, displayFont, stripBrackets,
+} from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
 const ROW_H = 84;
@@ -34,7 +36,7 @@ export class CodexScene extends Phaser.Scene {
     restartOnResize(this);
 
     this.add.text(cx, 42, i18n.t('codex.title'), {
-      fontFamily: FONTS.display, fontSize: '30px', color: cssHex(pal.paper),
+      fontFamily: displayFont(loc), fontSize: '30px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(1.5);
     const found = CREATURES.filter((c) => codex.entry(c.id).count > 0).length;
     this.add.text(cx, 80, i18n.t('codex.count', { found, total: CREATURES.length }).toUpperCase(), {
@@ -104,7 +106,7 @@ export class CodexScene extends Phaser.Scene {
 
     const name = nameKnown ? c.names[loc] : i18n.t('codex.unknown');
     const nameText = this.add.text(134, y - 26, name, {
-      fontFamily: FONTS.display, fontSize: '19px',
+      fontFamily: displayFont(loc), fontSize: '19px',
       color: discovered ? cssHex(pal.paper) : cssHex(pal.paperDim),
     });
     row.add(nameText);
@@ -149,7 +151,7 @@ export class CodexScene extends Phaser.Scene {
     const bh = 46;
     const btn = this.add.graphics();
     btn.lineStyle(1.5, pal.gold, 0.65).strokeRoundedRect(cx - bw / 2, by - bh / 2, bw, bh, BRUSH_RADIUS);
-    this.add.text(cx, by, i18n.t('btn.camp').replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '').toUpperCase(), {
+    this.add.text(cx, by, stripBrackets(i18n.t('btn.camp')).toUpperCase(), {
       fontFamily: FONTS.body, fontSize: '15px', color: cssHex(pal.gold),
     }).setOrigin(0.5).setLetterSpacing(2);
     this.add.rectangle(cx, by, bw, bh, 0, 0)
