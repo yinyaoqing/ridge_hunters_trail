@@ -11,6 +11,7 @@ import type { AudioBus } from '../core/audio';
 import {
   dailyCommissions, COMMISSION_REWARD_NOTES, type Commission, type CommissionStore,
 } from '../core/commissions';
+import type { ScoreStore } from '../core/score';
 import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, guardLowFps, PARTICLE_CAPS,
@@ -39,6 +40,8 @@ export class CampScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(pal.bg);
     this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
     this.registry.set('lastComms', []); // 同上，清空委託完成行狀態
+    this.registry.remove('lastGain'); // 同上，清空押注押分暫存（score.gain 顯示用）
+    this.registry.remove('lastLoss'); // 同上，清空押注損失暫存（score.lost 顯示用）
     // 清空每日挑戰 dateKey 暫存：回到營地代表本次 daily（若有）已結算完畢；
     // 若不清空，下一局若改走主線（run）模式，ResultScene 仍會殘留讀到舊 dailyKey，
     // 一旦跨過 UTC 午夜就會用錯日期的委託/分享 dateKey（見 F2）
@@ -65,6 +68,21 @@ export class CampScene extends Phaser.Scene {
       this.add.text(w - 20, 24, i18n.t('camp.streak', { n: st.streak }).toUpperCase(), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
       }).setOrigin(1, 0.5).setLetterSpacing(2);
+    }
+    // 押注戰績（右上，接在連勝 chip 之下）：最佳連追紀錄＋目前入袋/待入袋結餘，各自獨立判斷是否顯示
+    const score: ScoreStore = this.registry.get('score');
+    const sc = score.state();
+    let scoreY = st.streak > 0 ? 42 : 24;
+    if (sc.bestRun > 0) {
+      this.add.text(w - 20, scoreY, i18n.t('camp.best', { n: sc.bestRun }), {
+        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.gold),
+      }).setOrigin(1, 0.5).setLetterSpacing(1);
+      scoreY += 16;
+    }
+    if (sc.banked + sc.pot > 0) {
+      this.add.text(w - 20, scoreY, i18n.t('camp.carry', { b: sc.banked, p: sc.pot }), {
+        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
+      }).setOrigin(1, 0.5).setLetterSpacing(1);
     }
 
     const today = dailyKey(new Date());

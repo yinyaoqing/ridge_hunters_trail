@@ -6,6 +6,7 @@ import {
 } from '../core/codex';
 import { qualityFromQte, type Quality } from '../core/quality';
 import type { QteState } from '../core/qte';
+import { catchScore, MULTIPLIERS, type ScoreStore } from '../core/score';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
@@ -40,6 +41,7 @@ export class ResultScene extends Phaser.Scene {
     const rng: Rng = this.registry.get('rng');
     const codex: CodexStore = this.registry.get('codex');
     const i18n: I18n = this.registry.get('i18n');
+    const score: ScoreStore = this.registry.get('score');
     this.audio = this.registry.get('audio');
     this.audio.ambient(false); // 結算畫面停風聲
     const loc = i18n.locale();
@@ -71,9 +73,17 @@ export class ResultScene extends Phaser.Scene {
         if (s.mode === 'run') {
           this.registry.set('runRound', s.round + 1);
           runState.setRound(s.round + 1);
+          // 押注記帳：以本局品質＋異彩加成算得分，累入未入袋的 pot（乘上目前連追倍率）
+          const gained = score.addCatch(catchScore(s.round, quality ?? 'bronze', s.level.iris));
+          this.registry.set('lastGain', gained);
         }
       } else {
         codex.addNotes(creature.id, notes);
+        // 押注記帳：失手清空 pot——須在 loseRun() 歸零前先讀出待入袋金額，供下方顯示 score.lost
+        if (s.mode === 'run') {
+          this.registry.set('lastLoss', score.state().pot);
+          score.loseRun();
+        }
       }
       if (s.mode === 'daily') {
         (this.registry.get('streak') as StreakStore).recordPlay(dk);
@@ -115,12 +125,20 @@ export class ResultScene extends Phaser.Scene {
     // 卡片間距與後續按鈕位移量一併縮小，降低與按鈕重疊的機率
     const compactCards = h < 700;
     const cardStep = compactCards ? 22 : 40;
-    const toolOffset = cardStep * showTools.length;
+    // run 且失手時，未入袋的 score.lost 軟著陸訊息併入同一疊層（視為多一張卡），
+    // 讓下方筆記掉落區與失敗按鈕列（沿用 toolOffset 夾限）自動一併往下挪，不必另外改按鈕程式碼
+    const lastLoss = (this.registry.get('lastLoss') as number | undefined) ?? 0;
+    const showLoss = !caught && s.mode === 'run' && lastLoss > 0;
+    const lossStep = compactCards ? 34 : 46;
+    const toolOffset = cardStep * showTools.length + (showLoss ? lossStep : 0);
     // 委託完成行：緊接道具卡堆疊在下方（只在補獲時可能非空，見 resolved 區塊註解）
     const lastComms = (this.registry.get('lastComms') as number[] | undefined) ?? [];
     const commsToday = dailyCommissions(dk); // 純函式、依 dk 決定性重算，供索引取回描述文字
     const commStep = 24;
-    const totalOffset = toolOffset + commStep * lastComms.length;
+    // run 且補獲時，score.gain/score.pot 兩行也併入同一疊層，往下推 caught 分支的按鈕列
+    const showScoreGain = caught && s.mode === 'run';
+    const scoreStep = showScoreGain ? (compactCards ? 30 : 40) : 0;
+    const totalOffset = toolOffset + commStep * lastComms.length + scoreStep;
 
     let title: string;
     let body: string;
@@ -170,6 +188,26 @@ export class ResultScene extends Phaser.Scene {
       this.renderCommissionLine(cx, toolBaseY + toolOffset + i * commStep, commsToday[idx], i18n);
     });
 
+    // 押注顯示：補獲時接在道具卡／委託行之後顯示本次入袋收穫＋目前未入袋總額
+    if (showScoreGain) {
+      const lastGain = (this.registry.get('lastGain') as number | undefined) ?? 0;
+      const gainY = toolBaseY + toolOffset + commStep * lastComms.length;
+      this.add.text(cx, gainY, i18n.t('score.gain', { n: lastGain }), {
+        fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.gold), fontStyle: 'bold',
+      }).setOrigin(0.5);
+      this.add.text(cx, gainY + 20, i18n.t('score.pot', { n: score.state().pot }), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+      }).setOrigin(0.5);
+    }
+
+    // 押注軟著陸：未入袋收穫散進霧裡的溫柔提示，接在道具卡之後、筆記掉落區之上
+    // （佔用一格 lossStep 高的疊層槽位，筆記掉落已因 toolOffset 內含 lossStep 而往下讓出空間）
+    if (showLoss) {
+      this.add.text(cx, 486 + cardStep * showTools.length + (compactCards ? 16 : 20), i18n.t('score.lost'), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+        wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+      }).setOrigin(0.5);
+    }
     if (!caught) this.showNotesDrop(cx, 486 + totalOffset, creature.id, notes, codex, i18n);
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
@@ -203,14 +241,22 @@ export class ResultScene extends Phaser.Scene {
       this.button(cx, campY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
+      // 押注雙卡：[安全歇腳] 入袋收工回營地／[乘勝續追] 疊高倍率繼續下一局，
+      // 歇腳即回營地取代原本的 [下一場狩獵]+[返回營地] 雙鈕，故 btn.camp 次鈕移除
       const yPrimary = Math.min(552 + totalOffset, h - 96);
       const ySecondary = Math.min(614 + totalOffset, h - 34);
-      this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
+      const curMult = score.state().multiplier;
+      const nextIdx = Math.min((MULTIPLIERS as readonly number[]).indexOf(curMult) + 1, MULTIPLIERS.length - 1);
+      const nextMult = MULTIPLIERS[nextIdx];
+      this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.bank')), true, () => {
+        score.bank();
+        fadeToScene(this, 'Camp');
+      });
+      this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.push', { m: nextMult })), false, () => {
+        score.push();
         this.registry.set('session', newSession(runRound, rng));
         fadeToScene(this, 'Map');
       });
-      this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
-        () => fadeToScene(this, 'Camp'));
     } else {
       // Daily retry lives in the daily branch above; this is run mode only
       const yPrimary = Math.min(552 + toolOffset, h - 96);

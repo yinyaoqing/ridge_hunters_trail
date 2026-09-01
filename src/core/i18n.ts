@@ -23,7 +23,8 @@ export type MsgKey =
   | 'tool.glowbell.name' | 'tool.glowbell.desc'
   | 'result.toolUnlocked' | 'hud.bell'
   | 'comm.title' | 'comm.record' | 'comm.stamina' | 'comm.quality' | 'comm.done' | 'comm.reward'
-  | 'tut.move' | 'tut.read' | 'tut.cross' | 'tut.qte';
+  | 'tut.move' | 'tut.read' | 'tut.cross' | 'tut.qte'
+  | 'score.gain' | 'score.pot' | 'score.lost' | 'btn.bank' | 'btn.push' | 'camp.best' | 'camp.carry';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -97,6 +98,13 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'tut.read': 'A clue! The creature is somewhere it points to.',
     'tut.cross': 'Two clues overlap — the truth hides where both agree.',
     'tut.qte': 'You are close. Get ready to tap in rhythm!',
+    'score.gain': '+{n} pts',
+    'score.pot': 'Unbanked {n}',
+    'score.lost': 'The unbanked haul faded into the mist... banked points are safe.',
+    'btn.bank': '[ Rest & Bank ]',
+    'btn.push': '[ Push On x{m} ]',
+    'camp.best': 'Best run {n}',
+    'camp.carry': 'Banked {b} · Unbanked {p}',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -169,6 +177,13 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'tut.read': '線索！牠就在這指向的範圍裡。',
     'tut.cross': '兩條線索重疊——真相藏在交集之處。',
     'tut.qte': '很近了，準備節奏點擊！',
+    'score.gain': '得分 +{n}',
+    'score.pot': '待入袋 {n}',
+    'score.lost': '這趟未入袋的收穫散進霧裡了……已入袋的安然無恙。',
+    'btn.bank': '［安全歇腳］',
+    'btn.push': '［乘勝續追 ×{m}］',
+    'camp.best': '最佳連追 {n}',
+    'camp.carry': '入袋 {b}｜待入袋 {p}',
   },
 };
 
