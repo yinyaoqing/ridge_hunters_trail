@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { generateLevel } from '../src/core/generate';
+import { generateLevel, generateLevelFor } from '../src/core/generate';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key, intersect } from '../src/core/clues';
 import { dist } from '../src/core/geometry';
 import { CREATURES } from '../src/data/creatures';
+import { applyQuirk } from '../src/core/quirks';
 
 describe('generateLevel (property tests over 200 seeds)', () => {
   const cases = Array.from({ length: 200 }, (_, i) => ({
@@ -35,7 +36,8 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       const p = getDifficulty(round);
       const level = generateLevel(round, mulberry32(seed));
       const decoys = level.clues.filter((c) => c.isDecoy);
-      expect(decoys.length).toBe(p.decoyCount);
+      const pq = applyQuirk(p, level.creatureId);
+      expect(decoys.length).toBe(pq.decoyCount);
     }
   });
 
@@ -49,7 +51,8 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       const creature = CREATURES.find((c) => c.id === level.creatureId);
       expect(creature).toBeDefined();
       expect(level.terrain[level.targetPos.y][level.targetPos.x]).toBe(creature!.terrain);
-      expect(level.supplies.length).toBeLessThanOrEqual(p.supplyCount);
+      const pq = applyQuirk(p, level.creatureId);
+      expect(level.supplies.length).toBeLessThanOrEqual(pq.supplyCount);
       for (const s of level.supplies) {
         expect(key(s)).not.toBe(key(level.targetPos));
       }
@@ -68,6 +71,16 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       for (const c of level.clues.filter((c) => !c.isDecoy)) {
         expect(key(c.position)).not.toBe(key(level.targetPos));
       }
+    }
+  });
+
+  it('generateLevelFor applies creature quirks end-to-end', () => {
+    const a = generateLevelFor(5, mulberry32(7), 'dewhopper');
+    const b = generateLevelFor(5, mulberry32(7), 'mistfawn');
+    expect(a.supplies.length).toBeLessThanOrEqual(getDifficulty(5).supplyCount + 2);
+    const scent = b.clues.find((c) => c.type === 'scent' && !c.isDecoy);
+    if (scent && scent.type === 'scent') {
+      expect(scent.data.tolerance).toBe(getDifficulty(5).scentTolerance * 2);
     }
   });
 });

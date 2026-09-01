@@ -3,11 +3,8 @@ import { dist, clampToMap, angleDeg, pointOnCircle, type Vec2 } from './geometry
 import type { Clue, ClueType, Level, TerrainType } from './types';
 import { getDifficulty, type DifficultyParams } from './difficulty';
 import { key, intersect } from './clues';
+import { applyQuirk, terrainPoolFor } from './quirks';
 import { CREATURES } from '../data/creatures';
-
-const TERRAIN_POOL: [TerrainType, number][] = [
-  ['meadow', 5], ['mist', 2], ['thicket', 2], ['rock', 1],
-];
 
 function randomPos(rng: Rng, size: number): Vec2 {
   return { x: randInt(rng, 0, size - 1), y: randInt(rng, 0, size - 1) };
@@ -51,10 +48,10 @@ function makeClue(
   }
 }
 
-export function generateLevel(round: number, rng: Rng): Level {
-  const p = getDifficulty(round);
+export function generateLevelFor(round: number, rng: Rng, creatureId: string): Level {
+  const p = applyQuirk(getDifficulty(round), creatureId);
   const size = p.mapSize;
-  const creature = CREATURES[randInt(rng, 0, CREATURES.length - 1)];
+  const creature = CREATURES.find((c) => c.id === creatureId)!;
   const targetPos = randomPos(rng, size);
 
   const ratio: [ClueType, number][] = [
@@ -83,10 +80,11 @@ export function generateLevel(round: number, rng: Rng): Level {
     }
   }
 
+  const pool = terrainPoolFor(creatureId);
   const terrain: TerrainType[][] = [];
   for (let y = 0; y < size; y++) {
     const row: TerrainType[] = [];
-    for (let x = 0; x < size; x++) row.push(pickWeighted(rng, TERRAIN_POOL));
+    for (let x = 0; x < size; x++) row.push(pickWeighted(rng, pool));
     terrain.push(row);
   }
   terrain[targetPos.y][targetPos.x] = creature.terrain;
@@ -102,4 +100,9 @@ export function generateLevel(round: number, rng: Rng): Level {
   }
 
   return { round, mapSize: size, targetPos, clues, terrain, supplies, creatureId: creature.id };
+}
+
+export function generateLevel(round: number, rng: Rng): Level {
+  const creature = CREATURES[randInt(rng, 0, CREATURES.length - 1)];
+  return generateLevelFor(round, rng, creature.id);
 }

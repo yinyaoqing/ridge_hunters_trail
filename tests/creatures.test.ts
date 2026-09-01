@@ -18,4 +18,10 @@ describe('CREATURES', () => {
       expect(c.descs['zh-TW'].length).toBeGreaterThan(0);
     }
   });
+  it('every creature has quirk hints in both locales', () => {
+    for (const c of CREATURES) {
+      expect(c.quirkHints.en.length).toBeGreaterThan(0);
+      expect(c.quirkHints['zh-TW'].length).toBeGreaterThan(0);
+    }
+  });
 });
