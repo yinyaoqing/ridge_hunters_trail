@@ -55,7 +55,7 @@ export function createAudio(
   // 每次要出聲前都嘗試 resume 一次（reject 靜默吞掉，不影響其餘邏輯）。
   const resumeIfSuspended = (c: AudioContext) => {
     if (c.state === 'suspended') {
-      try { void c.resume(); } catch { /* 靜默 */ }
+      try { c.resume().catch(() => { /* 靜默 */ }); } catch { /* 靜默 */ }
     }
   };
 
