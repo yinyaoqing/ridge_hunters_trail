@@ -6,7 +6,7 @@ describe('shareText', () => {
   it('renders a three-line card for a caught daily with medal and stats', () => {
     const text = shareText(createI18n('en'), {
       dateKey: '2026-08-31', caught: true, quality: 'gold',
-      steps: 23, staminaLeft: 12, streak: 4,
+      steps: 23, staminaLeft: 12, streak: 4, iris: false,
     });
     const lines = text.split('\n');
     expect(lines).toHaveLength(3);
@@ -20,7 +20,7 @@ describe('shareText', () => {
   it('renders an escape line without medal when not caught', () => {
     const text = shareText(createI18n('zh-TW'), {
       dateKey: '2026-08-31', caught: false, quality: null,
-      steps: 9, staminaLeft: 0, streak: 1,
+      steps: 9, staminaLeft: 0, streak: 1, iris: false,
     });
     expect(text.split('\n')[1]).toContain('🌫️');
     expect(text).not.toContain('🥇');
@@ -28,15 +28,29 @@ describe('shareText', () => {
   it('renders the bronze medal for a bronze-quality catch', () => {
     const text = shareText(createI18n('en'), {
       dateKey: '2026-08-31', caught: true, quality: 'bronze',
-      steps: 15, staminaLeft: 5, streak: 2,
+      steps: 15, staminaLeft: 5, streak: 2, iris: false,
     });
     expect(text.split('\n')[1]).toContain('🥉');
   });
   it('renders the silver medal for a silver-quality catch', () => {
     const text = shareText(createI18n('en'), {
       dateKey: '2026-08-31', caught: true, quality: 'silver',
-      steps: 18, staminaLeft: 8, streak: 3,
+      steps: 18, staminaLeft: 8, streak: 3, iris: false,
     });
     expect(text.split('\n')[1]).toContain('🥈');
+  });
+  it('appends the rainbow marker when caught with iris', () => {
+    const text = shareText(createI18n('en'), {
+      dateKey: '2026-08-31', caught: true, quality: 'gold',
+      steps: 23, staminaLeft: 12, streak: 4, iris: true,
+    });
+    expect(text.split('\n')[1]).toContain('🌈');
+  });
+  it('does not include the rainbow marker when caught without iris', () => {
+    const text = shareText(createI18n('en'), {
+      dateKey: '2026-08-31', caught: true, quality: 'gold',
+      steps: 23, staminaLeft: 12, streak: 4, iris: false,
+    });
+    expect(text.split('\n')[1]).not.toContain('🌈');
   });
 });

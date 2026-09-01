@@ -41,4 +41,5 @@ export interface Level {
   supplies: Vec2[];         // 補給道具（規格書「霧葉/露珠果」的統一實作）
   creatureId: string;
   weather: Weather;
+  iris: boolean; // 異彩變種——純視覺＋計分，不影響難度
 }

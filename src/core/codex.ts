@@ -4,6 +4,7 @@ export interface CodexEntry {
   count: number;               // 成功記錄次數
   research: number;            // 研究度（筆記＋記錄累積）
   bestQuality: Quality | null; // 歷史最佳記錄品質
+  irisSeen: boolean;           // 是否曾記錄過異彩變種
 }
 
 export const RESEARCH_NOTE = 1;   // 一枚觀察筆記的研究度
@@ -22,13 +23,13 @@ export interface CodexStore {
   entries(): Record<string, CodexEntry>;
   entry(id: string): CodexEntry;
   counts(): Record<string, number>;
-  addRecord(id: string, quality: Quality): void;
+  addRecord(id: string, quality: Quality, iris?: boolean): void;
   addNotes(id: string, notes: number): void;
 }
 
 const V1_KEY = 'rht.codex.v1';
 const V2_KEY = 'rht.codex.v2';
-const EMPTY: CodexEntry = { count: 0, research: 0, bestQuality: null };
+const EMPTY: CodexEntry = { count: 0, research: 0, bestQuality: null, irisSeen: false };
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
@@ -39,7 +40,9 @@ function migrateV1(storage: Store): Record<string, CodexEntry> {
     const out: Record<string, CodexEntry> = {};
     for (const [id, n] of Object.entries(v1)) {
       const count = typeof n === 'number' && n > 0 ? n : 0;
-      if (count > 0) out[id] = { count, research: count * RESEARCH_RECORD, bestQuality: 'bronze' };
+      if (count > 0) {
+        out[id] = { count, research: count * RESEARCH_RECORD, bestQuality: 'bronze', irisSeen: false };
+      }
     }
     return out;
   } catch {
@@ -86,25 +89,28 @@ export function createCodex(storage?: Store): CodexStore {
 
   return {
     entries: load,
-    entry: (id) => load()[id] ?? { ...EMPTY },
+    // 正規化：舊版（v1 遷移或缺 irisSeen 欄位的既有 v2 資料）與 EMPTY 合併，
+    // 確保回傳的 CodexEntry 一律具備完整欄位，不會因缺欄位而讓下游讀取炸掉。
+    entry: (id) => ({ ...EMPTY, ...(load()[id] ?? {}) }),
     counts() {
       const out: Record<string, number> = {};
       for (const [id, e] of Object.entries(load())) if (e.count > 0) out[id] = e.count;
       return out;
     },
-    addRecord(id, quality) {
+    addRecord(id, quality, iris) {
       const data = load();
-      const e = data[id] ?? { ...EMPTY };
+      const e = { ...EMPTY, ...(data[id] ?? {}) };
       data[id] = {
         count: e.count + 1,
         research: e.research + RESEARCH_RECORD,
         bestQuality: maxQuality(e.bestQuality, quality),
+        irisSeen: (e.irisSeen ?? false) || iris === true,
       };
       save(data);
     },
     addNotes(id, notes) {
       const data = load();
-      const e = data[id] ?? { ...EMPTY };
+      const e = { ...EMPTY, ...(data[id] ?? {}) };
       data[id] = { ...e, research: e.research + notes * RESEARCH_NOTE };
       save(data);
     },

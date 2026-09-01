@@ -19,7 +19,7 @@ describe('createCodex v2', () => {
     codex.addRecord('mistfawn', 'silver');
     codex.addRecord('mistfawn', 'bronze'); // 較差品質不覆蓋
     expect(codex.entry('mistfawn')).toEqual({
-      count: 2, research: 2 * RESEARCH_RECORD, bestQuality: 'silver',
+      count: 2, research: 2 * RESEARCH_RECORD, bestQuality: 'silver', irisSeen: false,
     });
   });
 
@@ -27,12 +27,14 @@ describe('createCodex v2', () => {
     const codex = createCodex(fakeStorage());
     codex.addNotes('veilmoth', 2);
     expect(codex.entry('veilmoth')).toEqual({
-      count: 0, research: 2 * RESEARCH_NOTE, bestQuality: null,
+      count: 0, research: 2 * RESEARCH_NOTE, bestQuality: null, irisSeen: false,
     });
   });
 
   it('entry of unknown id is the empty entry', () => {
-    expect(createCodex().entry('nobody')).toEqual({ count: 0, research: 0, bestQuality: null });
+    expect(createCodex().entry('nobody')).toEqual({
+      count: 0, research: 0, bestQuality: null, irisSeen: false,
+    });
   });
 
   it('counts() derives id -> count for discovered creatures only', () => {
@@ -53,7 +55,7 @@ describe('createCodex v2', () => {
     const storage = fakeStorage({ 'rht.codex.v1': JSON.stringify({ mistfawn: 2 }) });
     const codex = createCodex(storage);
     expect(codex.entry('mistfawn')).toEqual({
-      count: 2, research: 2 * RESEARCH_RECORD, bestQuality: 'bronze',
+      count: 2, research: 2 * RESEARCH_RECORD, bestQuality: 'bronze', irisSeen: false,
     });
   });
 
@@ -82,9 +84,32 @@ describe('createCodex v2', () => {
     codex.addRecord('mistfawn', 'bronze');
     codex.addNotes('veilmoth', 1);
     expect(codex.entry('mistfawn')).toEqual({
-      count: 2, research: 2 * RESEARCH_RECORD, bestQuality: 'silver',
+      count: 2, research: 2 * RESEARCH_RECORD, bestQuality: 'silver', irisSeen: false,
     });
     expect(codex.counts()).toEqual({ mistfawn: 2 });
+  });
+
+  it('addRecord with iris:true sets irisSeen, and a later non-iris record does not clear it', () => {
+    const codex = createCodex(fakeStorage());
+    codex.addRecord('mistfawn', 'bronze', true);
+    expect(codex.entry('mistfawn').irisSeen).toBe(true);
+    codex.addRecord('mistfawn', 'silver'); // no iris arg
+    expect(codex.entry('mistfawn').irisSeen).toBe(true);
+    codex.addRecord('mistfawn', 'gold', false);
+    expect(codex.entry('mistfawn').irisSeen).toBe(true);
+  });
+
+  it('normalizes a legacy v2 record lacking irisSeen without throwing', () => {
+    const storage = fakeStorage({
+      'rht.codex.v2': JSON.stringify({
+        mistfawn: { count: 1, research: RESEARCH_RECORD, bestQuality: 'bronze' },
+      }),
+    });
+    const codex = createCodex(storage);
+    expect(() => codex.entry('mistfawn')).not.toThrow();
+    expect(codex.entry('mistfawn')).toEqual({
+      count: 1, research: RESEARCH_RECORD, bestQuality: 'bronze', irisSeen: false,
+    });
   });
 });
 

@@ -65,7 +65,7 @@ export class ResultScene extends Phaser.Scene {
     if (!s.resolved) {
       s.resolved = true;
       if (caught) {
-        codex.addRecord(creature.id, quality ?? 'bronze');
+        codex.addRecord(creature.id, quality ?? 'bronze', s.level.iris);
         const runState = this.registry.get('runState') as RunState;
         runState.addWin();
         if (s.mode === 'run') {
@@ -187,6 +187,7 @@ export class ResultScene extends Phaser.Scene {
         const text = shareText(i18n, {
           dateKey: dk, caught, quality,
           steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
+          iris: s.level.iris,
         });
         this.button(cx, copyY, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
           () => this.copyShare(text, i18n, copyY));

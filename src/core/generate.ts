@@ -7,6 +7,8 @@ import { applyQuirk, terrainPoolFor } from './quirks';
 import { applyWeather, WEATHER_POOL } from './weather';
 import { CREATURES } from '../data/creatures';
 
+export const IRIS_RATE = 0.05;
+
 function randomPos(rng: Rng, size: number): Vec2 {
   return { x: randInt(rng, 0, size - 1), y: randInt(rng, 0, size - 1) };
 }
@@ -57,6 +59,7 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   const p2 = applyWeather(p, weather);
   const size = p2.mapSize;
   const creature = CREATURES.find((c) => c.id === creatureId)!;
+  const iris = rng() < IRIS_RATE;
   const targetPos = randomPos(rng, size);
 
   const ratio: [ClueType, number][] = [
@@ -104,7 +107,9 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
     }
   }
 
-  return { round, mapSize: size, targetPos, clues, terrain, supplies, creatureId: creature.id, weather };
+  return {
+    round, mapSize: size, targetPos, clues, terrain, supplies, creatureId: creature.id, weather, iris,
+  };
 }
 
 export function generateLevel(round: number, rng: Rng): Level {

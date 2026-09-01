@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateLevel, generateLevelFor } from '../src/core/generate';
+import { generateLevel, generateLevelFor, IRIS_RATE } from '../src/core/generate';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key, intersect } from '../src/core/clues';
@@ -121,5 +121,25 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       }
     }
     expect(found).toBe(true);
+  });
+
+  it('every level carries a boolean iris flag', () => {
+    for (const { seed, round } of cases) {
+      const level = generateLevel(round, mulberry32(seed));
+      expect(typeof level.iris).toBe('boolean');
+    }
+  });
+
+  it('iris rate over 1000 seeds is within a rough sanity band', () => {
+    let irisCount = 0;
+    const total = 1000;
+    for (let seed = 1; seed <= total; seed++) {
+      const level = generateLevel(5, mulberry32(seed));
+      if (level.iris) irisCount++;
+    }
+    const rate = irisCount / total;
+    expect(IRIS_RATE).toBeCloseTo(0.05);
+    expect(rate).toBeGreaterThanOrEqual(0.02);
+    expect(rate).toBeLessThanOrEqual(0.09);
   });
 });

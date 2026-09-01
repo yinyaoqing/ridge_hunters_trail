@@ -10,13 +10,14 @@ export interface ShareInput {
   steps: number;
   staminaLeft: number;
   streak: number;
+  iris: boolean;
 }
 
 // 每日挑戰分享卡：三行純文字，仿 Wordle 可貼進任何聊天室
 export function shareText(i18n: I18n, s: ShareInput): string {
   const line1 = `Ridge Hunter's Trail · ${s.dateKey}`;
   const line2 = s.caught
-    ? `🐾🐾🐾✨${s.quality ? MEDAL[s.quality] : ''}`
+    ? `🐾🐾🐾✨${s.quality ? MEDAL[s.quality] : ''}${s.iris ? '🌈' : ''}`
     : '🐾🐾🌫️';
   const line3 = i18n.t('share.stats', {
     steps: s.steps, stam: s.staminaLeft, streak: s.streak,
