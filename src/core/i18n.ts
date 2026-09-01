@@ -20,7 +20,8 @@ export type MsgKey =
   | 'tool.windstone.name' | 'tool.windstone.desc'
   | 'tool.glowbell.name' | 'tool.glowbell.desc'
   | 'result.toolUnlocked' | 'hud.bell'
-  | 'comm.title' | 'comm.record' | 'comm.stamina' | 'comm.quality' | 'comm.done' | 'comm.reward';
+  | 'comm.title' | 'comm.record' | 'comm.stamina' | 'comm.quality' | 'comm.done' | 'comm.reward'
+  | 'tut.move' | 'tut.read' | 'tut.cross' | 'tut.qte';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -84,6 +85,10 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'comm.quality': 'Earn a {q} record or better',
     'comm.done': 'Done',
     'comm.reward': '+{n} field notes',
+    'tut.move': 'See that marker? Walk over and read it.',
+    'tut.read': 'A clue! The creature is somewhere it points to.',
+    'tut.cross': 'Two clues overlap — the truth hides where both agree.',
+    'tut.qte': 'You are close. Get ready to tap in rhythm!',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -146,6 +151,10 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'comm.quality': '取得{q}以上記錄',
     'comm.done': '已完成',
     'comm.reward': '觀察筆記 +{n}',
+    'tut.move': '看到那個記號了嗎？走過去判讀。',
+    'tut.read': '線索！牠就在這指向的範圍裡。',
+    'tut.cross': '兩條線索重疊——真相藏在交集之處。',
+    'tut.qte': '很近了，準備節奏點擊！',
   },
 };
 

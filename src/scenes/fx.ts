@@ -68,6 +68,21 @@ export function guardLowFps(scene: Phaser.Scene, emitter: Phaser.GameObjects.Par
   });
 }
 
+// 新手引導：脈動高亮圈（虛線感改用純描邊圓，避免 fx.ts 反向依賴 paint.ts）——
+// scale 1→1.25 yoyo 三次（duration*2*3 ≈ 1.8s）後自毀，非常駐效果
+export function pulseHighlight(
+  scene: Phaser.Scene, x: number, y: number, r: number, color: number,
+): Phaser.GameObjects.Container {
+  const g = scene.make.graphics({}, false);
+  g.lineStyle(2, color, 0.9).strokeCircle(0, 0, r);
+  const holder = scene.add.container(x, y, [g]);
+  scene.tweens.add({
+    targets: holder, scale: 1.25, duration: 300, yoyo: true, repeat: 2,
+    onComplete: () => holder.destroy(),
+  });
+  return holder;
+}
+
 // 僅 WebGL 才疊加光暈後製（Canvas renderer 無此能力，靜默跳過不影響既有畫法）
 export function addGlowIfWebGL(
   scene: Phaser.Scene,

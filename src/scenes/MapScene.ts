@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import { canMove, move, toggleMark, useBell, TERRAIN_COST, type SessionState } from '../core/session';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
-import { key } from '../core/clues';
-import type { Vec2 } from '../core/geometry';
+import { key, intersect } from '../core/clues';
+import { cheb, dist, type Vec2 } from '../core/geometry';
 import type { Clue, TerrainType } from '../core/types';
-import type { I18n } from '../core/i18n';
+import type { I18n, MsgKey } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
 import type { Rng } from '../core/rng';
 import type { ToolStore } from '../core/tools';
@@ -15,7 +15,7 @@ import {
   BRUSH_RADIUS, FONTS, displayFont,
 } from './paint';
 import {
-  restartOnResize, fadeIn, fadeToScene, floatText,
+  restartOnResize, fadeIn, fadeToScene, floatText, pulseHighlight,
   PARTICLE_CAPS, motionOK, ensureDotTexture, guardLowFps,
 } from './fx';
 
@@ -57,6 +57,10 @@ export class MapScene extends Phaser.Scene {
   private skipFirstRunHelp = false;
   private audio!: AudioBus;
   private tools!: ToolStore;
+  // 互動式新手引導：-1=未啟動/已結束，0..3=引導步驟（見 startTutStep0 起各步驟方法）
+  private tutStep = -1;
+  private tutText?: Phaser.GameObjects.Text;
+  private tutBg?: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('Map');
@@ -89,6 +93,7 @@ export class MapScene extends Phaser.Scene {
     this.tools = this.registry.get('tools');
     this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
     this.registry.set('lastComms', []); // 同上，清空委託完成行狀態
+    this.initTutorialFlag(s);
 
     this.buildBackground(s);
     this.spawnMistParticles(s);
@@ -111,8 +116,92 @@ export class MapScene extends Phaser.Scene {
     this.redraw();
     restartOnResize(this);
     fadeIn(this);
-    this.maybeShowFirstRunHelp();
+    if (this.tutStep === 0) this.startTutStep0(s);
+    else this.maybeShowFirstRunHelp(); // 引導進行中時跳過彈窗，改由 ? chip 手動開啟
     this.audio.ambient(true); // 探索環境風聲（靜音時 ambient 內部自行忽略）
+  }
+
+  // 判斷本局是否啟動新手引導：旗標未設且為主線第 1 局（探索階段）
+  private initTutorialFlag(s: SessionState) {
+    const storage: Pick<Storage, 'getItem' | 'setItem'> | undefined = this.registry.get('storage');
+    let done = false;
+    try {
+      done = storage?.getItem('rht.tut.v1') === '1';
+    } catch {
+      done = false;
+    }
+    this.tutStep = (!done && s.mode === 'run' && s.round === 1 && s.phase === 'explore') ? 0 : -1;
+  }
+
+  // 引導 step0：高亮離玩家最近的未讀真線索（round1 無幌子，全部皆為真線索）＋顯示引導字
+  private startTutStep0(s: SessionState) {
+    const unread = s.level.clues.filter((c) => !c.isDecoy && !s.readClues.has(key(c.position)));
+    if (unread.length === 0) return; // 防禦：理論上不會發生（round1 一定有未讀真線索）
+    let nearest = unread[0];
+    let best = dist(s.player, nearest.position);
+    for (const c of unread.slice(1)) {
+      const d = dist(s.player, c.position);
+      if (d < best) { best = d; nearest = c; }
+    }
+    const cs = this.cell;
+    const p = { x: this.ox + nearest.position.x * cs + cs / 2, y: this.oy + nearest.position.y * cs + cs / 2 };
+    pulseHighlight(this, p.x, p.y, cs * 0.6, this.pal.gold);
+    this.showTut('tut.move');
+  }
+
+  // 引導 step1→2：讀滿 2 條線索後計算交集格並閃色提示；在 3 秒延遲與後續移動中都會檢查
+  private checkTutStep1to2(s: SessionState) {
+    if (this.tutStep !== 1 || s.readClues.size < 2) return;
+    this.tutStep = 2;
+    const readReal = s.level.clues.filter((c) => s.readClues.has(key(c.position)));
+    const cells = intersect(readReal, s.level.mapSize);
+    const cs = this.cell;
+    const g = this.add.graphics();
+    for (const ck of cells) {
+      const [cx, cy] = ck.split(',').map(Number);
+      g.fillStyle(this.pal.gold, 0.25).fillRect(this.ox + cx * cs, this.oy + cy * cs, cs, cs);
+    }
+    this.tweens.add({ targets: g, alpha: 0, duration: 1500, onComplete: () => g.destroy() });
+    this.showTut('tut.cross');
+  }
+
+  // 引導文字：底部置中，共用單一 Text/Graphics（切換文案時重繪底條），全程不攔截輸入
+  private showTut(msgKey: MsgKey) {
+    const pal = this.pal;
+    if (!this.tutText) {
+      this.tutBg = this.add.graphics().setDepth(80);
+      this.tutText = this.add.text(0, 0, '', {
+        fontFamily: FONTS.body, fontSize: '13px', color: cssHex(pal.paper),
+      }).setOrigin(0.5).setDepth(81);
+    }
+    this.tutText.setText(this.i18n().t(msgKey));
+    const w = this.scale.width;
+    const y = this.scale.height - 24;
+    this.tutText.setPosition(w / 2, y);
+    const bw = this.tutText.width + 24;
+    const bh = this.tutText.height + 12;
+    this.tutBg!.clear().fillStyle(pal.panel, 0.88)
+      .fillRoundedRect(w / 2 - bw / 2, y - bh / 2, bw, bh, BRUSH_RADIUS);
+  }
+
+  private hideTut() {
+    this.tutText?.destroy();
+    this.tutBg?.destroy();
+    this.tutText = undefined;
+    this.tutBg = undefined;
+  }
+
+  // 引導完成：與玩法說明共用旗標寫入邏輯（? chip 之後仍可手動開啟 Help）
+  private finishTutorial() {
+    this.hideTut();
+    this.tutStep = -1;
+    const storage: Pick<Storage, 'getItem' | 'setItem'> | undefined = this.registry.get('storage');
+    try {
+      storage?.setItem('rht.tut.v1', '1');
+      storage?.setItem('rht.help.v1', '1');
+    } catch {
+      // 無法記憶時下次 round1 仍會重新引導，可接受
+    }
   }
 
   // 首次啟動自動彈出玩法說明（localStorage 記憶，不可用時僅本次顯示）
@@ -554,6 +643,19 @@ export class MapScene extends Phaser.Scene {
             this.playReveal(clue);
             this.audio.play('reveal');
           }
+          if (this.tutStep === 0) {
+            this.tutStep = 1;
+            this.showTut('tut.read');
+            this.time.delayedCall(3000, () => this.checkTutStep1to2(s));
+          } else if (this.tutStep === 1) {
+            this.checkTutStep1to2(s);
+          }
+        }
+        // 引導 step2→3：進逼目標範圍（cheb<=2）先於實際 QTE 觸發距離（cheb<=1）示警，
+        // 涵蓋玩家跳步略過 step1/2 的情境（任何 0..2 步驟命中都直接進 step3）
+        if (this.tutStep >= 0 && this.tutStep <= 2 && cheb(s.player, s.level.targetPos) <= 2) {
+          this.tutStep = 3;
+          this.showTut('tut.qte');
         }
         this.redraw();
         this.afterMove();
@@ -590,8 +692,12 @@ export class MapScene extends Phaser.Scene {
 
   private afterMove() {
     const s = this.session();
-    if (s.phase === 'qte') fadeToScene(this, 'Qte');
-    else if (s.phase === 'exhausted') fadeToScene(this, 'Result');
+    if (s.phase === 'qte') {
+      if (this.tutStep >= 0) this.finishTutorial(); // 引導收尾：進 QTE 即視為引導完成，寫入兩把旗標
+      fadeToScene(this, 'Qte');
+    } else if (s.phase === 'exhausted') {
+      fadeToScene(this, 'Result'); // 中途力竭不寫旗標：下次 round1 仍會重新引導
+    }
   }
 
   private redraw() {
