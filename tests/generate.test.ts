@@ -6,6 +6,7 @@ import { key, intersect } from '../src/core/clues';
 import { dist, angleDiff, angleDeg } from '../src/core/geometry';
 import { CREATURES } from '../src/data/creatures';
 import { applyQuirk } from '../src/core/quirks';
+import { applyWeather } from '../src/core/weather';
 
 describe('generateLevel (property tests over 200 seeds)', () => {
   const cases = Array.from({ length: 200 }, (_, i) => ({
@@ -80,7 +81,16 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     expect(a.supplies.length).toBeLessThanOrEqual(getDifficulty(5).supplyCount + 2);
     const scent = b.clues.find((c) => c.type === 'scent' && !c.isDecoy);
     if (scent && scent.type === 'scent') {
-      expect(scent.data.tolerance).toBe(getDifficulty(5).scentTolerance * 2);
+      expect(scent.data.tolerance).toBeCloseTo(
+        applyWeather(applyQuirk(getDifficulty(5), 'mistfawn'), b.weather).scentTolerance,
+      );
+    }
+  });
+
+  it('every level has a weather drawn from the known pool', () => {
+    for (const { seed, round } of cases) {
+      const level = generateLevel(round, mulberry32(seed));
+      expect(['clear', 'mist', 'wind', 'drizzle']).toContain(level.weather);
     }
   });
 

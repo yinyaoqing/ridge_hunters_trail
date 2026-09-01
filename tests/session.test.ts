@@ -18,7 +18,7 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
       type: 'scent', position: { x: 2, y: 0 }, isDecoy: false,
       data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
     }],
-    terrain, supplies: [{ x: 1, y: 0 }], creatureId: 'mistfawn',
+    terrain, supplies: [{ x: 1, y: 0 }], creatureId: 'mistfawn', weather: 'clear',
   };
   return {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,

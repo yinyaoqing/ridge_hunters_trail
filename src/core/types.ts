@@ -1,4 +1,5 @@
 import type { Vec2 } from './geometry';
+import type { Weather } from './weather';
 
 export type TerrainType = 'meadow' | 'mist' | 'thicket' | 'rock';
 
@@ -39,4 +40,5 @@ export interface Level {
   terrain: TerrainType[][]; // terrain[y][x]
   supplies: Vec2[];         // 補給道具（規格書「霧葉/露珠果」的統一實作）
   creatureId: string;
+  weather: Weather;
 }
