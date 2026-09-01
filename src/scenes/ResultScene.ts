@@ -100,17 +100,21 @@ export class ResultScene extends Phaser.Scene {
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
     const runRound: number = this.registry.get('runRound');
     if (s.mode === 'daily') {
+      // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊
+      const streakY = caught ? 500 : 534;
+      const copyY = streakY + 52;
+      const campY = caught ? 614 : streakY + 112;
       const streak: StreakStore = this.registry.get('streak');
       const text = shareText(i18n, {
         dateKey: dailyKey(new Date()), caught, quality,
         steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
       });
-      this.add.text(cx, 500, i18n.t('camp.streak', { n: streak.state().streak }).toUpperCase(), {
+      this.add.text(cx, streakY, i18n.t('camp.streak', { n: streak.state().streak }).toUpperCase(), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
       }).setOrigin(0.5).setLetterSpacing(2);
-      this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
-        () => this.copyShare(text, i18n));
-      this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+      this.button(cx, copyY, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
+        () => this.copyShare(text, i18n, copyY));
+      this.button(cx, campY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
       this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
@@ -129,11 +133,11 @@ export class ResultScene extends Phaser.Scene {
     }
   }
 
-  // 剪貼簿優先，失敗退回 textarea+execCommand；成功顯示「已複製！」浮字
-  private copyShare(text: string, i18n: I18n) {
+  // 剪貼簿優先，失敗退回 textarea+execCommand；成功在複製鈕上方顯示「已複製！」浮字
+  private copyShare(text: string, i18n: I18n, buttonY: number) {
     const done = () => {
       const cx = this.scale.width / 2;
-      const t = this.add.text(cx, 500, i18n.t('result.copied'), {
+      const t = this.add.text(cx, buttonY - 40, i18n.t('result.copied'), {
         fontFamily: FONTS.body, fontSize: '13px', color: cssHex(this.pal.supply), fontStyle: 'bold',
       }).setOrigin(0.5);
       this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() });
