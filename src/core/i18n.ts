@@ -11,7 +11,7 @@ export type MsgKey =
   | 'btn.camp' | 'btn.copy'
   | 'help.title' | 'help.goal'
   | 'help.footprint' | 'help.disturbance' | 'help.scent'
-  | 'help.decoy' | 'help.stamina' | 'help.mark' | 'help.qte'
+  | 'help.decoy' | 'help.stamina' | 'help.mark' | 'help.qte' | 'help.terrain'
   | 'camp.continue' | 'camp.daily' | 'camp.dailyDone' | 'camp.streak'
   | 'quality.bronze' | 'quality.silver' | 'quality.gold'
   | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded'
@@ -55,6 +55,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.stamina': 'Every step costs stamina; thickets and rock cost more. Mistleaf and dewfruit restore it.',
     'help.mark': 'Shift+click marks a cell for your notes. Step onto a clue to read it.',
     'help.qte': 'Up close, tap or press SPACE when the needle sweeps the glowing arc.',
+    'help.terrain': 'Terrain costs stamina: meadow/mist 1 · thicket/rock 2.',
     'camp.continue': 'Hit the Trail · Round {n}',
     'camp.daily': "Today's Trail",
     'camp.dailyDone': 'Done today',
@@ -110,6 +111,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.stamina': '每一步都消耗體力；密叢與岩坡消耗更多。霧葉與露珠果可以回復體力。',
     'help.mark': 'Shift+點擊可在格子上做標記筆記；踩上線索即可判讀。',
     'help.qte': '逼近目標後，趁指針掃過發光弧區時點擊或按空白鍵。',
+    'help.terrain': '地形消耗體力：草地／霧地 1 ・密叢／岩坡 2。',
     'camp.continue': '上山追蹤｜第 {n} 局',
     'camp.daily': '今日行蹤',
     'camp.dailyDone': '今日已完成',

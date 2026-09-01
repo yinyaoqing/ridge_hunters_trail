@@ -4,11 +4,12 @@ import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { key } from '../core/clues';
 import type { Vec2 } from '../core/geometry';
-import type { Clue } from '../core/types';
+import type { Clue, TerrainType } from '../core/types';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
 import type { Rng } from '../core/rng';
 import type { ToolStore } from '../core/tools';
+import type { RunState } from '../core/runstate';
 import {
   cssHex, cssRgba, dashedCircle, dashedArc, dashedLine, drawClueToken, drawSupply,
   BRUSH_RADIUS, FONTS, displayFont,
@@ -24,6 +25,9 @@ const BG_KEY = 'map-bg';
 export class MapScene extends Phaser.Scene {
   private g!: Phaser.GameObjects.Graphics;
   private pg!: Phaser.GameObjects.Graphics; // 玩家專用層
+  private hoverG!: Phaser.GameObjects.Graphics; // hover 高亮專用層（建於 pg 之後，疊在最上層）
+  private hoverCostText?: Phaser.GameObjects.Text; // 重用單一 Text，hover 時移動＋顯示，不逐格重建
+  private hoverCell: Vec2 | null = null;
   private animating = false;
   private lowTween?: Phaser.Tweens.Tween;
   private hudG!: Phaser.GameObjects.Graphics;
@@ -90,13 +94,19 @@ export class MapScene extends Phaser.Scene {
     this.buildHud();
     this.g = this.add.graphics();
     this.pg = this.add.graphics();
+    this.hoverG = this.add.graphics(); // 建於 pg 之後，確保 hover 外框畫在玩家層之上
+    this.hoverCostText = this.add.text(0, 0, '', {
+      fontFamily: FONTS.body, fontSize: '10px', color: cssHex(this.pal.paperDim),
+    }).setOrigin(1, 1).setVisible(false);
 
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.pressAt = { t: p.time, x: p.x, y: p.y };
+      this.clearHover(); // 按下後（可能拖曳/移動）暫時隱藏 hover，避免殘影
     });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
-    this.events.on(Phaser.Scenes.Events.RESUME, () => this.redraw());
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
+    this.events.on(Phaser.Scenes.Events.RESUME, () => { this.clearHover(); this.redraw(); });
     this.redraw();
     restartOnResize(this);
     fadeIn(this);
@@ -269,14 +279,31 @@ export class MapScene extends Phaser.Scene {
       }).setLetterSpacing(2.5);
     }
 
+    // 迷你地形圖例（僅寬螢幕：副標題右側，四色塊＋成本數字；窄螢幕圖例改放 HelpScene）
+    if (w >= 900) {
+      const legendG = this.add.graphics();
+      const legendY = 36;
+      const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
+      const costs = ['1', '1', '2', '2'];
+      let lx = 250;
+      order.forEach((t, i) => {
+        legendG.fillStyle(pal.terrain[t], 1).fillRect(lx, legendY, 12, 12);
+        this.add.text(lx + 16, legendY + 6, costs[i], {
+          fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.paperDim),
+        }).setOrigin(0, 0.5);
+        lx += 16 + 12 + 12; // 色塊(12)+間距(4)+數字寬+組間距
+      });
+    }
+
     // 體力條（筆觸感不規則圓角，動態填色於 redraw）
     this.stamLabel = this.add.text(w / 2, 8, '', {
       fontFamily: FONTS.body, fontSize: '10.5px', color: cssHex(pal.paperDim),
     }).setOrigin(0.5, 0).setLetterSpacing(2);
     this.hudG = this.add.graphics();
 
-    // 操作提示（兩行右對齊）
-    if (!compact) {
+    // 操作提示（兩行右對齊）：熟練玩家（累積 3 勝以上）自動退場，不再佔用版面
+    const wins = (this.registry.get('runState') as RunState).wins();
+    if (!compact && wins < 3) {
       this.hintText = this.add.text(w - 136, 15, '', {
         fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(pal.paperDim),
         align: 'right', lineSpacing: 4,
@@ -441,6 +468,43 @@ export class MapScene extends Phaser.Scene {
     return x >= 0 && y >= 0 && x < size && y < size ? { x, y } : null;
   }
 
+  // Hover 地形成本：僅桌面裝置（觸控裝置以 device.os.desktop 判斷，避免與拖曳移動手勢衝突）、
+  // 僅 explore 階段、指標未按下時，於目前格畫 1px 金框並在右下角顯示地形成本數字
+  private onPointerMove(p: Phaser.Input.Pointer) {
+    if (!this.sys.game.device.os.desktop) return;
+    const s = this.session();
+    if (s.phase !== 'explore' || p.isDown) {
+      this.clearHover();
+      return;
+    }
+    const cellPos = this.toGrid(p.x, p.y);
+    if (!cellPos) {
+      this.clearHover();
+      return;
+    }
+    if (this.hoverCell && this.hoverCell.x === cellPos.x && this.hoverCell.y === cellPos.y) return;
+    this.hoverCell = cellPos;
+    this.drawHover(cellPos, s);
+  }
+
+  private clearHover() {
+    if (this.hoverCell === null) return;
+    this.hoverCell = null;
+    this.hoverG.clear();
+    this.hoverCostText?.setVisible(false);
+  }
+
+  private drawHover(c: Vec2, s: SessionState) {
+    const cs = this.cell;
+    const pal = this.pal;
+    const x = this.ox + c.x * cs;
+    const y = this.oy + c.y * cs;
+    this.hoverG.clear();
+    this.hoverG.lineStyle(1, pal.gold, 0.5).strokeRect(x, y, cs, cs);
+    const cost = TERRAIN_COST[s.level.terrain[c.y][c.x]];
+    this.hoverCostText?.setText(String(cost)).setPosition(x + cs - 3, y + cs - 3).setVisible(true);
+  }
+
   private onPointerUp(p: Phaser.Input.Pointer) {
     const s = this.session();
     if (s.phase !== 'explore' || !this.pressAt) return;
@@ -548,7 +612,9 @@ export class MapScene extends Phaser.Scene {
     }
     for (const c of L.clues) {
       const p = px(c.position);
-      drawClueToken(this.g, p.x, p.y, Math.max(8, cs * 0.34), c.type, pal);
+      const r = Math.max(8, cs * 0.34);
+      drawClueToken(this.g, p.x, p.y, r, c.type, pal);
+      if (s.readClues.has(key(c.position))) this.drawReadCheck(p.x, p.y, r);
     }
 
     for (const m of s.marks) {
@@ -619,6 +685,13 @@ export class MapScene extends Phaser.Scene {
       this.lowTween = undefined;
       this.hudG.setAlpha(1);
     }
+  }
+
+  // 已判讀線索 token 金色小勾（右上角，兩段線，座標依 token 半徑 r 縮放）
+  private drawReadCheck(x: number, y: number, r: number) {
+    this.g.lineStyle(1.6, this.pal.gold, 1);
+    this.g.lineBetween(x + r * 0.5, y - r * 0.9, x + r * 0.8, y - r * 0.6);
+    this.g.lineBetween(x + r * 0.8, y - r * 0.6, x + r * 1.3, y - r * 1.2);
   }
 
   // 已判讀線索覆蓋層（設計板）：足跡=金色錐形（淡填色＋點描邊線）、

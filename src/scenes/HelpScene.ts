@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { SessionState } from '../core/session';
+import type { TerrainType } from '../core/types';
 import { getPalette, type Palette } from '../core/palette';
 import type { I18n } from '../core/i18n';
 import { cssHex, drawClueToken, drawSupply, BRUSH_RADIUS, FONTS, displayFont } from './paint';
@@ -111,6 +112,21 @@ export class HelpScene extends Phaser.Scene {
           icons.strokePath();
           icons.lineStyle(2, pal.paper, 1).lineBetween(rowX, y, rowX + 10, y - 7);
           icons.fillStyle(pal.paper, 1).fillCircle(rowX, y, 2.5);
+        },
+      },
+      {
+        // 第 8 列（py0+514）：與開始按鈕（py0+ph-56=py0+580）仍保有 66px 間距，未擠壓版面
+        y: py0 + 514, key: 'help.terrain',
+        icon: (y) => {
+          const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
+          const sq = 6;
+          const gap = 2;
+          const totalW = order.length * sq + (order.length - 1) * gap;
+          let x = rowX - totalW / 2;
+          for (const t of order) {
+            icons.fillStyle(pal.terrain[t], 1).fillRect(x, y - sq / 2, sq, sq);
+            x += sq + gap;
+          }
         },
       },
     ];
