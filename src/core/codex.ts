@@ -10,6 +10,7 @@ export const RESEARCH_NOTE = 1;   // 一枚觀察筆記的研究度
 export const RESEARCH_RECORD = 3; // 一次成功記錄的研究度
 export const MILESTONE_NAME = 3;  // 達標揭示：名稱
 export const MILESTONE_DETAIL = 8; // 達標揭示：描述＋地形偏好
+export const MILESTONE_QUIRK = 15; // 達標揭示：判讀心得
 
 // 失敗軟著陸：依已判讀線索數掉落筆記（至少 1、至多 3）
 export function notesForRun(readClueCount: number): number {

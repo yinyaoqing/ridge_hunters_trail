@@ -15,7 +15,7 @@ export type MsgKey =
   | 'camp.continue' | 'camp.daily' | 'camp.dailyDone' | 'camp.streak'
   | 'quality.bronze' | 'quality.silver' | 'quality.gold'
   | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded'
-  | 'codex.research' | 'codex.rumored'
+  | 'codex.research' | 'codex.rumored' | 'codex.quirk'
   | 'share.stats';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
@@ -65,6 +65,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.notRecorded': 'Not yet recorded',
     'codex.research': 'Research',
     'codex.rumored': 'Traces found in the field...',
+    'codex.quirk': 'Field instinct',
     'share.stats': 'Steps {steps} · Stamina {stam} · Streak {streak}',
   },
   'zh-TW': {
@@ -113,6 +114,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.notRecorded': '尚未記錄',
     'codex.research': '研究度',
     'codex.rumored': '山野間已見蹤跡……',
+    'codex.quirk': '判讀心得',
     'share.stats': '步數 {steps}｜剩餘體力 {stam}｜連勝 {streak}',
   },
 };

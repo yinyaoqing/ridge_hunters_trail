@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { newSession, type SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
-import { notesForRun, MILESTONE_NAME, MILESTONE_DETAIL, type CodexStore } from '../core/codex';
+import {
+  notesForRun, MILESTONE_NAME, MILESTONE_DETAIL, MILESTONE_QUIRK, type CodexStore,
+} from '../core/codex';
 import { qualityFromQte, type Quality } from '../core/quality';
 import type { QteState } from '../core/qte';
 import { CREATURES } from '../data/creatures';
@@ -219,8 +221,9 @@ export class ResultScene extends Phaser.Scene {
   ) {
     const pal = this.pal;
     const e = codex.entry(creatureId);
-    const next = e.research >= MILESTONE_DETAIL ? MILESTONE_DETAIL
-      : e.research >= MILESTONE_NAME ? MILESTONE_DETAIL : MILESTONE_NAME;
+    const next = e.research >= MILESTONE_QUIRK ? MILESTONE_QUIRK
+      : e.research >= MILESTONE_DETAIL ? MILESTONE_QUIRK
+        : e.research >= MILESTONE_NAME ? MILESTONE_DETAIL : MILESTONE_NAME;
     const t = this.add.text(cx, y, i18n.t('result.notes', { n: notes }), {
       fontFamily: FONTS.body, fontSize: '15px', color: cssHex(pal.supply), fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0);

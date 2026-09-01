@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createCodex, notesForRun, RESEARCH_NOTE, RESEARCH_RECORD,
-  MILESTONE_NAME, MILESTONE_DETAIL,
+  MILESTONE_NAME, MILESTONE_DETAIL, MILESTONE_QUIRK,
 } from '../src/core/codex';
 
 function fakeStorage(initial: Record<string, string> = {}) {
@@ -101,5 +101,9 @@ describe('notesForRun', () => {
 describe('milestones', () => {
   it('name unlocks before detail', () => {
     expect(MILESTONE_NAME).toBeLessThan(MILESTONE_DETAIL);
+  });
+
+  it('detail unlocks before quirk', () => {
+    expect(MILESTONE_DETAIL).toBeLessThan(MILESTONE_QUIRK);
   });
 });

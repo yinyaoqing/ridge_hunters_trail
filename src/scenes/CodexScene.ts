@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
-import { MILESTONE_NAME, MILESTONE_DETAIL, type CodexStore } from '../core/codex';
+import {
+  MILESTONE_NAME, MILESTONE_DETAIL, MILESTONE_QUIRK, type CodexStore,
+} from '../core/codex';
 import type { SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
 import { CREATURES } from '../data/creatures';
@@ -10,7 +12,7 @@ import {
 } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
-const ROW_H = 84;
+const ROW_H = 96;
 
 export class CodexScene extends Phaser.Scene {
   private list!: Phaser.GameObjects.Container;
@@ -118,22 +120,26 @@ export class CodexScene extends Phaser.Scene {
       row.add(qg);
     }
 
-    const detail = detailKnown
+    const quirkKnown = e.research >= MILESTONE_QUIRK;
+    let detail = detailKnown
       ? c.descs[loc]
       : e.research > 0 ? i18n.t('codex.rumored') : i18n.t('codex.notRecorded');
+    if (quirkKnown) detail += `\n${i18n.t('codex.quirk')} · ${c.quirkHints[loc]}`;
     row.add(this.add.text(134, y - 2, detail, {
       fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.paperDim),
       wordWrap: { width: w - 300, useAdvancedWrap: true },
     }).setAlpha(detailKnown ? 1 : 0.6));
 
-    // 研究度條：滿檔 = MILESTONE_DETAIL
+    // 研究度條：滿檔 = MILESTONE_QUIRK，兩道里程碑刻度（名稱／描述）
     const bw = 150;
-    const ratio = Math.min(1, e.research / MILESTONE_DETAIL);
+    const ratio = Math.min(1, e.research / MILESTONE_QUIRK);
     g.fillStyle(0x0d1310, 1).fillRoundedRect(134, y + 22, bw, 6, 3);
     if (ratio > 0) g.fillStyle(pal.glow, 0.9).fillRoundedRect(135, y + 23, (bw - 2) * ratio, 4, 2);
     g.lineStyle(1, pal.paper, 0.25)
-      .lineBetween(134 + bw * (MILESTONE_NAME / MILESTONE_DETAIL), y + 20,
-        134 + bw * (MILESTONE_NAME / MILESTONE_DETAIL), y + 30); // 里程碑刻度
+      .lineBetween(134 + bw * (MILESTONE_NAME / MILESTONE_QUIRK), y + 20,
+        134 + bw * (MILESTONE_NAME / MILESTONE_QUIRK), y + 30) // 里程碑刻度：名稱
+      .lineBetween(134 + bw * (MILESTONE_DETAIL / MILESTONE_QUIRK), y + 20,
+        134 + bw * (MILESTONE_DETAIL / MILESTONE_QUIRK), y + 30); // 里程碑刻度：描述
     row.add(this.add.text(134 + bw + 10, y + 25, i18n.t('codex.research'), {
       fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.paperDim),
     }).setOrigin(0, 0.5).setLetterSpacing(1.5));
