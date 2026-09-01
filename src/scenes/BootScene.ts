@@ -17,6 +17,8 @@ export class BootScene extends Phaser.Scene {
   // preload 先於 create 執行是 Phaser 場景生命週期的既定順序，故不需額外同步機制。
   preload() {
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
+      // 僅吞可選 sprite 的缺檔——未來地形等必要資源不得沿用此靜默路徑
+      if (!file.key.startsWith('spr-')) return;
       console.debug(`[assets] optional sprite missing, using silhouette fallback: ${file.key}`);
     });
     for (const c of CREATURES) {

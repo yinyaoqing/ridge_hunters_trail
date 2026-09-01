@@ -15,6 +15,10 @@
 | 路徑與命名 | `public/assets/creatures/<id>.png` |
 | 生物 id 清單 | `mistfawn`、`emberquill`、`thicketloom`、`dewhopper`、`veilmoth`、`lanternshrew`、`ridgecrest`、`plumetail`（對照 `src/data/creatures.ts`） |
 
+> **顯示尺寸警語**：sprite 顯示尺寸沿用既有剪影的 `setScale` 係數（QTE 1.35／結算 1.05／圖鑑 0.3，
+> 係數以剪影原生 208×176 調校）；128×128 素材上線後可能偏大或偏小，正式素材到位後需人工核對
+> 三處顯示比例並調整係數。
+
 ### 運作方式
 
 - `BootScene.preload()` 對每個生物 id 嘗試載入 `spr-<id>`（`assets/creatures/<id>.png`）。
