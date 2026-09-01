@@ -19,7 +19,8 @@ export type MsgKey =
   | 'share.stats'
   | 'tool.windstone.name' | 'tool.windstone.desc'
   | 'tool.glowbell.name' | 'tool.glowbell.desc'
-  | 'result.toolUnlocked' | 'hud.bell';
+  | 'result.toolUnlocked' | 'hud.bell'
+  | 'comm.title' | 'comm.record' | 'comm.stamina' | 'comm.quality' | 'comm.done' | 'comm.reward';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -77,6 +78,12 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'tool.glowbell.desc': 'Once per hunt, rings out one false trail.',
     'result.toolUnlocked': 'New tool: {name}',
     'hud.bell': 'Bell',
+    'comm.title': 'Notice Board',
+    'comm.record': 'Record {name}',
+    'comm.stamina': 'Finish a hunt with {n}+ stamina',
+    'comm.quality': 'Earn a {q} record or better',
+    'comm.done': 'Done',
+    'comm.reward': '+{n} field notes',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -133,6 +140,12 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'tool.glowbell.desc': '每局一次，辨明一條假蹤跡。',
     'result.toolUnlocked': '獲得道具：{name}',
     'hud.bell': '鈴',
+    'comm.title': '委託板',
+    'comm.record': '記錄{name}',
+    'comm.stamina': '以 ≥{n} 體力完成一局',
+    'comm.quality': '取得{q}以上記錄',
+    'comm.done': '已完成',
+    'comm.reward': '觀察筆記 +{n}',
   },
 };
 

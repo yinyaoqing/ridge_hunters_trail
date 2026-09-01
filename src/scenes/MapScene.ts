@@ -88,6 +88,7 @@ export class MapScene extends Phaser.Scene {
     this.audio = this.registry.get('audio');
     this.tools = this.registry.get('tools');
     this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
+    this.registry.set('lastComms', []); // 同上，清空委託完成行狀態
 
     this.buildBackground(s);
     this.spawnMistParticles(s);

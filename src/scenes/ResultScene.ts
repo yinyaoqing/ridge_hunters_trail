@@ -15,6 +15,9 @@ import { shareText } from '../core/share';
 import type { AudioBus } from '../core/audio';
 import type { ToolStore, ToolId } from '../core/tools';
 import {
+  dailyCommissions, evaluate, COMMISSION_REWARD_NOTES, type Commission, type CommissionStore,
+} from '../core/commissions';
+import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
   displayFont, stripBrackets,
 } from './paint';
@@ -74,6 +77,25 @@ export class ResultScene extends Phaser.Scene {
       // 離開 Result（Camp/Map create()）時再清空，避免下次進場殘留舊卡片
       const newTools = (this.registry.get('tools') as ToolStore).syncUnlocks(codex);
       this.registry.set('lastUnlocks', newTools);
+
+      // 委託判定：只在補獲時可能達成（evaluate 對 !caught 一律回 false），沿用 dk（同一取樣）
+      // 避免委託與分享卡對 UTC 午夜產生分歧；本次新完成的索引暫存進 registry，
+      // 供離開 create() 後的渲染區塊讀取（含 resize 重啟），離開 Result 時清空
+      const commStore = this.registry.get('commissions') as CommissionStore;
+      const comms = dailyCommissions(dk);
+      const status = commStore.statusFor(dk);
+      const ctx = {
+        caught, creatureId: creature.id, staminaLeft: Math.max(0, s.stamina), quality, mode: s.mode,
+      };
+      const newlyDone: number[] = [];
+      comms.forEach((c, i) => {
+        if (!status[i] && evaluate(c, ctx)) {
+          commStore.markDone(dk, i);
+          codex.addNotes(creature.id, COMMISSION_REWARD_NOTES);
+          newlyDone.push(i);
+        }
+      });
+      this.registry.set('lastComms', newlyDone);
     }
 
     const pal = this.pal;
@@ -88,6 +110,11 @@ export class ResultScene extends Phaser.Scene {
     const compactCards = h < 700;
     const cardStep = compactCards ? 22 : 40;
     const toolOffset = cardStep * showTools.length;
+    // 委託完成行：緊接道具卡堆疊在下方（只在補獲時可能非空，見 resolved 區塊註解）
+    const lastComms = (this.registry.get('lastComms') as number[] | undefined) ?? [];
+    const commsToday = dailyCommissions(dk); // 純函式、依 dk 決定性重算，供索引取回描述文字
+    const commStep = 24;
+    const totalOffset = toolOffset + commStep * lastComms.length;
 
     let title: string;
     let body: string;
@@ -126,21 +153,26 @@ export class ResultScene extends Phaser.Scene {
 
     // 道具解鎖卡（至多同幀 2 枚）：caught 排在圖鑑點列/分隔線下方；
     // !caught 疊在筆記掉落區之上，筆記掉落再依卡片數往下推 toolOffset
+    const toolBaseY = caught ? 470 : 486;
     showTools.forEach((id, i) => {
-      this.renderToolCard(cx, (caught ? 470 : 486) + i * cardStep, id, i18n, compactCards);
+      this.renderToolCard(cx, toolBaseY + i * cardStep, id, i18n, compactCards);
+    });
+    // 委託完成行接在道具卡之後（同一堆疊區塊，道具卡在上、委託行在下）
+    lastComms.forEach((idx, i) => {
+      this.renderCommissionLine(cx, toolBaseY + toolOffset + i * commStep, commsToday[idx], i18n);
     });
 
-    if (!caught) this.showNotesDrop(cx, 486 + toolOffset, creature.id, notes, codex, i18n);
+    if (!caught) this.showNotesDrop(cx, 486 + totalOffset, creature.id, notes, codex, i18n);
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
     // 依視窗高度夾限座標，避免矮視窗（如橫向手機）裁切按鈕；780 全高時維持原座標不變
     const runRound: number = this.registry.get('runRound');
     if (s.mode === 'daily') {
       // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊；
-      // 解鎖卡出現時再疊加 toolOffset，避免卡片與連勝列相撞
-      const streakY = caught ? Math.min(500 + toolOffset, h - 148) : Math.min(542 + toolOffset, h - 150);
+      // 解鎖卡／委託完成行出現時再疊加 totalOffset，避免卡片與連勝列相撞
+      const streakY = caught ? Math.min(500 + totalOffset, h - 148) : Math.min(542 + totalOffset, h - 150);
       const copyY = streakY + 52;
-      const campY = Math.min(caught ? 614 + toolOffset : streakY + 112, h - 30);
+      const campY = Math.min(caught ? 614 + totalOffset : streakY + 112, h - 30);
       const streak: StreakStore = this.registry.get('streak');
       const text = shareText(i18n, {
         dateKey: dk, caught, quality,
@@ -154,8 +186,8 @@ export class ResultScene extends Phaser.Scene {
       this.button(cx, campY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
-      const yPrimary = Math.min(552 + toolOffset, h - 96);
-      const ySecondary = Math.min(614 + toolOffset, h - 34);
+      const yPrimary = Math.min(552 + totalOffset, h - 96);
+      const ySecondary = Math.min(614 + totalOffset, h - 34);
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
         this.registry.set('session', newSession(runRound, rng));
         fadeToScene(this, 'Map');
@@ -271,6 +303,34 @@ export class ResultScene extends Phaser.Scene {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
       }).setOrigin(0.5).setAlpha(0);
       this.tweens.add({ targets: descText, alpha: 1, duration: 400, delay: 550 });
+    }
+  }
+
+  // 委託完成行：單行淡入（供給綠），格式「✓ 描述 — 獎勵」
+  private renderCommissionLine(cx: number, y: number, comm: Commission, i18n: I18n) {
+    const text = `✓ ${this.describeCommission(comm, i18n)} — ${i18n.t('comm.reward', { n: COMMISSION_REWARD_NOTES })}`;
+    const t = this.add.text(cx, y, text, {
+      fontFamily: FONTS.body, fontSize: '13px', color: cssHex(this.pal.supply),
+    }).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({ targets: t, alpha: 1, duration: 400, delay: 500 });
+  }
+
+  // 委託描述組字：依 kind 套用對應 i18n 樣板；quality 的 {q} 沿用 stampQuality
+  // 同款「zh-TW 取首字／en 取首詞」邏輯，避免長字串塞爆窄卡
+  // 註：CampScene 需要同一段邏輯繪製委託卡，依本專案「場景自成一體」慣例於該處重複實作
+  private describeCommission(c: Commission, i18n: I18n): string {
+    switch (c.kind) {
+      case 'record-creature': {
+        const cr = CREATURES.find((x) => x.id === c.creatureId)!;
+        return i18n.t('comm.record', { name: cr.names[i18n.locale()] });
+      }
+      case 'stamina-finish':
+        return i18n.t('comm.stamina', { n: c.min });
+      case 'quality-any': {
+        const full = i18n.t(QUALITY_KEY[c.quality]);
+        const q = i18n.locale() === 'zh-TW' ? full.slice(0, 1) : full.split(' ')[0];
+        return i18n.t('comm.quality', { q });
+      }
     }
   }
 

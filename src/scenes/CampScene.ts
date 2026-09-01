@@ -7,6 +7,9 @@ import type { CodexStore } from '../core/codex';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
+import {
+  dailyCommissions, COMMISSION_REWARD_NOTES, type Commission, type CommissionStore,
+} from '../core/commissions';
 import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, guardLowFps, PARTICLE_CAPS,
@@ -34,6 +37,7 @@ export class CampScene extends Phaser.Scene {
     const cx = w / 2;
     this.cameras.main.setBackgroundColor(pal.bg);
     this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
+    this.registry.set('lastComms', []); // 同上，清空委託完成行狀態
     fadeIn(this);
     restartOnResize(this);
     this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart()); // Help 關閉後刷新語言
@@ -81,6 +85,31 @@ export class CampScene extends Phaser.Scene {
       () => fadeToScene(this, 'Codex'));
     by += 72;
 
+    // 委託板：三則每日委託（同 dailyKey 種子，與 ResultScene 結算共用判定邏輯）；
+    // 矮視窗（h<640）已很擁擠，收合為單行「委託板 n/3」，避免與下方工具列相撞
+    const commStore = this.registry.get('commissions') as CommissionStore;
+    const comms = dailyCommissions(today);
+    const commStatus = commStore.statusFor(today);
+    if (h < 640) {
+      const doneCount = commStatus.filter(Boolean).length;
+      this.add.text(cx, by, `${i18n.t('comm.title')} ${doneCount}/3`, {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+      }).setOrigin(0.5).setLetterSpacing(1);
+      by += 28;
+    } else {
+      this.add.text(cx, by, i18n.t('comm.title'), {
+        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
+      }).setOrigin(0.5).setLetterSpacing(1.5);
+      by += 20;
+      const rowH = 34;
+      const rowGap = 6;
+      comms.forEach((c, i) => {
+        this.drawCommissionRow(cx, by, bw, rowH, c, commStatus[i], i18n);
+        by += rowH + rowGap;
+      });
+      by += 4; // 與工具列留一點呼吸空間
+    }
+
     // 小工具列：靜音＋說明＋語言（三鈕置中排列，18px 間距）
     const xSound = cx - 80;
     const xHelp = cx - 18;
@@ -123,6 +152,45 @@ export class CampScene extends Phaser.Scene {
     if (!enabled) {
       this.add.graphics().lineStyle(1.5, pal.paperDim, 0.9)
         .lineBetween(x - 9, y + 9, x + 9, y - 9);
+    }
+  }
+
+  // 委託窄卡：panel 色圓角矩形，左側描述、右側完成勾或獎勵提示
+  private drawCommissionRow(
+    cx: number, y: number, w: number, h: number, c: Commission, done: boolean, i18n: I18n,
+  ) {
+    const pal = this.pal;
+    this.add.graphics().fillStyle(pal.panel, 0.9).fillRoundedRect(cx - w / 2, y, w, h, 6);
+    this.add.text(cx - w / 2 + 12, y + h / 2, this.describeCommission(c, i18n), {
+      fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(done ? pal.paperDim : pal.paper),
+    }).setOrigin(0, 0.5);
+    if (done) {
+      this.add.text(cx + w / 2 - 14, y + h / 2, '✓', {
+        fontFamily: FONTS.body, fontSize: '15px', color: cssHex(pal.gold), fontStyle: 'bold',
+      }).setOrigin(1, 0.5);
+    } else {
+      this.add.text(cx + w / 2 - 12, y + h / 2, i18n.t('comm.reward', { n: COMMISSION_REWARD_NOTES }), {
+        fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.supply),
+      }).setOrigin(1, 0.5);
+    }
+  }
+
+  // 委託描述組字：與 ResultScene.describeCommission 邏輯相同（依專案「場景自成一體」
+  // 慣例於此重複實作，而非跨場景共用私有方法）；{q} 沿用 stampQuality 的
+  // 「zh-TW 取首字／en 取首詞」短形式，避免長字串塞爆窄卡
+  private describeCommission(c: Commission, i18n: I18n): string {
+    switch (c.kind) {
+      case 'record-creature': {
+        const cr = CREATURES.find((x) => x.id === c.creatureId)!;
+        return i18n.t('comm.record', { name: cr.names[i18n.locale()] });
+      }
+      case 'stamina-finish':
+        return i18n.t('comm.stamina', { n: c.min });
+      case 'quality-any': {
+        const full = i18n.t(QUALITY_KEY[c.quality]);
+        const q = i18n.locale() === 'zh-TW' ? full.slice(0, 1) : full.split(' ')[0];
+        return i18n.t('comm.quality', { q });
+      }
     }
   }
 
@@ -198,3 +266,8 @@ export class CampScene extends Phaser.Scene {
       .on('pointerup', () => { txt.setScale(1); this.audio.play('click'); onClick(); });
   }
 }
+
+// 品質字串鍵映射：同 ResultScene 的 QUALITY_KEY，避免模板字面型別無法收斂為 MsgKey 聯集
+const QUALITY_KEY = {
+  bronze: 'quality.bronze', silver: 'quality.silver', gold: 'quality.gold',
+} as const;
