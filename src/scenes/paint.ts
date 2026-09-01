@@ -142,6 +142,15 @@ export function creatureTexKey(scene: Phaser.Scene, id: string): string {
   return scene.textures.exists(`spr-${id}`) ? `spr-${id}` : `sil-${id}`;
 }
 
+// 剪影母檔 208×176（實際墨形寬約 144px）與 sprite 128×128（實際造型寬約 112px）
+// 兩者原生尺寸不同，同一 setScale 會讓 sprite 明顯偏小；此係數讓兩者在畫面上等大。
+export const SPRITE_SCALE_RATIO = 1.3;
+
+// 依實際使用的貼圖回傳顯示倍率：sprite 放大 SPRITE_SCALE_RATIO，剪影沿用原倍率。
+export function creatureScale(texKey: string, silhouetteScale: number): number {
+  return texKey.startsWith('spr-') ? silhouetteScale * SPRITE_SCALE_RATIO : silhouetteScale;
+}
+
 // 去除字串前後的方括號（含全形），用於按鈕文字裁切「[ ]」外框
 export const stripBrackets = (s: string): string =>
   s.replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '');

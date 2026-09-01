@@ -9,6 +9,7 @@ import type { I18n } from '../core/i18n';
 import type { Locale } from '../core/types';
 import {
   cssHex, BRUSH_RADIUS, FONTS, QUALITY_COLORS, displayFont, stripBrackets, creatureTexKey,
+  creatureScale,
 } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
@@ -99,7 +100,7 @@ export class CodexScene extends Phaser.Scene {
 
     const texKey = creatureTexKey(this, id);
     if (this.textures.exists(texKey)) {
-      const img = this.add.image(92, y + 2, texKey).setScale(0.3);
+      const img = this.add.image(92, y + 2, texKey).setScale(creatureScale(texKey, 0.3));
       if (!discovered) img.setTintFill(0x10160f).setAlpha(0.85); // 墨影 teaser
       row.add(img);
     } else {

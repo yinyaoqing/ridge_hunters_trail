@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2e3f45"/>
+      <stop offset="0.55" stop-color="#1b262b"/>
+      <stop offset="1" stop-color="#0d1418"/>
+    </linearGradient>
+    <linearGradient id="legGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b262b"/>
+      <stop offset="1" stop-color="#0d1418"/>
+    </linearGradient>
+    <radialGradient id="shade" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+      <path d="M62 58 Q40 30 16 30 Q4 42 14 58 Q26 72 58 70 Z" fill="url(#bodyGrad)"/>
+      <path d="M66 58 Q88 30 112 30 Q124 42 114 58 Q102 72 70 70 Z" fill="url(#bodyGrad)"/>
+      <path d="M60 68 Q42 78 34 96 Q46 106 58 96 Q64 86 62 72 Z" fill="url(#bodyGrad)" opacity="0.92"/>
+      <path d="M68 68 Q86 78 94 96 Q82 106 70 96 Q64 86 66 72 Z" fill="url(#bodyGrad)" opacity="0.92"/>
+      <g stroke="#c9b1d6" fill="none" stroke-linecap="round" opacity="0.55">
+        <path d="M22 40 Q38 44 52 56" stroke-width="2"/>
+        <path d="M18 52 Q34 56 50 64" stroke-width="1.6" opacity="0.7"/>
+        <path d="M106 40 Q90 44 76 56" stroke-width="2"/>
+        <path d="M110 52 Q94 56 78 64" stroke-width="1.6" opacity="0.7"/>
+        <path d="M44 84 Q52 82 58 78" stroke-width="1.6"/>
+        <path d="M84 84 Q76 82 70 78" stroke-width="1.6"/>
+      </g>
+      <ellipse cx="64" cy="68" rx="8" ry="22" fill="#1b262b"/>
+      <ellipse cx="64" cy="52" rx="7" ry="8" fill="#2e3f45"/>
+      <path d="M60 46 Q52 34 42 30" stroke="#c9b1d6" stroke-width="2" fill="none"
+            stroke-linecap="round" opacity="0.8"/>
+      <path d="M68 46 Q76 34 86 30" stroke="#c9b1d6" stroke-width="2" fill="none"
+            stroke-linecap="round" opacity="0.8"/>
+      <circle cx="60" cy="52" r="2" fill="#c9b1d6"/>
+      <circle cx="68" cy="52" r="2" fill="#c9b1d6"/>
+      <circle cx="64" cy="52" r="10" fill="#c9b1d6" opacity="0.16"/>
+      <g fill="#c9b1d6" opacity="0.3"><circle cx="42" cy="30" r="2.2"/><circle cx="86" cy="30" r="2.2"/></g>
+</svg>

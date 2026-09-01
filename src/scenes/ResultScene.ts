@@ -20,7 +20,7 @@ import {
 } from '../core/commissions';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
-  displayFont, stripBrackets, creatureTexKey,
+  displayFont, stripBrackets, creatureTexKey, creatureScale,
 } from './paint';
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, addGlowIfWebGL, PARTICLE_CAPS,
@@ -445,7 +445,7 @@ export class ResultScene extends Phaser.Scene {
     dashedCircle(ring, cx, cy, 92, color, 0.35, 1.4, 2, 8);
     const texKey = creatureTexKey(this, creatureId);
     if (this.textures.exists(texKey)) {
-      const sil = this.add.image(cx, cy + 4, texKey).setScale(1.05);
+      const sil = this.add.image(cx, cy + 4, texKey).setScale(creatureScale(texKey, 1.05));
       // setTint（非 tintFill）疊染異彩色，保留貼圖原始形狀明暗
       if (iris) sil.setTint(color);
       addGlowIfWebGL(this, sil, this.pal.glow);

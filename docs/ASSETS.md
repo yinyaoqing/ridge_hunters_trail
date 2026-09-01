@@ -15,9 +15,11 @@
 | 路徑與命名 | `public/assets/creatures/<id>.png` |
 | 生物 id 清單 | `mistfawn`、`emberquill`、`thicketloom`、`dewhopper`、`veilmoth`、`lanternshrew`、`ridgecrest`、`plumetail`（對照 `src/data/creatures.ts`） |
 
-> **顯示尺寸警語**：sprite 顯示尺寸沿用既有剪影的 `setScale` 係數（QTE 1.35／結算 1.05／圖鑑 0.3，
-> 係數以剪影原生 208×176 調校）；128×128 素材上線後可能偏大或偏小，正式素材到位後需人工核對
-> 三處顯示比例並調整係數。
+> **顯示尺寸（已處理）**：剪影母檔原生 208×176（實際墨形寬約 144px），sprite 為 128×128
+> （實際造型寬約 112px），同一 `setScale` 會讓 sprite 明顯偏小。`paint.ts` 的
+> `creatureScale(texKey, silhouetteScale)` 依實際貼圖回傳倍率——sprite 乘上
+> `SPRITE_SCALE_RATIO`（1.3），剪影沿用原值——三處消費端（QTE 1.35／結算 1.05／圖鑑 0.3）
+> 皆已改用此函式，故 sprite 與剪影在畫面上等大。新素材若改變造型佔比，調整該常數即可。
 
 ### 運作方式
 
@@ -30,6 +32,29 @@
   三處消費端皆已改用 `creatureTexKey`，剪影/純色幾何 fallback 分支維持不變。
 - 因此：**放入符合命名的 PNG 檔即可局部或全部升級單一生物的視覺**，不需要改動任何程式碼、
   不需要全部生物同時到齊，且移除檔案後會在下次載入時自動恢復剪影顯示。
+
+### 內建素材與重新產生
+
+本倉庫已附一套原創生物 sprite（`public/assets/creatures/*.png`，8 隻，合計約 39 KB）。
+造型為程式化向量原稿，母檔與產生器如下：
+
+| 檔案 | 用途 |
+|---|---|
+| `scripts/creature-art.mjs` | 8 隻生物的向量原稿（可編輯的美術母檔），含造型註解與設計意圖 |
+| `scripts/build-sprites.mjs` | 光柵化腳本：輸出 `art/creatures/*.svg` 與 `public/assets/creatures/*.png`，並檢查 ≤64 KB 預算 |
+| `art/creatures/*.svg` | 產生出的 SVG 母檔（供外部向量軟體再加工） |
+
+重新產生（光柵器 `@resvg/resvg-js` 僅為建置期工具，刻意不寫入 `package.json` 相依，
+以維持執行期零額外相依）：
+
+```bash
+npm i --no-save @resvg/resvg-js
+node scripts/build-sprites.mjs
+npm r --no-save @resvg/resvg-js
+```
+
+要替換為其他來源（例如 AI 生成後手工簡化）的素材時，直接覆蓋 `public/assets/creatures/<id>.png`
+即可，無須理會上述腳本；腳本僅是內建這套向量素材的可重現產生路徑。
 
 ### 路徑寫法（相對路徑，無前導斜線）
 
