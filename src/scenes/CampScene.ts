@@ -6,11 +6,13 @@ import { CREATURES } from '../data/creatures';
 import type { CodexStore } from '../core/codex';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
+import type { AudioBus } from '../core/audio';
 import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
 export class CampScene extends Phaser.Scene {
   private pal!: Palette;
+  private audio!: AudioBus;
 
   constructor() {
     super('Camp');
@@ -22,6 +24,7 @@ export class CampScene extends Phaser.Scene {
     const codex: CodexStore = this.registry.get('codex');
     const streak: StreakStore = this.registry.get('streak');
     const runRound: number = this.registry.get('runRound');
+    this.audio = this.registry.get('audio');
     this.pal = getPalette(1); // 營地固定霧綠配色
     const pal = this.pal;
     const w = this.scale.width;
@@ -75,25 +78,49 @@ export class CampScene extends Phaser.Scene {
       () => fadeToScene(this, 'Codex'));
     by += 72;
 
-    // 小工具列：說明＋語言
-    this.add.text(cx - 40, by, '?', {
+    // 小工具列：靜音＋說明＋語言（三鈕置中排列，18px 間距）
+    const xSound = cx - 80;
+    const xHelp = cx - 18;
+    const xLang = cx + 62;
+    this.drawSoundGlyph(xSound, by, this.audio.enabled());
+    this.add.rectangle(xSound, by, 44, 44, 0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        this.audio.toggle();
+        this.scene.restart(); // 較簡單一致：與語言鈕相同，用 restart 取代局部重繪
+      });
+    this.add.text(xHelp, by, '?', {
       fontFamily: FONTS.display, fontSize: '18px', color: cssHex(pal.gold),
     }).setOrigin(0.5);
-    this.add.rectangle(cx - 40, by, 44, 44, 0, 0)
+    this.add.rectangle(xHelp, by, 44, 44, 0, 0)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
         this.scene.launch('Help', { from: 'Camp' });
         this.scene.pause();
       });
-    this.add.text(cx + 40, by, 'EN / 中', {
+    this.add.text(xLang, by, 'EN / 中', {
       fontFamily: FONTS.body, fontSize: '13px', color: cssHex(pal.gold),
     }).setOrigin(0.5).setLetterSpacing(1);
-    this.add.rectangle(cx + 40, by, 80, 44, 0, 0)
+    this.add.rectangle(xLang, by, 80, 44, 0, 0)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
         this.scene.restart();
       });
+
+    this.audio.ambient(true); // 營地環境風聲（靜音時 ambient 內部自行忽略）
+  }
+
+  // ♪ 圖示：開＝金色，關＝暗色＋斜線（與 MapScene 標記 chip 同語彙）
+  private drawSoundGlyph(x: number, y: number, enabled: boolean) {
+    const pal = this.pal;
+    this.add.text(x, y, '♪', {
+      fontFamily: FONTS.display, fontSize: '18px', color: cssHex(enabled ? pal.gold : pal.paperDim),
+    }).setOrigin(0.5);
+    if (!enabled) {
+      this.add.graphics().lineStyle(1.5, pal.paperDim, 0.9)
+        .lineBetween(x - 9, y + 9, x + 9, y - 9);
+    }
   }
 
   // 山稜背景：三層漸遠剪影（程式繪製，延續水墨方向）
@@ -151,6 +178,6 @@ export class CampScene extends Phaser.Scene {
       .on('pointerover', () => draw(true))
       .on('pointerout', () => { draw(false); txt.setScale(1); })
       .on('pointerdown', () => txt.setScale(0.96))
-      .on('pointerup', () => { txt.setScale(1); onClick(); });
+      .on('pointerup', () => { txt.setScale(1); this.audio.play('click'); onClick(); });
   }
 }

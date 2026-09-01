@@ -5,6 +5,7 @@ import { createCodex } from './core/codex';
 import { createI18n, detectLocale } from './core/i18n';
 import { createStreak } from './core/daily';
 import { createRunState } from './core/runstate';
+import { createAudio } from './core/audio';
 import { BootScene } from './scenes/BootScene';
 import { CampScene } from './scenes/CampScene';
 import { MapScene } from './scenes/MapScene';
@@ -43,6 +44,11 @@ function launch(): void {
         game.registry.set('runState', runState);
         game.registry.set('runRound', runState.round());
         game.registry.set('streak', createStreak(storage));
+        // Safari 舊版無 window.AudioContext，退回 webkitAudioContext 前綴；
+        // 皆缺席時 factory 內 throw，createAudio 會靜默降級為無聲
+        game.registry.set('audio', createAudio(storage, () => new (
+          window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        )()));
       },
     },
   });

@@ -5,6 +5,7 @@ import { resolveQte, type SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
+import type { AudioBus } from '../core/audio';
 import { cssHex, FONTS, displayFont } from './paint';
 import { fadeIn, fadeToScene } from './fx';
 
@@ -21,6 +22,7 @@ export class QteScene extends Phaser.Scene {
   private pal!: Palette;
   private ending = false;
   private sil?: Phaser.GameObjects.Image;
+  private audio!: AudioBus;
 
   constructor() {
     super('Qte');
@@ -30,6 +32,8 @@ export class QteScene extends Phaser.Scene {
     fadeIn(this);
     const s: SessionState = this.registry.get('session');
     this.i18n = this.registry.get('i18n');
+    this.audio = this.registry.get('audio');
+    this.audio.ambient(false); // QTE 期間停風聲，專注音效回饋
     this.pal = getPalette(s.round);
     this.cfg = getDifficulty(s.round).qte;
     this.q = newQte(this.cfg, this.registry.get('rng') as Rng);
@@ -102,8 +106,13 @@ export class QteScene extends Phaser.Scene {
   private onPress() {
     if (this.ending) return;
     press(this.q, this.cfg, this.registry.get('rng') as Rng);
-    if (this.q.lastHit) this.cameras.main.flash(110, 216, 200, 116);
-    else this.cameras.main.shake(70, 0.004);
+    if (this.q.lastHit) {
+      this.cameras.main.flash(110, 216, 200, 116);
+      this.audio.play('hit');
+    } else {
+      this.cameras.main.shake(70, 0.004);
+      this.audio.play('miss');
+    }
     if (this.q.done) {
       this.ending = true;
       const s: SessionState = this.registry.get('session');
@@ -115,6 +124,7 @@ export class QteScene extends Phaser.Scene {
 
   // 成功：剪影亮起；失敗：剪影滑出淡去（溜走）。900ms 後入結算
   private playEnding(success: boolean) {
+    this.audio.play(success ? 'caught' : 'escaped');
     if (this.sil) {
       this.tweens.add(success
         ? { targets: this.sil, alpha: 0.85, scale: 1.5, duration: 600, ease: 'Cubic.easeOut' }

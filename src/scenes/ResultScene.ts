@@ -10,6 +10,7 @@ import type { I18n } from '../core/i18n';
 import { dailyKey, type StreakStore } from '../core/daily';
 import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
+import type { AudioBus } from '../core/audio';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
   displayFont, stripBrackets,
@@ -20,6 +21,7 @@ const GLOW_KEY = 'result-glow';
 
 export class ResultScene extends Phaser.Scene {
   private pal!: Palette;
+  private audio!: AudioBus;
 
   constructor() {
     super('Result');
@@ -30,6 +32,8 @@ export class ResultScene extends Phaser.Scene {
     const rng: Rng = this.registry.get('rng');
     const codex: CodexStore = this.registry.get('codex');
     const i18n: I18n = this.registry.get('i18n');
+    this.audio = this.registry.get('audio');
+    this.audio.ambient(false); // 結算畫面停風聲
     const loc = i18n.locale();
     const creature = CREATURES.find((c) => c.id === s.level.creatureId)!;
     const outcome = s.phase;
@@ -283,7 +287,7 @@ export class ResultScene extends Phaser.Scene {
       .on('pointerover', () => draw(true))
       .on('pointerout', () => { draw(false); txt.setScale(1); })
       .on('pointerdown', () => txt.setScale(0.96))
-      .on('pointerup', () => { txt.setScale(1); onClick(); });
+      .on('pointerup', () => { txt.setScale(1); this.audio.play('click'); onClick(); });
   }
 }
 

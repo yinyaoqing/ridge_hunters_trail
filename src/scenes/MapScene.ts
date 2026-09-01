@@ -6,6 +6,7 @@ import { key } from '../core/clues';
 import type { Vec2 } from '../core/geometry';
 import type { Clue } from '../core/types';
 import type { I18n } from '../core/i18n';
+import type { AudioBus } from '../core/audio';
 import {
   cssHex, cssRgba, dashedCircle, dashedLine, drawClueToken, drawSupply,
   BRUSH_RADIUS, FONTS, displayFont,
@@ -35,7 +36,12 @@ export class MapScene extends Phaser.Scene {
   private markChipText?: Phaser.GameObjects.Text;
   private markChipX = 0;
   private markChipY = 0;
+  private soundChipG?: Phaser.GameObjects.Graphics;
+  private soundChipText?: Phaser.GameObjects.Text;
+  private soundChipX = 0;
+  private soundChipY = 0;
   private skipFirstRunHelp = false;
+  private audio!: AudioBus;
 
   constructor() {
     super('Map');
@@ -64,6 +70,7 @@ export class MapScene extends Phaser.Scene {
     this.ox = Math.floor((w - this.cell * s.level.mapSize) / 2);
     this.oy = HUD_HEIGHT + Math.max(4, Math.floor((h - HUD_HEIGHT - this.cell * s.level.mapSize) / 2));
     this.cameras.main.setBackgroundColor(this.pal.bg);
+    this.audio = this.registry.get('audio');
 
     this.buildBackground(s);
     this.buildHud();
@@ -80,6 +87,7 @@ export class MapScene extends Phaser.Scene {
     restartOnResize(this);
     fadeIn(this);
     this.maybeShowFirstRunHelp();
+    this.audio.ambient(true); // 探索環境風聲（靜音時 ambient 內部自行忽略）
   }
 
   // 首次啟動自動彈出玩法說明（localStorage 記憶，不可用時僅本次顯示）
@@ -216,30 +224,36 @@ export class MapScene extends Phaser.Scene {
       }).setOrigin(1, 0);
     }
 
-    // 語言切換鈕、玩法說明鈕與標記模式鈕（設計板：金邊小chip，由右至左排列）
+    // 語言切換鈕、玩法說明鈕、標記模式鈕與靜音鈕（設計板：金邊小chip，由右至左排列）
+    // 窄螢幕（w<560）隱藏語言 chip 並將標記／靜音 chip 右移，避免與置中體力條相撞
+    // （語言切換仍可從 Camp/Help 進行）
     const chipY = 13;
     const chipH = 30;
-    const xHelp = w - 12 - 32;        // '?' chip 左緣
-    const xLang = xHelp - 8 - 72;     // 語言 chip 左緣
-    const xMark = xLang - 8 - 60;     // 標記 chip 左緣
+    const xHelp = w - 12 - 32;                            // '?' chip 左緣
+    const xLang = xHelp - 8 - 72;                         // 語言 chip 左緣（僅非 compact 顯示）
+    const xMark = compact ? xHelp - 8 - 60 : xLang - 8 - 60; // 標記 chip 左緣
+    const xSound = xMark - 8 - 32;                        // 靜音 chip 左緣
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
-    chip.strokeRoundedRect(xLang, chipY, 72, chipH, BRUSH_RADIUS);
+    if (!compact) {
+      chip.strokeRoundedRect(xLang, chipY, 72, chipH, BRUSH_RADIUS);
+      this.add.text(xLang + 36, chipY + chipH / 2, 'EN / 中', {
+        fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
+      }).setOrigin(0.5).setLetterSpacing(1);
+      this.add.rectangle(xLang + 36, chipY + chipH / 2, 72, 44, 0, 0) // 44px 命中區
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', (p: Phaser.Input.Pointer) => {
+          p.event.stopPropagation();
+          const i18n = this.i18n();
+          i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
+          // roundText 的展示字體隨語系而異且僅在 create() 時設定，
+          // 用 restart（既有的 resize 重建機制）取代 redraw 以確保字體刷新；
+          // 帶入 skipFirstRunHelp 避免儲存降級時每次切語言都重新彈出玩法說明
+          this.scene.restart({ skipFirstRunHelp: true });
+        });
+    }
     chip.strokeRoundedRect(xHelp, chipY, 32, chipH, { tl: 5, tr: 9, br: 4, bl: 8 });
-    this.add.text(xLang + 36, chipY + chipH / 2, 'EN / 中', {
-      fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
-    }).setOrigin(0.5).setLetterSpacing(1);
-    this.add.rectangle(xLang + 36, chipY + chipH / 2, 72, 44, 0, 0) // 44px 命中區
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', (p: Phaser.Input.Pointer) => {
-        p.event.stopPropagation();
-        const i18n = this.i18n();
-        i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
-        // roundText 的展示字體隨語系而異且僅在 create() 時設定，
-        // 用 restart（既有的 resize 重建機制）取代 redraw 以確保字體刷新；
-        // 帶入 skipFirstRunHelp 避免儲存降級時每次切語言都重新彈出玩法說明
-        this.scene.restart({ skipFirstRunHelp: true });
-      });
+    chip.strokeRoundedRect(xSound, chipY, 32, chipH, { tl: 5, tr: 9, br: 4, bl: 8 });
     this.add.text(xHelp + 16, chipY + chipH / 2, '?', {
       fontFamily: FONTS.display, fontSize: '16px', color: cssHex(pal.gold),
     }).setOrigin(0.5);
@@ -248,6 +262,22 @@ export class MapScene extends Phaser.Scene {
       .on('pointerdown', (p: Phaser.Input.Pointer) => {
         p.event.stopPropagation();
         this.openHelp();
+      });
+
+    // 靜音鈕（開＝金色 ♪、關＝暗色 ♪＋斜線；獨立 Graphics 供重繪，座標存為欄位）
+    this.soundChipX = xSound;
+    this.soundChipY = chipY;
+    this.soundChipG = this.add.graphics();
+    this.soundChipText = this.add.text(xSound + 16, chipY + chipH / 2, '♪', {
+      fontFamily: FONTS.display, fontSize: '15px', color: cssHex(pal.gold),
+    }).setOrigin(0.5);
+    this.drawSoundChip(xSound, chipY, 32, chipH);
+    this.add.rectangle(xSound + 16, chipY + chipH / 2, 32, 44, 0, 0) // 44px 命中區
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (p: Phaser.Input.Pointer) => {
+        p.event.stopPropagation();
+        this.audio.toggle();
+        this.drawSoundChip(xSound, chipY, 32, chipH);
       });
 
     // 標記模式鈕（開/關填色不同，需獨立 Graphics 供重繪；座標存為欄位供 updateHud 重繪標籤時使用）
@@ -265,6 +295,19 @@ export class MapScene extends Phaser.Scene {
         this.markMode = !this.markMode;
         this.drawMarkChip(xMark, chipY, 60, chipH);
       });
+  }
+
+  // 靜音 chip 圖示：邊框已由 buildHud 靜態繪製（同 '?' chip），此處僅切換字色與斜線
+  private drawSoundChip(x: number, y: number, w: number, h: number) {
+    const pal = this.pal;
+    const g = this.soundChipG!;
+    g.clear();
+    const enabled = this.audio.enabled();
+    this.soundChipText!.setColor(cssHex(enabled ? pal.gold : pal.paperDim));
+    if (!enabled) {
+      g.lineStyle(1.3, pal.paperDim, 0.85);
+      g.lineBetween(x + 8, y + h - 7, x + w - 8, y + 7);
+    }
   }
 
   private drawMarkChip(x: number, y: number, w: number, h: number) {
@@ -327,10 +370,14 @@ export class MapScene extends Phaser.Scene {
         floatText(this, dest.x, dest.y - cs * 0.5, `-${cost}`, cssRgba(this.pal.paper, 0.75));
         if (gotSupply) {
           floatText(this, dest.x, dest.y - cs, `+${getDifficulty(s.round).supplyRestore}`, cssHex(this.pal.supply));
+          this.audio.play('pickup');
         }
         if (s.readClues.size > readBefore) {
           const clue = s.level.clues.find((c) => key(c.position) === key(to));
-          if (clue) this.playReveal(clue);
+          if (clue) {
+            this.playReveal(clue);
+            this.audio.play('reveal');
+          }
         }
         this.redraw();
         this.afterMove();
