@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { canMove, move, toggleMark, type SessionState } from '../core/session';
+import { canMove, move, toggleMark, TERRAIN_COST, type SessionState } from '../core/session';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { key } from '../core/clues';
@@ -10,13 +10,16 @@ import {
   cssHex, cssRgba, dashedCircle, dashedLine, drawClueToken, drawSupply,
   BRUSH_RADIUS, FONTS,
 } from './paint';
-import { restartOnResize, fadeIn } from './fx';
+import { restartOnResize, fadeIn, fadeToScene, floatText } from './fx';
 
 const HUD_HEIGHT = 56;
 const BG_KEY = 'map-bg';
 
 export class MapScene extends Phaser.Scene {
   private g!: Phaser.GameObjects.Graphics;
+  private pg!: Phaser.GameObjects.Graphics; // 玩家專用層
+  private animating = false;
+  private lowTween?: Phaser.Tweens.Tween;
   private hudG!: Phaser.GameObjects.Graphics;
   private roundText!: Phaser.GameObjects.Text;
   private stamLabel!: Phaser.GameObjects.Text;
@@ -53,6 +56,7 @@ export class MapScene extends Phaser.Scene {
     this.buildBackground(s);
     this.buildHud();
     this.g = this.add.graphics();
+    this.pg = this.add.graphics();
 
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
@@ -99,11 +103,7 @@ export class MapScene extends Phaser.Scene {
     else if (jd(this.cursors.right)) to = { x: s.player.x + 1, y: s.player.y };
     else if (jd(this.cursors.up)) to = { x: s.player.x, y: s.player.y - 1 };
     else if (jd(this.cursors.down)) to = { x: s.player.x, y: s.player.y + 1 };
-    if (to && canMove(s, to)) {
-      move(s, to);
-      this.redraw();
-      this.afterMove();
-    }
+    if (to) this.doMove(to);
   }
 
   private session(): SessionState {
@@ -286,17 +286,41 @@ export class MapScene extends Phaser.Scene {
       this.redraw();
       return;
     }
-    if (canMove(s, cellPos)) {
-      move(s, cellPos);
-      this.redraw();
-      this.afterMove();
-    }
+    this.doMove(cellPos);
+  }
+
+  private doMove(to: Vec2) {
+    const s = this.session();
+    if (this.animating || !canMove(s, to)) return;
+    const cs = this.cell;
+    const from = { x: this.ox + s.player.x * cs + cs / 2, y: this.oy + s.player.y * cs + cs / 2 };
+    const dest = { x: this.ox + to.x * cs + cs / 2, y: this.oy + to.y * cs + cs / 2 };
+    const cost = TERRAIN_COST[s.level.terrain[to.y][to.x]];
+    const suppliesBefore = s.level.supplies.length;
+    move(s, to);
+    const gotSupply = s.level.supplies.length < suppliesBefore;
+
+    this.animating = true;
+    const pos = { ...from };
+    this.tweens.add({
+      targets: pos, x: dest.x, y: dest.y, duration: 100, ease: 'Sine.easeOut',
+      onUpdate: () => this.drawPlayer(pos.x, pos.y),
+      onComplete: () => {
+        this.animating = false;
+        floatText(this, dest.x, dest.y - cs * 0.5, `-${cost}`, cssRgba(this.pal.paper, 0.75));
+        if (gotSupply) {
+          floatText(this, dest.x, dest.y - cs, '+10', cssHex(this.pal.supply));
+        }
+        this.redraw();
+        this.afterMove();
+      },
+    });
   }
 
   private afterMove() {
     const s = this.session();
-    if (s.phase === 'qte') this.scene.start('Qte');
-    else if (s.phase === 'exhausted') this.scene.start('Result');
+    if (s.phase === 'qte') fadeToScene(this, 'Qte');
+    else if (s.phase === 'exhausted') fadeToScene(this, 'Result');
   }
 
   private redraw() {
@@ -332,12 +356,19 @@ export class MapScene extends Phaser.Scene {
 
     // 玩家：光暈＋紙墨白圓點（設計板）
     const pp = px(s.player);
-    this.g.fillStyle(pal.gold, 0.1).fillCircle(pp.x, pp.y, cs * 0.62);
-    this.g.fillStyle(pal.gold, 0.16).fillCircle(pp.x, pp.y, cs * 0.44);
-    this.g.lineStyle(1.2, pal.paper, 0.5).strokeCircle(pp.x, pp.y, cs * 0.36);
-    this.g.fillStyle(pal.paper, 1).fillCircle(pp.x, pp.y, cs * 0.26);
+    this.drawPlayer(pp.x, pp.y);
 
     this.updateHud(s);
+  }
+
+  private drawPlayer(x: number, y: number) {
+    const cs = this.cell;
+    const pal = this.pal;
+    this.pg.clear();
+    this.pg.fillStyle(pal.gold, 0.1).fillCircle(x, y, cs * 0.62);
+    this.pg.fillStyle(pal.gold, 0.16).fillCircle(x, y, cs * 0.44);
+    this.pg.lineStyle(1.2, pal.paper, 0.5).strokeCircle(x, y, cs * 0.36);
+    this.pg.fillStyle(pal.paper, 1).fillCircle(x, y, cs * 0.26);
   }
 
   private updateHud(s: SessionState) {
@@ -359,9 +390,20 @@ export class MapScene extends Phaser.Scene {
     this.hudG.fillStyle(0x0d1310, 1).fillRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
     this.hudG.lineStyle(1, pal.paper, 0.18).strokeRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
     const ratio = Math.max(0, Math.min(1, s.stamina / budget));
+    const low = ratio > 0 && ratio < 0.25;
     if (ratio > 0) {
-      this.hudG.fillStyle(pal.gold, 1)
+      this.hudG.fillStyle(low ? pal.mark : pal.gold, 1)
         .fillRoundedRect(bx + 1, by + 1, Math.max(6, (bw - 2) * ratio), bh - 2, { tl: 7, tr: 2, br: 6, bl: 3 });
+    }
+    if (low && !this.lowTween) {
+      this.lowTween = this.tweens.add({
+        targets: this.hudG, alpha: { from: 1, to: 0.55 },
+        duration: 700, yoyo: true, repeat: -1,
+      });
+    } else if (!low && this.lowTween) {
+      this.lowTween.stop();
+      this.lowTween = undefined;
+      this.hudG.setAlpha(1);
     }
   }
 

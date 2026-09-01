@@ -5,6 +5,7 @@ import { getPalette } from '../core/palette';
 import { CREATURES } from '../data/creatures';
 import type { I18n } from '../core/i18n';
 import { cssHex, BRUSH_RADIUS, FONTS } from './paint';
+import { fadeIn, fadeToScene } from './fx';
 
 export class CodexScene extends Phaser.Scene {
   constructor() {
@@ -12,6 +13,7 @@ export class CodexScene extends Phaser.Scene {
   }
 
   create() {
+    fadeIn(this);
     const codex: CodexStore = this.registry.get('codex');
     const i18n: I18n = this.registry.get('i18n');
     const session: SessionState = this.registry.get('session');
@@ -82,6 +84,6 @@ export class CodexScene extends Phaser.Scene {
     }).setOrigin(0.5).setLetterSpacing(2);
     this.add.rectangle(cx, by, bw, bh, 0, 0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.start('Map'));
+      .on('pointerdown', () => fadeToScene(this, 'Map'));
   }
 }

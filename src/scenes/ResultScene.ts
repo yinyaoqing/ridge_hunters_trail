@@ -6,6 +6,7 @@ import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import { cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS } from './paint';
+import { fadeIn, fadeToScene } from './fx';
 
 const GLOW_KEY = 'result-glow';
 
@@ -20,6 +21,7 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create() {
+    fadeIn(this);
     const s: SessionState = this.registry.get('session');
     const rng: Rng = this.registry.get('rng');
     const codex: CodexStore = this.registry.get('codex');
@@ -80,8 +82,8 @@ export class ResultScene extends Phaser.Scene {
       wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 6,
     }).setOrigin(0.5);
 
-    this.button(cx, 532, 250, 52, stripBrackets(action), true, () => this.scene.start('Map'));
-    this.button(cx, 596, 250, 50, stripBrackets(i18n.t('btn.guide')), false, () => this.scene.start('Codex'));
+    this.button(cx, 532, 250, 52, stripBrackets(action), true, () => fadeToScene(this, 'Map'));
+    this.button(cx, 596, 250, 50, stripBrackets(i18n.t('btn.guide')), false, () => fadeToScene(this, 'Codex'));
   }
 
   // 收錄成功的生物肖像：發光徑向底＋虛線環＋剪影（設計板）

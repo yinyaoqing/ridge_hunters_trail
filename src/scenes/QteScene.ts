@@ -6,6 +6,7 @@ import { getPalette, type Palette } from '../core/palette';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import { cssHex, FONTS } from './paint';
+import { fadeIn, fadeToScene } from './fx';
 
 const DIAL_BG_KEY = 'qte-dial-bg';
 const R = 150;
@@ -25,6 +26,7 @@ export class QteScene extends Phaser.Scene {
   }
 
   create() {
+    fadeIn(this);
     const s: SessionState = this.registry.get('session');
     this.i18n = this.registry.get('i18n');
     this.pal = getPalette(s.round);
@@ -103,7 +105,7 @@ export class QteScene extends Phaser.Scene {
       this.ending = true;
       const s: SessionState = this.registry.get('session');
       resolveQte(s, this.q.success === true);
-      this.time.delayedCall(500, () => this.scene.start('Result'));
+      this.time.delayedCall(500, () => fadeToScene(this, 'Result'));
     }
   }
 
