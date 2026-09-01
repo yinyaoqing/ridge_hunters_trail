@@ -46,6 +46,9 @@ export class CampScene extends Phaser.Scene {
     restartOnResize(this);
     // F1 audio unlock hook：任何首次指標按下即視為使用者手勢，解除 AudioContext 靜音鎖
     // （unlock() 冪等，MapScene 亦掛同款 hook，兩邊皆可安全觸發）
+    // 鍵盤 hook：MapScene 支援方向鍵移動，純鍵盤玩家永遠不會觸發 pointerdown，
+    // 需另掛一次性 keydown 才能解鎖（keydown 同為瀏覽器認可的有效手勢）
+    this.input.keyboard?.once('keydown', () => this.audio.unlock());
     this.input.once('pointerdown', () => this.audio.unlock());
     this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart()); // Help 關閉後刷新語言
 
