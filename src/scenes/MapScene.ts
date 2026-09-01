@@ -132,7 +132,7 @@ export class MapScene extends Phaser.Scene {
     else this.maybeShowFirstRunHelp(); // 引導進行中時跳過彈窗，改由 ? chip 手動開啟
     // 探索環境音：依本局天氣選變體（風日較強風聲、細雨日雨感噪音）；其餘天氣沿用預設風聲
     // （靜音時 ambient 內部自行忽略）
-    this.audio.ambient(true, s.level.weather === 'wind' ? 'wind' : s.level.weather === 'drizzle' ? 'drizzle' : undefined);
+    this.audio.ambient(true, this.ambientVariant());
   }
 
   // 判斷本局是否啟動新手引導：旗標未設且為主線第 1 局（探索階段）
@@ -259,6 +259,16 @@ export class MapScene extends Phaser.Scene {
 
   private session(): SessionState {
     return this.registry.get('session');
+  }
+
+  // 本局天氣→環境音變體映射：風日/細雨日各自對應音效變體，其餘天氣沿用預設風聲。
+  // 抽出為單一方法，供 create() 首次啟動與靜音鈕重新開啟時共用，避免兩處各自硬編邏輯導致
+  // 「靜音→取消靜音」後環境音悄悄退回預設風聲、與當下天氣不一致的問題。
+  private ambientVariant(): 'wind' | 'drizzle' | undefined {
+    const weather = this.session().level.weather;
+    if (weather === 'wind') return 'wind';
+    if (weather === 'drizzle') return 'drizzle';
+    return undefined;
   }
 
   private i18n(): I18n {
@@ -482,8 +492,9 @@ export class MapScene extends Phaser.Scene {
         p.event.stopPropagation();
         this.audio.unlock(); // 保險：確保這次手勢也算數（與 create() 的全域 hook 冪等共存）
         this.audio.toggle();
-        // 重新開啟時風聲需立刻恢復，不能等到下次進場；ambient() 內建 windGain 防重入
-        if (this.audio.enabled()) this.audio.ambient(true);
+        // 重新開啟時風聲需立刻恢復，不能等到下次進場；ambient() 內建 windGain 防重入。
+        // 帶回本局天氣對應的變體，避免靜音→取消靜音後悄悄退回預設風聲（與當下天氣不一致）
+        if (this.audio.enabled()) this.audio.ambient(true, this.ambientVariant());
         this.drawSoundChip(xSound, chipY, 32, chipH);
       });
 
