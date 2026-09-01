@@ -31,6 +31,7 @@ const GLOW_KEY = 'result-glow';
 export class ResultScene extends Phaser.Scene {
   private pal!: Palette;
   private audio!: AudioBus;
+  private choiceMade = false;
 
   constructor() {
     super('Result');
@@ -42,6 +43,7 @@ export class ResultScene extends Phaser.Scene {
     const codex: CodexStore = this.registry.get('codex');
     const i18n: I18n = this.registry.get('i18n');
     const score: ScoreStore = this.registry.get('score');
+    this.choiceMade = false; // 場景實例會跨局重用，每次 create()（含 resize 重啟）都要重置押注互斥旗標
     this.audio = this.registry.get('audio');
     this.audio.ambient(false); // 結算畫面停風聲
     const loc = i18n.locale();
@@ -249,10 +251,16 @@ export class ResultScene extends Phaser.Scene {
       const nextIdx = Math.min((MULTIPLIERS as readonly number[]).indexOf(curMult) + 1, MULTIPLIERS.length - 1);
       const nextMult = MULTIPLIERS[nextIdx];
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.bank')), true, () => {
+        // 押注雙鈕互斥——防 fade 窗內連點造成雙重寫入
+        if (this.choiceMade) return;
+        this.choiceMade = true;
         score.bank();
         fadeToScene(this, 'Camp');
       });
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.push', { m: nextMult })), false, () => {
+        // 押注雙鈕互斥——防 fade 窗內連點造成雙重寫入
+        if (this.choiceMade) return;
+        this.choiceMade = true;
         score.push();
         this.registry.set('session', newSession(runRound, rng));
         fadeToScene(this, 'Map');
