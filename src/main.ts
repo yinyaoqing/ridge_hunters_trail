@@ -22,10 +22,10 @@ function launch(): void {
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'app',
-    width: 720,
-    height: 780,
+    width: window.innerWidth,
+    height: window.innerHeight,
     backgroundColor: '#131a17',
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [BootScene, MapScene, QteScene, ResultScene, CodexScene, HelpScene],
     callbacks: {
       preBoot: (game) => {

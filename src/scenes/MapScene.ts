@@ -10,6 +10,7 @@ import {
   cssHex, cssRgba, dashedCircle, dashedLine, drawClueToken, drawSupply,
   BRUSH_RADIUS, FONTS,
 } from './paint';
+import { restartOnResize, fadeIn } from './fx';
 
 const HUD_HEIGHT = 56;
 const BG_KEY = 'map-bg';
@@ -19,12 +20,12 @@ export class MapScene extends Phaser.Scene {
   private hudG!: Phaser.GameObjects.Graphics;
   private roundText!: Phaser.GameObjects.Text;
   private stamLabel!: Phaser.GameObjects.Text;
-  private hintText!: Phaser.GameObjects.Text;
+  private hintText?: Phaser.GameObjects.Text;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private pal!: Palette;
   private cell = 0;
   private ox = 0;
-  private oy = HUD_HEIGHT + 4;
+  private oy = 0;
 
   constructor() {
     super('Map');
@@ -32,9 +33,15 @@ export class MapScene extends Phaser.Scene {
 
   create() {
     const s = this.session();
+    const w = this.scale.width;
+    const h = this.scale.height;
     this.pal = getPalette(s.round);
-    this.cell = Math.floor((this.scale.height - HUD_HEIGHT - 12) / s.level.mapSize);
-    this.ox = Math.floor((this.scale.width - this.cell * s.level.mapSize) / 2);
+    this.cell = Math.max(10, Math.floor(Math.min(
+      (h - HUD_HEIGHT - 12) / s.level.mapSize,
+      (w - 8) / s.level.mapSize,
+    )));
+    this.ox = Math.floor((w - this.cell * s.level.mapSize) / 2);
+    this.oy = HUD_HEIGHT + Math.max(4, Math.floor((h - HUD_HEIGHT - this.cell * s.level.mapSize) / 2));
     this.cameras.main.setBackgroundColor(this.pal.bg);
 
     this.buildBackground(s);
@@ -45,6 +52,8 @@ export class MapScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointer(p));
     this.events.on(Phaser.Scenes.Events.RESUME, () => this.redraw());
     this.redraw();
+    restartOnResize(this);
+    fadeIn(this);
     this.maybeShowFirstRunHelp();
   }
 
@@ -147,6 +156,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   private buildHud() {
+    const compact = this.scale.width < 560;
     const pal = this.pal;
     const w = this.scale.width;
 
@@ -164,9 +174,11 @@ export class MapScene extends Phaser.Scene {
     this.roundText = this.add.text(50, 8, '', {
       fontFamily: FONTS.display, fontSize: '20px', color: cssHex(pal.paper),
     });
-    this.add.text(50, 34, "RIDGE HUNTER'S TRAIL", {
-      fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.paperDim),
-    }).setLetterSpacing(2.5);
+    if (!compact) {
+      this.add.text(50, 34, "RIDGE HUNTER'S TRAIL", {
+        fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.paperDim),
+      }).setLetterSpacing(2.5);
+    }
 
     // 體力條（筆觸感不規則圓角，動態填色於 redraw）
     this.stamLabel = this.add.text(w / 2, 8, '', {
@@ -175,10 +187,12 @@ export class MapScene extends Phaser.Scene {
     this.hudG = this.add.graphics();
 
     // 操作提示（兩行右對齊）
-    this.hintText = this.add.text(w - 136, 15, '', {
-      fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(pal.paperDim),
-      align: 'right', lineSpacing: 4,
-    }).setOrigin(1, 0);
+    if (!compact) {
+      this.hintText = this.add.text(w - 136, 15, '', {
+        fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(pal.paperDim),
+        align: 'right', lineSpacing: 4,
+      }).setOrigin(1, 0);
+    }
 
     // 語言切換鈕與玩法說明鈕（設計板：金邊小chip）
     const chip = this.add.graphics();
@@ -284,9 +298,9 @@ export class MapScene extends Phaser.Scene {
 
     this.roundText.setText(i18n.t('hud.round', { n: s.round }));
     this.stamLabel.setText(`${i18n.t('hud.stamina', { n: s.stamina })} / ${budget}`.toUpperCase());
-    this.hintText.setText(i18n.t('hud.hint').split(' · ').join('\n'));
+    this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
 
-    const bw = 210;
+    const bw = Math.max(120, Math.min(210, this.scale.width - 320));
     const bh = 12;
     const bx = w / 2 - bw / 2;
     const by = 27;
