@@ -9,7 +9,7 @@ import type { QteState } from '../core/qte';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
-import { dailyKey, type StreakStore } from '../core/daily';
+import { dailyKey, createDailySessionFromKey, type StreakStore } from '../core/daily';
 import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
 import type { AudioBus } from '../core/audio';
@@ -204,7 +204,8 @@ export class ResultScene extends Phaser.Scene {
       const yPrimary = Math.min(552 + toolOffset, h - 96);
       const ySecondary = Math.min(614 + toolOffset, h - 34);
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
-        this.registry.set('session', newSession(s.round, rng, s.mode));
+        this.registry.set('session',
+          s.mode === 'daily' ? createDailySessionFromKey(dk) : newSession(s.round, rng));
         fadeToScene(this, 'Map');
       });
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,

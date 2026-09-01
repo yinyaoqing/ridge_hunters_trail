@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  dailyKey, dailySeed, createDailySession, createStreak, daysBetween,
+  dailyKey, dailySeed, createDailySession, createDailySessionFromKey, createStreak, daysBetween,
   DAILY_ROUND, FREEZE_EVERY, FREEZE_CAP,
 } from '../src/core/daily';
 
@@ -28,6 +28,17 @@ describe('daily seed', () => {
     expect(a.round).toBe(DAILY_ROUND);
     const c = createDailySession(new Date(Date.UTC(2026, 8, 1)));
     expect(c.level.targetPos).not.toEqual(a.level.targetPos);
+  });
+});
+
+describe('createDailySessionFromKey', () => {
+  it('same key reproduces the same level; matches createDailySession for that date', () => {
+    const a = createDailySessionFromKey('2026-09-01');
+    const b = createDailySessionFromKey('2026-09-01');
+    expect(a.level).toEqual(b.level);
+    const c = createDailySession(new Date(Date.UTC(2026, 8, 1)));
+    expect(a.level).toEqual(c.level);
+    expect(a.mode).toBe('daily');
   });
 });
 

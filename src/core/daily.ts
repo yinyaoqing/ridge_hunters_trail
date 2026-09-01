@@ -17,6 +17,10 @@ export function createDailySession(d: Date): SessionState {
   return newSession(DAILY_ROUND, mulberry32(dailySeed(d)), 'daily');
 }
 
+export function createDailySessionFromKey(dateKey: string): SessionState {
+  return newSession(DAILY_ROUND, mulberry32(Number(dateKey.replaceAll('-', ''))), 'daily');
+}
+
 export function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
 }
