@@ -101,7 +101,7 @@ export class ResultScene extends Phaser.Scene {
     const runRound: number = this.registry.get('runRound');
     if (s.mode === 'daily') {
       // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊
-      const streakY = caught ? 500 : 534;
+      const streakY = caught ? 500 : 542;
       const copyY = streakY + 52;
       const campY = caught ? 614 : streakY + 112;
       const streak: StreakStore = this.registry.get('streak');
@@ -137,7 +137,7 @@ export class ResultScene extends Phaser.Scene {
   private copyShare(text: string, i18n: I18n, buttonY: number) {
     const done = () => {
       const cx = this.scale.width / 2;
-      const t = this.add.text(cx, buttonY - 40, i18n.t('result.copied'), {
+      const t = this.add.text(cx, buttonY - 46, i18n.t('result.copied'), {
         fontFamily: FONTS.body, fontSize: '13px', color: cssHex(this.pal.supply), fontStyle: 'bold',
       }).setOrigin(0.5);
       this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() });
