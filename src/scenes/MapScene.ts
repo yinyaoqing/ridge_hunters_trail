@@ -4,6 +4,7 @@ import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { key, intersect } from '../core/clues';
 import { cheb, dist, type Vec2 } from '../core/geometry';
+import { rollMicroEvent, type MicroEvent } from '../core/events';
 import type { Clue, TerrainType } from '../core/types';
 import type { Weather } from '../core/weather';
 import type { I18n, MsgKey } from '../core/i18n';
@@ -681,6 +682,11 @@ export class MapScene extends Phaser.Scene {
           this.showTut('tut.qte');
         }
         this.redraw();
+        // 途中微事件：教學期間不觸發（rollMicroEvent 內部已排除每日模式與各項條件）
+        if (this.tutStep < 0) {
+          const ev = rollMicroEvent(s, this.registry.get('rng') as Rng);
+          if (ev) this.playMicroEvent(ev);
+        }
         this.afterMove();
       },
     });
@@ -711,6 +717,84 @@ export class MapScene extends Phaser.Scene {
       targets: holder, scale: 1, alpha: 0, duration: 420, ease: 'Cubic.easeOut',
       onComplete: () => holder.destroy(),
     });
+  }
+
+  // 途中微事件演出：全部一次性、不留常駐物件；reduced-motion 時跳過視覺演出但效果（浮字／補給／音效）保留。
+  // bonus-supply 的新格子由 rollMicroEvent 直接寫入 s.level.supplies，此處固定在 doMove 的
+  // redraw() 之後才呼叫（見教學期間排除註解處），故該分支需補畫一次 redraw 讓格子立即可見。
+  private playMicroEvent(ev: MicroEvent): void {
+    const s = this.session();
+    const cs = this.cell;
+    const pal = this.pal;
+    const player = {
+      x: this.ox + s.player.x * cs + cs / 2,
+      y: this.oy + s.player.y * cs + cs / 2,
+    };
+
+    if (ev.kind === 'bird-startle') {
+      if (motionOK()) {
+        this.playEventCone(player, ev.direction, 45, cs * 6, pal.gold, 0.25, 2500);
+        this.spawnBurstDots(player, ev.direction, pal.gold);
+      }
+      this.audio.play('reveal');
+      floatText(this, player.x, player.y - cs * 0.5, '!', cssHex(pal.mark));
+      return;
+    }
+
+    if (ev.kind === 'bonus-supply') {
+      const center = {
+        x: this.ox + ev.pos.x * cs + cs / 2,
+        y: this.oy + ev.pos.y * cs + cs / 2,
+      };
+      this.redraw(); // 補畫：讓 rollMicroEvent 剛寫入的新補給格立即可見
+      floatText(this, center.x, center.y - cs * 0.5, '+', cssHex(pal.supply));
+      this.audio.play('pickup');
+      return;
+    }
+
+    // old-trail：玩家所在格的一次性弱足跡
+    if (motionOK()) {
+      this.playEventCone(player, ev.direction, 60, cs * 5, pal.gold, 0.2, 5000, true);
+    }
+    this.audio.play('reveal');
+  }
+
+  // 微事件錐形演出：複製 playReveal 的容器縮放淡出技法（scale 0.3→1、alpha→0）；
+  // dashedEdge 供 old-trail 加畫足跡感虛線邊
+  private playEventCone(
+    center: Vec2, direction: number, halfAngle: number, len: number,
+    color: number, fillAlpha: number, duration: number, dashedEdge = false,
+  ): void {
+    const g = this.add.graphics();
+    const a1 = ((direction - halfAngle) * Math.PI) / 180;
+    const a2 = ((direction + halfAngle) * Math.PI) / 180;
+    const p1 = { x: len * Math.cos(a1), y: len * Math.sin(a1) };
+    const p2 = { x: len * Math.cos(a2), y: len * Math.sin(a2) };
+    g.fillStyle(color, fillAlpha).fillTriangle(0, 0, p1.x, p1.y, p2.x, p2.y);
+    if (dashedEdge) {
+      dashedLine(g, 0, 0, p1.x, p1.y, color, 0.45);
+      dashedLine(g, 0, 0, p2.x, p2.y, color, 0.45);
+    }
+    const holder = this.add.container(center.x, center.y, [g]).setScale(0.3).setAlpha(0.9);
+    this.tweens.add({
+      targets: holder, scale: 1, alpha: 0, duration, ease: 'Cubic.easeOut',
+      onComplete: () => holder.destroy(),
+    });
+  }
+
+  // 鳥驚飛：沿方向散開的一次性小點（≤6 顆），explode 後即靜態消散，非常駐 emitter
+  private spawnBurstDots(center: Vec2, direction: number, color: number): void {
+    ensureDotTexture(this, 'dot-startle', color, 3);
+    const emitter = this.add.particles(center.x, center.y, 'dot-startle', {
+      lifespan: 700,
+      speed: { min: 60, max: 140 },
+      angle: { min: direction - 20, max: direction + 20 },
+      alpha: { start: 0.9, end: 0 },
+      scale: { start: 1, end: 0.3 },
+      emitting: false,
+    });
+    emitter.explode(6);
+    this.time.delayedCall(800, () => emitter.destroy());
   }
 
   private afterMove() {
