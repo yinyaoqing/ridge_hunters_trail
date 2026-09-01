@@ -16,7 +16,10 @@ export type MsgKey =
   | 'quality.bronze' | 'quality.silver' | 'quality.gold'
   | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded'
   | 'codex.research' | 'codex.rumored' | 'codex.quirk'
-  | 'share.stats';
+  | 'share.stats'
+  | 'tool.windstone.name' | 'tool.windstone.desc'
+  | 'tool.glowbell.name' | 'tool.glowbell.desc'
+  | 'result.toolUnlocked' | 'hud.bell';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -67,6 +70,12 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.rumored': 'Traces found in the field...',
     'codex.quirk': 'Field instinct',
     'share.stats': 'Steps {steps} · Stamina {stam} · Streak {streak}',
+    'tool.windstone.name': 'Windstone',
+    'tool.windstone.desc': 'Scent rings now lean toward the source.',
+    'tool.glowbell.name': 'Glowbell',
+    'tool.glowbell.desc': 'Once per hunt, rings out one false trail.',
+    'result.toolUnlocked': 'New tool: {name}',
+    'hud.bell': 'Bell',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -116,6 +125,12 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.rumored': '山野間已見蹤跡……',
     'codex.quirk': '判讀心得',
     'share.stats': '步數 {steps}｜剩餘體力 {stam}｜連勝 {streak}',
+    'tool.windstone.name': '風向石',
+    'tool.windstone.desc': '氣味環將偏向來源方向。',
+    'tool.glowbell.name': '微光鈴',
+    'tool.glowbell.desc': '每局一次，辨明一條假蹤跡。',
+    'result.toolUnlocked': '獲得道具：{name}',
+    'hud.bell': '鈴',
   },
 };
 

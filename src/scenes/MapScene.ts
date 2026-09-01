@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { canMove, move, toggleMark, TERRAIN_COST, type SessionState } from '../core/session';
+import { canMove, move, toggleMark, useBell, TERRAIN_COST, type SessionState } from '../core/session';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { key } from '../core/clues';
@@ -7,8 +7,10 @@ import type { Vec2 } from '../core/geometry';
 import type { Clue } from '../core/types';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
+import type { Rng } from '../core/rng';
+import type { ToolStore } from '../core/tools';
 import {
-  cssHex, cssRgba, dashedCircle, dashedLine, drawClueToken, drawSupply,
+  cssHex, cssRgba, dashedCircle, dashedArc, dashedLine, drawClueToken, drawSupply,
   BRUSH_RADIUS, FONTS, displayFont,
 } from './paint';
 import {
@@ -43,9 +45,14 @@ export class MapScene extends Phaser.Scene {
   private soundChipText?: Phaser.GameObjects.Text;
   private soundChipX = 0;
   private soundChipY = 0;
-  private chipRowLeft = 0; // chip 列最左緣（靜音 chip 左緣）：體力條需與其保持 ≥8px 間距
+  private bellChipG?: Phaser.GameObjects.Graphics;
+  private bellChipText?: Phaser.GameObjects.Text;
+  private bellChipX = 0;
+  private bellChipY = 0;
+  private chipRowLeft = 0; // chip 列最左緣（鈴／靜音 chip 左緣）：體力條需與其保持 ≥8px 間距
   private skipFirstRunHelp = false;
   private audio!: AudioBus;
+  private tools!: ToolStore;
 
   constructor() {
     super('Map');
@@ -75,6 +82,8 @@ export class MapScene extends Phaser.Scene {
     this.oy = HUD_HEIGHT + Math.max(4, Math.floor((h - HUD_HEIGHT - this.cell * s.level.mapSize) / 2));
     this.cameras.main.setBackgroundColor(this.pal.bg);
     this.audio = this.registry.get('audio');
+    this.tools = this.registry.get('tools');
+    this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
 
     this.buildBackground(s);
     this.spawnMistParticles(s);
@@ -283,7 +292,9 @@ export class MapScene extends Phaser.Scene {
     const xLang = xHelp - 8 - 72;                         // 語言 chip 左緣（僅非 compact 顯示）
     const xMark = compact ? xHelp - 8 - 60 : xLang - 8 - 60; // 標記 chip 左緣
     const xSound = xMark - 8 - 32;                        // 靜音 chip 左緣
-    this.chipRowLeft = xSound; // 供 updateHud 計算體力條寬度時保持間距
+    const hasBell = this.tools.has('glowbell');
+    const xBell = xSound - 8 - 60;                        // 鈴 chip 左緣（僅持有微光鈴時顯示）
+    this.chipRowLeft = hasBell ? xBell : xSound; // 供 updateHud 計算體力條寬度時保持間距
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
     if (!compact) {
@@ -348,6 +359,53 @@ export class MapScene extends Phaser.Scene {
         this.markMode = !this.markMode;
         this.drawMarkChip(xMark, chipY, 60, chipH);
       });
+
+    // 微光鈴 chip（僅持有 glowbell 時建立）：位於 ♪ chip 左側，可用態＝標記色系描邊，
+    // 已用/無幌子線索時呈暗色描邊——視覺上停用，但點擊仍走同一路徑，由 useBell 內部 no-op
+    if (hasBell) {
+      this.bellChipX = xBell;
+      this.bellChipY = chipY;
+      this.bellChipG = this.add.graphics();
+      this.bellChipText = this.add.text(xBell + 30, chipY + chipH / 2, this.i18n().t('hud.bell'), {
+        fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.mark),
+      }).setOrigin(0.5).setLetterSpacing(1);
+      this.drawBellChip(xBell, chipY, 60, chipH);
+      this.add.rectangle(xBell + 30, chipY + chipH / 2, 60, 44, 0, 0) // 44px 命中區
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', (p: Phaser.Input.Pointer) => {
+          p.event.stopPropagation();
+          const s = this.session();
+          const pos = useBell(s, this.registry.get('rng') as Rng);
+          if (pos) {
+            this.audio.play('reveal');
+            this.redraw();
+            const cs = this.cell;
+            const cell = { x: this.ox + pos.x * cs + cs / 2, y: this.oy + pos.y * cs + cs / 2 };
+            floatText(this, cell.x, cell.y - cs * 0.5, this.i18n().t('hud.bell'), cssHex(this.pal.mark));
+            this.drawBellChip(xBell, chipY, 60, chipH);
+          }
+        });
+    }
+  }
+
+  // 鈴 chip：可用＝標記色描邊＋亮字；不可用（已用本局/無幌子線索）＝暗描邊＋暗字（僅視覺停用，
+  // 命中區仍在，但 pointerdown 中 useBell 對已用/無幌子情境回傳 null，等同 no-op）
+  private drawBellChip(x: number, y: number, w: number, h: number) {
+    const pal = this.pal;
+    const g = this.bellChipG!;
+    g.clear();
+    if (this.bellUsable()) {
+      g.lineStyle(1.2, pal.mark, 0.7).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
+      this.bellChipText!.setColor(cssHex(pal.mark));
+    } else {
+      g.lineStyle(1.2, pal.paperDim, 0.4).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
+      this.bellChipText!.setColor(cssHex(pal.paperDim));
+    }
+  }
+
+  private bellUsable(): boolean {
+    const s = this.session();
+    return this.tools.has('glowbell') && !s.bellUsed && s.level.clues.some((c) => c.isDecoy);
   }
 
   // 靜音 chip 圖示：邊框已由 buildHud 靜態繪製（同 '?' chip），此處僅切換字色與斜線
@@ -529,6 +587,7 @@ export class MapScene extends Phaser.Scene {
     this.stamLabel.setText(`${i18n.t('hud.stamina', { n: s.stamina })} / ${budget}`.toUpperCase());
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
+    if (this.bellChipG) this.drawBellChip(this.bellChipX, this.bellChipY, 60, 30);
 
     // 置中體力條在較窄視窗會撞上右側加寬後的 chip 列（新增 ♪ chip 後 chip 列左緣
     // 隨寬度線性變動，見 chipRowLeft）。與其疊加新斷點修修補補，改用明確規則：
@@ -580,6 +639,9 @@ export class MapScene extends Phaser.Scene {
     } else if (c.type === 'disturbance') {
       this.g.fillStyle(pal.gold, 0.05).fillCircle(center.x, center.y, c.data.radius * cs);
       dashedCircle(this.g, center.x, center.y, c.data.radius * cs, pal.gold, 0.45, 2, 6, 9);
+    } else if (this.tools.has('windstone')) {
+      // 風向石：完整距離環收窄為 240° 偏心弧，弧心指向 biasDirection（來源方向提示）
+      dashedArc(this.g, center.x, center.y, c.data.distance * cs, c.data.biasDirection, 240, pal.glow, 0.5, 2, 3, 8);
     } else {
       dashedCircle(this.g, center.x, center.y, c.data.distance * cs, pal.glow, 0.5, 2, 3, 8);
     }

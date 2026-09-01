@@ -33,6 +33,7 @@ export class CampScene extends Phaser.Scene {
     const h = this.scale.height;
     const cx = w / 2;
     this.cameras.main.setBackgroundColor(pal.bg);
+    this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
     fadeIn(this);
     restartOnResize(this);
     this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart()); // Help 關閉後刷新語言

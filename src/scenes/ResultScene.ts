@@ -13,6 +13,7 @@ import { dailyKey, type StreakStore } from '../core/daily';
 import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
 import type { AudioBus } from '../core/audio';
+import type { ToolStore, ToolId } from '../core/tools';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
   displayFont, stripBrackets,
@@ -68,6 +69,11 @@ export class ResultScene extends Phaser.Scene {
       if (s.mode === 'daily') {
         (this.registry.get('streak') as StreakStore).recordPlay(dk);
       }
+      // 解鎖判定屬記帳動作（會寫入 storage），須留在 resolved 防護內；渲染解鎖卡則需
+      // 每次 create（含 resize 重啟）都執行，故把「本次新解鎖」暫存進 registry，
+      // 離開 Result（Camp/Map create()）時再清空，避免下次進場殘留舊卡片
+      const newTools = (this.registry.get('tools') as ToolStore).syncUnlocks(codex);
+      this.registry.set('lastUnlocks', newTools);
     }
 
     const pal = this.pal;
@@ -76,6 +82,12 @@ export class ResultScene extends Phaser.Scene {
     restartOnResize(this);
     const cx = this.scale.width / 2;
     const h = this.scale.height;
+    const showTools = (this.registry.get('lastUnlocks') as ToolId[] | undefined) ?? [];
+    // h<700 視窗已很擁擠（見既有的 Math.min(…, h-96) 夾限），解鎖卡收窄為僅標題行，
+    // 卡片間距與後續按鈕位移量一併縮小，降低與按鈕重疊的機率
+    const compactCards = h < 700;
+    const cardStep = compactCards ? 22 : 40;
+    const toolOffset = cardStep * showTools.length;
 
     let title: string;
     let body: string;
@@ -112,16 +124,23 @@ export class ResultScene extends Phaser.Scene {
       wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 6,
     }).setOrigin(0.5);
 
-    if (!caught) this.showNotesDrop(cx, 486, creature.id, notes, codex, i18n);
+    // 道具解鎖卡（至多同幀 2 枚）：caught 排在圖鑑點列/分隔線下方；
+    // !caught 疊在筆記掉落區之上，筆記掉落再依卡片數往下推 toolOffset
+    showTools.forEach((id, i) => {
+      this.renderToolCard(cx, (caught ? 470 : 486) + i * cardStep, id, i18n, compactCards);
+    });
+
+    if (!caught) this.showNotesDrop(cx, 486 + toolOffset, creature.id, notes, codex, i18n);
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
     // 依視窗高度夾限座標，避免矮視窗（如橫向手機）裁切按鈕；780 全高時維持原座標不變
     const runRound: number = this.registry.get('runRound');
     if (s.mode === 'daily') {
-      // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊
-      const streakY = caught ? Math.min(500, h - 148) : Math.min(542, h - 150);
+      // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊；
+      // 解鎖卡出現時再疊加 toolOffset，避免卡片與連勝列相撞
+      const streakY = caught ? Math.min(500 + toolOffset, h - 148) : Math.min(542 + toolOffset, h - 150);
       const copyY = streakY + 52;
-      const campY = Math.min(caught ? 614 : streakY + 112, h - 30);
+      const campY = Math.min(caught ? 614 + toolOffset : streakY + 112, h - 30);
       const streak: StreakStore = this.registry.get('streak');
       const text = shareText(i18n, {
         dateKey: dk, caught, quality,
@@ -135,8 +154,8 @@ export class ResultScene extends Phaser.Scene {
       this.button(cx, campY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
-      const yPrimary = Math.min(552, h - 96);
-      const ySecondary = Math.min(614, h - 34);
+      const yPrimary = Math.min(552 + toolOffset, h - 96);
+      const ySecondary = Math.min(614 + toolOffset, h - 34);
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
         this.registry.set('session', newSession(runRound, rng));
         fadeToScene(this, 'Map');
@@ -144,8 +163,8 @@ export class ResultScene extends Phaser.Scene {
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else {
-      const yPrimary = Math.min(552, h - 96);
-      const ySecondary = Math.min(614, h - 34);
+      const yPrimary = Math.min(552 + toolOffset, h - 96);
+      const ySecondary = Math.min(614 + toolOffset, h - 34);
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
         this.registry.set('session', newSession(s.round, rng, s.mode));
         fadeToScene(this, 'Map');
@@ -239,6 +258,22 @@ export class ResultScene extends Phaser.Scene {
     }).setOrigin(0.5).setLetterSpacing(1.5);
   }
 
+  // 道具解鎖卡：金色標題行（淡入）＋（非窄視窗時）暗色說明副標，逐字鍵對應 i18n
+  private renderToolCard(cx: number, y: number, id: ToolId, i18n: I18n, compact: boolean) {
+    const pal = this.pal;
+    const name = i18n.t('result.toolUnlocked', { name: i18n.t(TOOL_NAME_KEY[id]) });
+    const nameText = this.add.text(cx, y, name, {
+      fontFamily: FONTS.body, fontSize: '15px', color: cssHex(pal.gold), fontStyle: 'bold',
+    }).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({ targets: nameText, alpha: 1, duration: 400, delay: 500 });
+    if (!compact) {
+      const descText = this.add.text(cx, y + 16, i18n.t(TOOL_DESC_KEY[id]), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+      }).setOrigin(0.5).setAlpha(0);
+      this.tweens.add({ targets: descText, alpha: 1, duration: 400, delay: 550 });
+    }
+  }
+
   private drawCreaturePortrait(cx: number, cy: number, creatureId: string, color: number) {
     const size = 250;
     if (this.textures.exists(GLOW_KEY)) this.textures.remove(GLOW_KEY);
@@ -316,3 +351,7 @@ export class ResultScene extends Phaser.Scene {
 const QUALITY_KEY = {
   bronze: 'quality.bronze', silver: 'quality.silver', gold: 'quality.gold',
 } as const;
+
+// 道具字串鍵映射：同上，避免 `tool.${id}.name` 模板字面型別無法收斂為 MsgKey 聯集
+const TOOL_NAME_KEY = { windstone: 'tool.windstone.name', glowbell: 'tool.glowbell.name' } as const;
+const TOOL_DESC_KEY = { windstone: 'tool.windstone.desc', glowbell: 'tool.glowbell.desc' } as const;

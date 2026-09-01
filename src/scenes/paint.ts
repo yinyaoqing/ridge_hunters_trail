@@ -28,6 +28,23 @@ export function dashedCircle(
   }
 }
 
+// 偏心弧（風向石）：同 dashedCircle 手法，僅畫以 centerDeg 為中心 ±spanDeg/2 的區間，
+// 暗示氣味來源方向而非完整距離環
+export function dashedArc(
+  g: Gfx, cx: number, cy: number, r: number, centerDeg: number, spanDeg: number,
+  color: number, alpha: number, width = 2, dash = 3, gap = 8,
+): void {
+  g.lineStyle(width, color, alpha);
+  const startRad = ((centerDeg - spanDeg / 2) * Math.PI) / 180;
+  const endRad = ((centerDeg + spanDeg / 2) * Math.PI) / 180;
+  const step = (dash + gap) / r;
+  for (let a = startRad; a < endRad; a += step) {
+    g.beginPath();
+    g.arc(cx, cy, r, a, Math.min(a + dash / r, endRad));
+    g.strokePath();
+  }
+}
+
 export function dashedLine(
   g: Gfx, x1: number, y1: number, x2: number, y2: number,
   color: number, alpha: number, width = 1.5, dash = 2, gap = 7,
