@@ -20,6 +20,7 @@ export class QteScene extends Phaser.Scene {
   private i18n!: I18n;
   private pal!: Palette;
   private ending = false;
+  private sil?: Phaser.GameObjects.Image;
 
   constructor() {
     super('Qte');
@@ -50,7 +51,7 @@ export class QteScene extends Phaser.Scene {
     // 目標生物的朦朧剪影（設計板：轉盤中央淡影）
     const silKey = `sil-${s.level.creatureId}`;
     if (this.textures.exists(silKey)) {
-      this.add.image(cx, cy + 6, silKey).setScale(1.35).setAlpha(0.16);
+      this.sil = this.add.image(cx, cy + 6, silKey).setScale(1.35).setAlpha(0.16);
     }
 
     this.g = this.add.graphics();
@@ -101,12 +102,25 @@ export class QteScene extends Phaser.Scene {
   private onPress() {
     if (this.ending) return;
     press(this.q, this.cfg, this.registry.get('rng') as Rng);
+    if (this.q.lastHit) this.cameras.main.flash(110, 216, 200, 116);
+    else this.cameras.main.shake(70, 0.004);
     if (this.q.done) {
       this.ending = true;
       const s: SessionState = this.registry.get('session');
       resolveQte(s, this.q.success === true);
-      this.time.delayedCall(500, () => fadeToScene(this, 'Result'));
+      this.registry.set('qteOutcome', this.q);
+      this.playEnding(this.q.success === true);
     }
+  }
+
+  // 成功：剪影亮起；失敗：剪影滑出淡去（溜走）。900ms 後入結算
+  private playEnding(success: boolean) {
+    if (this.sil) {
+      this.tweens.add(success
+        ? { targets: this.sil, alpha: 0.85, scale: 1.5, duration: 600, ease: 'Cubic.easeOut' }
+        : { targets: this.sil, alpha: 0, x: this.sil.x + 60, duration: 600, ease: 'Cubic.easeIn' });
+    }
+    this.time.delayedCall(900, () => fadeToScene(this, 'Result'));
   }
 
   private draw() {

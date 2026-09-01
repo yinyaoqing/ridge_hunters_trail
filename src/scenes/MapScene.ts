@@ -297,6 +297,7 @@ export class MapScene extends Phaser.Scene {
     const dest = { x: this.ox + to.x * cs + cs / 2, y: this.oy + to.y * cs + cs / 2 };
     const cost = TERRAIN_COST[s.level.terrain[to.y][to.x]];
     const suppliesBefore = s.level.supplies.length;
+    const readBefore = s.readClues.size;
     move(s, to);
     const gotSupply = s.level.supplies.length < suppliesBefore;
 
@@ -311,9 +312,40 @@ export class MapScene extends Phaser.Scene {
         if (gotSupply) {
           floatText(this, dest.x, dest.y - cs, '+10', cssHex(this.pal.supply));
         }
+        if (s.readClues.size > readBefore) {
+          const clue = s.level.clues.find((c) => key(c.position) === key(to));
+          if (clue) this.playReveal(clue);
+        }
         this.redraw();
         this.afterMove();
       },
+    });
+  }
+
+  // 線索揭示：以容器縮放模擬形狀擴散，結束時 redraw 已畫出常駐覆蓋層
+  private playReveal(c: Clue) {
+    const cs = this.cell;
+    const pal = this.pal;
+    const center = {
+      x: this.ox + c.position.x * cs + cs / 2,
+      y: this.oy + c.position.y * cs + cs / 2,
+    };
+    const g = this.add.graphics();
+    if (c.type === 'footprint') {
+      const len = cs * 5;
+      const a1 = ((c.data.direction - c.data.angleSpread) * Math.PI) / 180;
+      const a2 = ((c.data.direction + c.data.angleSpread) * Math.PI) / 180;
+      g.fillStyle(pal.gold, 0.35).fillTriangle(
+        0, 0, len * Math.cos(a1), len * Math.sin(a1), len * Math.cos(a2), len * Math.sin(a2));
+    } else if (c.type === 'disturbance') {
+      g.lineStyle(3, pal.gold, 0.8).strokeCircle(0, 0, c.data.radius * cs);
+    } else {
+      g.lineStyle(3, pal.glow, 0.8).strokeCircle(0, 0, c.data.distance * cs);
+    }
+    const holder = this.add.container(center.x, center.y, [g]).setScale(0.25).setAlpha(0.9);
+    this.tweens.add({
+      targets: holder, scale: 1, alpha: 0, duration: 420, ease: 'Cubic.easeOut',
+      onComplete: () => holder.destroy(),
     });
   }
 
