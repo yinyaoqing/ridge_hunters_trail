@@ -7,6 +7,8 @@ import type { QteState } from '../core/qte';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
+import { dailyKey, type StreakStore } from '../core/daily';
+import { shareText } from '../core/share';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
 } from './paint';
@@ -47,6 +49,9 @@ export class ResultScene extends Phaser.Scene {
         if (s.mode === 'run') this.registry.set('runRound', s.round + 1);
       } else {
         codex.addNotes(creature.id, notes);
+      }
+      if (s.mode === 'daily') {
+        (this.registry.get('streak') as StreakStore).recordPlay(dailyKey(new Date()));
       }
     }
 
@@ -92,21 +97,66 @@ export class ResultScene extends Phaser.Scene {
 
     if (!caught) this.showNotesDrop(cx, 486, creature.id, notes, codex, i18n);
 
-    // 按鈕列（每日挑戰的按鈕在 Task 13 擴充；本 task 維持主線流程）
+    // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
     const runRound: number = this.registry.get('runRound');
-    if (caught) {
+    if (s.mode === 'daily') {
+      const streak: StreakStore = this.registry.get('streak');
+      const text = shareText(i18n, {
+        dateKey: dailyKey(new Date()), caught, quality,
+        steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
+      });
+      this.add.text(cx, 500, i18n.t('camp.streak', { n: streak.state().streak }).toUpperCase(), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
+      }).setOrigin(0.5).setLetterSpacing(2);
+      this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
+        () => this.copyShare(text, i18n));
+      this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+        () => fadeToScene(this, 'Camp'));
+    } else if (caught) {
       this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
         this.registry.set('session', newSession(runRound, rng));
         fadeToScene(this, 'Map');
       });
+      this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+        () => fadeToScene(this, 'Camp'));
     } else {
       this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
         this.registry.set('session', newSession(s.round, rng, s.mode));
         fadeToScene(this, 'Map');
       });
+      this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+        () => fadeToScene(this, 'Camp'));
     }
-    this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.guide')), false,
-      () => fadeToScene(this, 'Codex'));
+  }
+
+  // 剪貼簿優先，失敗退回 textarea+execCommand；成功顯示「已複製！」浮字
+  private copyShare(text: string, i18n: I18n) {
+    const done = () => {
+      const cx = this.scale.width / 2;
+      const t = this.add.text(cx, 500, i18n.t('result.copied'), {
+        fontFamily: FONTS.body, fontSize: '13px', color: cssHex(this.pal.supply), fontStyle: 'bold',
+      }).setOrigin(0.5);
+      this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 400, onComplete: () => t.destroy() });
+    };
+    try {
+      navigator.clipboard.writeText(text).then(done, () => this.copyFallback(text, done));
+    } catch {
+      this.copyFallback(text, done);
+    }
+  }
+
+  private copyFallback(text: string, done: () => void) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch {
+      // 複製不可用時靜默；分享卡文字仍顯示於畫面外不可見，不擋流程
+    }
   }
 
   // 品質墨章：蓋印動畫（縮放 1.8 → 1、Back ease）
