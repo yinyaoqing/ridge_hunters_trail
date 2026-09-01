@@ -7,7 +7,7 @@ const footprint = (x: number, y: number, direction: number, angleSpread: number)
 const disturbance = (x: number, y: number, radius: number): Clue =>
   ({ type: 'disturbance', position: { x, y }, isDecoy: false, data: { radius } });
 const scent = (x: number, y: number, distance: number, tolerance: number): Clue =>
-  ({ type: 'scent', position: { x, y }, isDecoy: false, data: { distance, tolerance, windBiasNeeded: false } });
+  ({ type: 'scent', position: { x, y }, isDecoy: false, data: { distance, tolerance, windBiasNeeded: false, biasDirection: 0 } });
 
 describe('key', () => {
   it('formats as x,y', () => {

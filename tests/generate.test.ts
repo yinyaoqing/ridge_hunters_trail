@@ -3,7 +3,7 @@ import { generateLevel, generateLevelFor } from '../src/core/generate';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key, intersect } from '../src/core/clues';
-import { dist } from '../src/core/geometry';
+import { dist, angleDiff, angleDeg } from '../src/core/geometry';
 import { CREATURES } from '../src/data/creatures';
 import { applyQuirk } from '../src/core/quirks';
 
@@ -81,6 +81,27 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     const scent = b.clues.find((c) => c.type === 'scent' && !c.isDecoy);
     if (scent && scent.type === 'scent') {
       expect(scent.data.tolerance).toBe(getDifficulty(5).scentTolerance * 2);
+    }
+  });
+
+  it('scent clues carry a bias within 30° of the true bearing', () => {
+    for (const { seed, round } of cases) {
+      const level = generateLevel(round, mulberry32(seed));
+      for (const c of level.clues) {
+        if (c.type !== 'scent') continue;
+        expect(c.data.windBiasNeeded).toBe(true);
+        expect(c.data.biasDirection).toBeGreaterThanOrEqual(0);
+        expect(c.data.biasDirection).toBeLessThan(360);
+      }
+    }
+  });
+
+  it('scent bias points within 30° of the true bearing from clue to target', () => {
+    const level = generateLevelFor(5, mulberry32(1), 'mistfawn');
+    const scent = level.clues.find((c) => c.type === 'scent' && !c.isDecoy);
+    if (scent && scent.type === 'scent') {
+      const trueBearing = angleDeg(scent.position, level.targetPos);
+      expect(angleDiff(scent.data.biasDirection, trueBearing)).toBeLessThanOrEqual(30);
     }
   });
 });

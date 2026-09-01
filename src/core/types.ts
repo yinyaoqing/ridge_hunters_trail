@@ -16,11 +16,12 @@ export interface DisturbanceData {
   radius: number; // 可能範圍半徑（格）
 }
 
-// 氣味：距離性線索（圓環）。windBiasNeeded 為後續風向道具保留，MVP 恆為 false
+// 氣味：距離性線索（圓環）。windBiasNeeded 標記風向石可呈現偏心弧提示
 export interface ScentData {
   distance: number;
   tolerance: number; // 環寬容差（格），難度越高越窄
   windBiasNeeded: boolean;
+  biasDirection: number;  // 目標方位提示（±30°），風向石持有時渲染為偏心弧
 }
 
 export type Clue =

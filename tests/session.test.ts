@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  newSession, canMove, move, toggleMark, resolveQte, nextSession,
+  newSession, canMove, move, toggleMark, resolveQte, nextSession, useBell,
   TERRAIN_COST, type SessionState,
 } from '../src/core/session';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
+import { key } from '../src/core/clues';
 import type { Level, TerrainType } from '../src/core/types';
 
 // 手工關卡：5x5 全草地，目標 (4,4)，補給 (1,0)，scent 線索 (2,0)
@@ -15,14 +16,14 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
     round: 1, mapSize: 5, targetPos: { x: 4, y: 4 },
     clues: [{
       type: 'scent', position: { x: 2, y: 0 }, isDecoy: false,
-      data: { distance: 4, tolerance: 1, windBiasNeeded: false },
+      data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
     }],
     terrain, supplies: [{ x: 1, y: 0 }], creatureId: 'mistfawn',
   };
   return {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
     readClues: new Set(), marks: new Set(), phase: 'explore',
-    steps: 0, mode: 'run', resolved: false,
+    steps: 0, mode: 'run', resolved: false, bellUsed: false,
     ...overrides,
   };
 }
@@ -167,5 +168,23 @@ describe('steps / mode / resolved', () => {
     expect(s.steps).toBe(before + 1);
     move(s, { x: -99, y: -99 }); // 非法移動不計步
     expect(s.steps).toBe(before + 1);
+  });
+});
+
+describe('useBell', () => {
+  it('marks one decoy once per session', () => {
+    const s = newSession(5, mulberry32(11)); // tier2 必有 decoy（含 quirk 可能 +1）
+    const decoys = s.level.clues.filter((c) => c.isDecoy);
+    if (decoys.length === 0) return; // veilmoth 以外一定 >0；防禦性跳過
+    const pos = useBell(s, mulberry32(1));
+    expect(pos).not.toBeNull();
+    expect(s.bellUsed).toBe(true);
+    expect(s.marks.has(key(pos!))).toBe(true);
+    expect(useBell(s, mulberry32(2))).toBeNull(); // 一局一次
+  });
+  it('returns null when no decoys exist', () => {
+    const s = newSession(1, mulberry32(3)); // tier1 無 decoy
+    expect(useBell(s, mulberry32(1))).toBeNull();
+    expect(s.bellUsed).toBe(false);
   });
 });

@@ -43,8 +43,10 @@ function makeClue(
       return { type, position: pos, isDecoy, data: { direction: angleDeg(pos, anchor), angleSpread: p.footprintSpread } };
     case 'disturbance':
       return { type, position: pos, isDecoy, data: { radius: Math.max(p.disturbanceRadius, Math.ceil(actual)) } };
-    case 'scent':
-      return { type, position: pos, isDecoy, data: { distance: Math.round(actual), tolerance: p.scentTolerance, windBiasNeeded: false } };
+    case 'scent': {
+      const bias = (angleDeg(pos, anchor) + (rng() * 60 - 30) + 360) % 360;
+      return { type, position: pos, isDecoy, data: { distance: Math.round(actual), tolerance: p.scentTolerance, windBiasNeeded: true, biasDirection: bias } };
+    }
   }
 }
 

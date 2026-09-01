@@ -23,6 +23,7 @@ export interface SessionState {
   steps: number;          // 本局累計移動步數（分享卡用）
   mode: SessionMode;      // 主線 run / 每日挑戰 daily
   resolved: boolean;      // Result 已記帳（防場景重啟重複記錄）
+  bellUsed: boolean;      // 微光鈴本局是否已使用（一局一次）
 }
 
 function startPos(level: Level): Vec2 {
@@ -44,6 +45,7 @@ export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): 
     steps: 0,
     mode,
     resolved: false,
+    bellUsed: false,
   };
 }
 
@@ -97,6 +99,17 @@ export function toggleMark(s: SessionState, p: Vec2): void {
 export function resolveQte(s: SessionState, success: boolean): void {
   if (s.phase !== 'qte') return;
   s.phase = success ? 'caught' : 'escaped';
+}
+
+// 微光鈴：一局一次，隨機標記一個幌子線索位置（未持有幌子時回傳 null）
+export function useBell(s: SessionState, rng: Rng): Vec2 | null {
+  if (s.bellUsed) return null;
+  const decoys = s.level.clues.filter((c) => c.isDecoy);
+  if (decoys.length === 0) return null;
+  const pick = decoys[Math.floor(rng() * decoys.length)];
+  s.marks.add(key(pick.position));
+  s.bellUsed = true;
+  return pick.position;
 }
 
 // caught → 下一局（難度遞增）；escaped / exhausted → 同難度整局重生（線索清空，規格 3）
