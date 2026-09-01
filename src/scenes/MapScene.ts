@@ -425,7 +425,7 @@ export class MapScene extends Phaser.Scene {
     const compact = w < 560;
     const bw = compact
       ? Math.max(60, Math.min(210, w - 250)) // 確保 bx+bw ≤ (w-192)-8，與 mark chip 保持 8px 間距
-      : Math.max(120, Math.min(210, w - 320));
+      : Math.max(120, Math.min(210, w - 400)); // w∈[560,610) 置中條同樣需與 chip 保持 ≥8px 間距
     const bh = compact ? 10 : 12;
     const bx = compact ? 50 : w / 2 - bw / 2;
     const by = compact ? 46 : 27;
