@@ -202,9 +202,12 @@ export class ResultScene extends Phaser.Scene {
     if (showScoreGain) {
       const lastGain = (this.registry.get('lastGain') as number | undefined) ?? 0;
       // 矮視窗＋多張卡片時，未夾限的 gainY 可能落在按鈕列附近甚至重疊（見 F7）——
-      // 夾進與 [安全歇腳] 按鈕（yPrimary）同一份版面預算，底線（pot 行）與按鈕保留 ≥16px 間距
+      // 夾進與 [安全歇腳] 按鈕（yPrimary）同一份版面預算。yPrimary 是按鈕「中心」y，
+      // 按鈕填色矩形頂緣在 yPrimary-26（高度 52 之半）；pot 行以 setOrigin(0.5) 置中繪製，
+      // 故其量測基準須是「按鈕頂緣」而非按鈕中心——56 讓 pot 行中心落在 yPrimary-36，
+      // 與頂緣還留 10px 淨空，扣掉 pot 行自身字框半高後仍不會被按鈕矩形蓋到
       const yPrimary = Math.min(552 + totalOffset, h - 96);
-      const gainY = Math.min(toolBaseY + toolOffset + commStep * lastComms.length, yPrimary - 46);
+      const gainY = Math.min(toolBaseY + toolOffset + commStep * lastComms.length, yPrimary - 56);
       this.add.text(cx, gainY, i18n.t('score.gain', { n: lastGain }), {
         fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.gold), fontStyle: 'bold',
       }).setOrigin(0.5);
