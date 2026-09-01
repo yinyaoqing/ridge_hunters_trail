@@ -130,7 +130,9 @@ export class MapScene extends Phaser.Scene {
     fadeIn(this);
     if (this.tutStep === 0) this.startTutStep0(s);
     else this.maybeShowFirstRunHelp(); // 引導進行中時跳過彈窗，改由 ? chip 手動開啟
-    this.audio.ambient(true); // 探索環境風聲（靜音時 ambient 內部自行忽略）
+    // 探索環境音：依本局天氣選變體（風日較強風聲、細雨日雨感噪音）；其餘天氣沿用預設風聲
+    // （靜音時 ambient 內部自行忽略）
+    this.audio.ambient(true, s.level.weather === 'wind' ? 'wind' : s.level.weather === 'drizzle' ? 'drizzle' : undefined);
   }
 
   // 判斷本局是否啟動新手引導：旗標未設且為主線第 1 局（探索階段）

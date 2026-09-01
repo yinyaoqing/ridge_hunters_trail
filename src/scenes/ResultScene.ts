@@ -254,6 +254,7 @@ export class ResultScene extends Phaser.Scene {
         // 押注雙鈕互斥——防 fade 窗內連點造成雙重寫入
         if (this.choiceMade) return;
         this.choiceMade = true;
+        this.audio.play('bank');
         score.bank();
         fadeToScene(this, 'Camp');
       });
@@ -261,6 +262,7 @@ export class ResultScene extends Phaser.Scene {
         // 押注雙鈕互斥——防 fade 窗內連點造成雙重寫入
         if (this.choiceMade) return;
         this.choiceMade = true;
+        this.audio.play('push');
         score.push();
         this.registry.set('session', newSession(runRound, rng));
         fadeToScene(this, 'Map');

@@ -130,6 +130,8 @@ export class QteScene extends Phaser.Scene {
 
   // 成功：剪影亮起；失敗：剪影滑出淡去（溜走）。900ms 後入結算
   private playEnding(success: boolean) {
+    const s: SessionState = this.registry.get('session');
+    if (success && s.level.iris) this.audio.play('iris'); // 異彩變種：捕獲音前先加一聲亮色提示
     this.audio.play(success ? 'caught' : 'escaped');
     if (this.sil) {
       this.tweens.add(success

@@ -1,11 +1,16 @@
 // 程序合成音效：零素材檔。所有失敗（無 AudioContext、被瀏覽器擋）一律靜默。
-export type SfxName = 'click' | 'reveal' | 'pickup' | 'hit' | 'miss' | 'caught' | 'escaped';
+export type SfxName =
+  | 'click' | 'reveal' | 'pickup' | 'hit' | 'miss' | 'caught' | 'escaped'
+  | 'iris' | 'bank' | 'push';
+
+// 環境音變體：wind＝原風聲（略增益）、drizzle＝細雨感（lowpass 提高＋噪音平滑係數降低）。
+export type AmbientVariant = 'wind' | 'drizzle';
 
 export interface AudioBus {
   enabled(): boolean;
   toggle(): boolean;
   play(name: SfxName): void;
-  ambient(on: boolean): void;
+  ambient(on: boolean, variant?: AmbientVariant): void;
   // 標記已取得使用者手勢（點擊/觸控），解除瀏覽器 autoplay 政策的靜音鎖；
   // 冪等——重複呼叫安全。解鎖前 play()/ambient(true) 一律不建立 AudioContext。
   unlock(): void;
@@ -22,6 +27,9 @@ const RECIPES: Record<SfxName, { type: OscillatorType; freqs: number[]; dur: num
   miss:    { type: 'square',   freqs: [180],            dur: 0.12, gain: 0.10 },
   caught:  { type: 'sine',     freqs: [523, 659, 784],  dur: 0.34, gain: 0.16 },
   escaped: { type: 'sine',     freqs: [440, 220],       dur: 0.40, gain: 0.12 },
+  iris:    { type: 'sine',     freqs: [659, 784, 988],  dur: 0.40, gain: 0.15 },
+  bank:    { type: 'sine',     freqs: [523, 784],       dur: 0.25, gain: 0.15 },
+  push:    { type: 'triangle', freqs: [440, 554],       dur: 0.20, gain: 0.14 },
 };
 
 export function createAudio(
@@ -45,6 +53,9 @@ export function createAudio(
   // 不啟動環境音；unlock() 後若有暫存的環境音請求（pendingAmbient）立即補放。
   let gestureSeen = false;
   let pendingAmbient = false;
+  let pendingVariant: AmbientVariant | undefined;
+  // 目前正在播放的環境音變體（undefined＝預設風聲）；用於判斷重複呼叫是否為 no-op。
+  let activeVariant: AmbientVariant | undefined;
 
   const persist = () => {
     if (!storage) return;
@@ -72,20 +83,24 @@ export function createAudio(
     }
   };
 
-  const startAmbient = () => {
+  const startAmbient = (variant?: AmbientVariant) => {
     if (!on || windGain) return;
     const c = getCtx();
     if (!c) return;
     resumeIfSuspended(c);
     try {
-      // 風聲：2 秒白噪音 buffer 循環 + lowpass + 微弱增益
+      // 風聲/雨聲共用同一顆有色噪音圖：drizzle 用較低平滑係數讓噪音更「碎」（雨滴感），
+      // lowpass 提高讓高頻通過更多；wind 維持原本低頻呼嘯感。
+      const smoothing = variant === 'drizzle' ? 0.90 : 0.97;
+      const lpFreq = variant === 'drizzle' ? 1200 : 400;
+      const targetGain = variant === 'wind' ? 0.09 : 0.05;
       // Math.random 僅用於噪音波形——非遊戲邏輯隨機性，不受種子 RNG 約束
       const len = c.sampleRate * 2;
       const buf = c.createBuffer(1, len, c.sampleRate);
       const data = buf.getChannelData(0);
       let last = 0;
       for (let i = 0; i < len; i++) {
-        last = last * 0.97 + (Math.random() * 2 - 1) * 0.03; // 平滑化噪音（風感）
+        last = last * smoothing + (Math.random() * 2 - 1) * 0.03;
         data[i] = last * 6;
       }
       const src = c.createBufferSource();
@@ -93,19 +108,21 @@ export function createAudio(
       src.loop = true;
       const lp = c.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 400;
+      lp.frequency.value = lpFreq;
       const gain = c.createGain();
       gain.gain.setValueAtTime(0, c.currentTime);
-      gain.gain.setTargetAtTime(0.05, c.currentTime, 0.8);
+      gain.gain.setTargetAtTime(targetGain, c.currentTime, 0.8);
       src.connect(lp).connect(gain).connect(c.destination);
       src.start();
       windGain = gain;
       windSrc = src;
       windLp = lp;
+      activeVariant = variant;
     } catch {
       windGain = null;
       windSrc = null;
       windLp = null;
+      activeVariant = undefined;
     }
   };
 
@@ -113,6 +130,8 @@ export function createAudio(
   // 連線，避免每次場景循環（Camp↔Map）都留下一條仍在跑的音訊子圖（buffer + CPU 洩漏）。
   const stopAmbient = () => {
     pendingAmbient = false;
+    pendingVariant = undefined;
+    activeVariant = undefined;
     if (!windGain || !ctx) return;
     const c = ctx;
     const gain = windGain;
@@ -167,17 +186,21 @@ export function createAudio(
         });
       } catch { /* 靜默 */ }
     },
-    ambient(onOff) {
+    ambient(onOff, variant) {
       if (!onOff) { stopAmbient(); return; }
-      if (!gestureSeen) { pendingAmbient = true; return; } // 手勢前只暫存請求，不建立 context
-      startAmbient();
+      if (!gestureSeen) { pendingAmbient = true; pendingVariant = variant; return; } // 手勢前只暫存請求，不建立 context
+      if (windGain && activeVariant === variant) return; // 同變體已在跑：no-op（維持既有冪等性）
+      if (windGain) stopAmbient(); // 變體切換：先停舊的（沿用既有淡出/onended 清理），再啟新的
+      startAmbient(variant);
     },
     unlock() {
       if (gestureSeen) return; // 冪等：重複呼叫（多個 chip/場景 hook）安全
       gestureSeen = true;
       if (pendingAmbient) {
         pendingAmbient = false;
-        startAmbient();
+        const v = pendingVariant;
+        pendingVariant = undefined;
+        startAmbient(v);
       }
     },
   };

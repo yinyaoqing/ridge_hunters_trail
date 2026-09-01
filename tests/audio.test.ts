@@ -58,4 +58,51 @@ describe('createAudio', () => {
     a.unlock(); // 冪等：不重複觸發
     expect(created).toBe(1);
   });
+
+  // Task 11：新增音色（iris/bank/push）與環境音變體（wind/drizzle）
+  it('plays the new iris/bank/push sfx without throwing (no ctx)', () => {
+    const a = createAudio(fakeStorage());
+    a.unlock();
+    expect(() => {
+      a.play('iris');
+      a.play('bank');
+      a.play('push');
+    }).not.toThrow();
+  });
+
+  it('ambient(true, "wind") before a gesture defers with variant; unlock() creates context exactly once', () => {
+    let created = 0;
+    const factory = () => { created++; throw new Error('no real ctx in node'); };
+    const a = createAudio(fakeStorage(), factory as unknown as () => AudioContext);
+    a.ambient(true, 'wind');
+    expect(created).toBe(0); // 暫存請求（含 variant），未建立 context
+    a.unlock();
+    expect(created).toBe(1); // 解鎖後補放一次
+    a.unlock(); // 冪等
+    expect(created).toBe(1);
+  });
+
+  it('repeating ambient(true, "wind") does not rebuild the context', () => {
+    let created = 0;
+    const factory = () => { created++; throw new Error('no real ctx in node'); };
+    const a = createAudio(fakeStorage(), factory as unknown as () => AudioContext);
+    a.unlock();
+    expect(() => {
+      a.ambient(true, 'wind');
+      a.ambient(true, 'wind'); // 同變體重複呼叫：no-op，不重建
+    }).not.toThrow();
+    expect(created).toBe(1); // 兩次呼叫共用同一次 getCtx() 嘗試（factory 失敗記憶，不重試轟炸）
+  });
+
+  it('switching ambient variant (wind -> drizzle) while running is safe and reuses the context', () => {
+    let created = 0;
+    const factory = () => { created++; throw new Error('no real ctx in node'); };
+    const a = createAudio(fakeStorage(), factory as unknown as () => AudioContext);
+    a.unlock();
+    expect(() => {
+      a.ambient(true, 'wind');
+      a.ambient(true, 'drizzle'); // 變體切換：先 stopAmbient 再啟新變體
+    }).not.toThrow();
+    expect(created).toBe(1); // 仍只嘗試建立一次 context
+  });
 });
