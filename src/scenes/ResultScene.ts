@@ -8,6 +8,7 @@ import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import { dailyKey, type StreakStore } from '../core/daily';
+import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
@@ -49,7 +50,12 @@ export class ResultScene extends Phaser.Scene {
       s.resolved = true;
       if (caught) {
         codex.addRecord(creature.id, quality ?? 'bronze');
-        if (s.mode === 'run') this.registry.set('runRound', s.round + 1);
+        const runState = this.registry.get('runState') as RunState;
+        runState.addWin();
+        if (s.mode === 'run') {
+          this.registry.set('runRound', s.round + 1);
+          runState.setRound(s.round + 1);
+        }
       } else {
         codex.addNotes(creature.id, notes);
       }

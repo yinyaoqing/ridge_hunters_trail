@@ -66,6 +66,12 @@ describe('streak', () => {
     const s = store.recordPlay('2026-08-20'); // 漏 3 天、無歇腳符
     expect(s).toMatchObject({ streak: Math.floor(6 / 2) + 1, freezes: 0 });
   });
+  it('insufficient freezes are kept, streak still halves (D1)', () => {
+    const store = createStreak(fakeStorage());
+    for (let i = 1; i <= 7; i++) store.recordPlay(`2026-08-${String(10 + i).padStart(2, '0')}`); // streak 7, freezes 1
+    const s = store.recordPlay('2026-08-21'); // 漏 3 天 > 1 符
+    expect(s).toMatchObject({ streak: Math.floor(7 / 2) + 1, freezes: 1 });
+  });
   it('persists through storage and survives corruption', () => {
     const storage = fakeStorage();
     createStreak(storage).recordPlay('2026-08-31');

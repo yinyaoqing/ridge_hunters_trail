@@ -4,6 +4,7 @@ import { newSession } from './core/session';
 import { createCodex } from './core/codex';
 import { createI18n, detectLocale } from './core/i18n';
 import { createStreak } from './core/daily';
+import { createRunState } from './core/runstate';
 import { BootScene } from './scenes/BootScene';
 import { CampScene } from './scenes/CampScene';
 import { MapScene } from './scenes/MapScene';
@@ -38,7 +39,9 @@ function launch(): void {
         game.registry.set('codex', createCodex(storage));
         game.registry.set('i18n', createI18n(detectLocale(navigator.language), storage));
         game.registry.set('session', newSession(1, rng));
-        game.registry.set('runRound', 1);
+        const runState = createRunState(storage);
+        game.registry.set('runState', runState);
+        game.registry.set('runRound', runState.round());
         game.registry.set('streak', createStreak(storage));
       },
     },

@@ -77,8 +77,8 @@ export function createStreak(storage?: Pick<Storage, 'getItem' | 'setItem'>): St
           freezes -= gap; // 歇腳符逐日抵扣
           streak = prev.streak + 1;
         } else {
-          freezes = 0;
-          streak = Math.floor(prev.streak / 2) + 1; // 降級不歸零（家庭向）
+          // 符不足：保留剩餘符，連勝減半+1（D1）
+          streak = Math.floor(prev.streak / 2) + 1;
         }
       }
       if (streak % FREEZE_EVERY === 0) freezes = Math.min(FREEZE_CAP, freezes + 1);
