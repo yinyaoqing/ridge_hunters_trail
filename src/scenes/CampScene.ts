@@ -99,9 +99,11 @@ export class CampScene extends Phaser.Scene {
     // 今日天氣：僅生成一次每日 session 取其 weather 欄位（成本可忽略），不存入 registry/session——
     // 真正要玩的 session 仍由下方按鈕的 createDailySession(now) 產生
     const todayWeather = createDailySessionFromKey(today).level.weather;
+    // 分隔符依語系而定：zh-TW 用全形｜、en 用半形 ·，避免英文行讀出「Clear｜」這種混排斷句
+    const sep = i18n.locale() === 'zh-TW' ? '｜' : ' · ';
     const dailyLabel = (dailyDone
       ? `${i18n.t('camp.daily')} · ${i18n.t('camp.dailyDone')} ✓`
-      : `${i18n.t('camp.daily')} · ${today}`) + `｜${i18n.t(WEATHER_KEY[todayWeather])}`;
+      : `${i18n.t('camp.daily')} · ${today}`) + `${sep}${i18n.t(WEATHER_KEY[todayWeather])}`;
     this.button(cx, by, bw, 50, dailyLabel, false, () => {
       const now = new Date();
       this.registry.set('session', createDailySession(now));

@@ -28,7 +28,6 @@ function findNearbyEmptyCell(s: SessionState): Vec2 | null {
     for (let dx = -2; dx <= 2; dx++) {
       if (dx === 0 && dy === 0) continue;
       const p: Vec2 = { x: player.x + dx, y: player.y + dy };
-      if (cheb(player, p) > 2) continue;
       if (p.x < 0 || p.y < 0 || p.x >= level.mapSize || p.y >= level.mapSize) continue;
       candidates.push(p);
     }

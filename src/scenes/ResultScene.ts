@@ -43,6 +43,14 @@ export class ResultScene extends Phaser.Scene {
     const codex: CodexStore = this.registry.get('codex');
     const i18n: I18n = this.registry.get('i18n');
     const score: ScoreStore = this.registry.get('score');
+
+    // 淡出期間若被 resize 重啟，registry 中已是下一局的全新 session（explore 階段）——
+    // 直接續走地圖，避免以新局資料誤跑結算記帳。
+    if (s.phase === 'explore') {
+      fadeToScene(this, 'Map');
+      return;
+    }
+
     this.choiceMade = false; // 場景實例會跨局重用，每次 create()（含 resize 重啟）都要重置押注互斥旗標
     this.audio = this.registry.get('audio');
     this.audio.ambient(false); // 結算畫面停風聲
@@ -193,7 +201,10 @@ export class ResultScene extends Phaser.Scene {
     // 押注顯示：補獲時接在道具卡／委託行之後顯示本次入袋收穫＋目前未入袋總額
     if (showScoreGain) {
       const lastGain = (this.registry.get('lastGain') as number | undefined) ?? 0;
-      const gainY = toolBaseY + toolOffset + commStep * lastComms.length;
+      // 矮視窗＋多張卡片時，未夾限的 gainY 可能落在按鈕列附近甚至重疊（見 F7）——
+      // 夾進與 [安全歇腳] 按鈕（yPrimary）同一份版面預算，底線（pot 行）與按鈕保留 ≥16px 間距
+      const yPrimary = Math.min(552 + totalOffset, h - 96);
+      const gainY = Math.min(toolBaseY + toolOffset + commStep * lastComms.length, yPrimary - 46);
       this.add.text(cx, gainY, i18n.t('score.gain', { n: lastGain }), {
         fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.gold), fontStyle: 'bold',
       }).setOrigin(0.5);

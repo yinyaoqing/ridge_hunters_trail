@@ -695,8 +695,10 @@ export class MapScene extends Phaser.Scene {
           this.showTut('tut.qte');
         }
         this.redraw();
-        // 途中微事件：教學期間不觸發（rollMicroEvent 內部已排除每日模式與各項條件）
-        if (this.tutStep < 0) {
+        // 途中微事件：教學期間不觸發（rollMicroEvent 內部已排除每日模式與各項條件）；
+        // 本次移動若已力竭（phase 轉為 exhausted），不再擲事件——避免演出蓋在淡出畫面上、
+        // 且 bonus-supply 會把新格子寫進即將捨棄的關卡資料
+        if (this.tutStep < 0 && s.phase === 'explore') {
           const ev = rollMicroEvent(s, this.registry.get('rng') as Rng);
           if (ev) this.playMicroEvent(ev);
         }

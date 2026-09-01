@@ -32,7 +32,7 @@ enumerate 方式：`grep -rn "rht\." src/`。降級規則欄位的兩個子項�
 | `rht.tools.v1` | JSON：`Record<'windstone'\|'glowbell', boolean>` | 讀取降級 → 退回記憶體 `mem`。JSON 解析失敗或非物件 → `DEFAULTS`（皆 `false`）；解析出的部分物件會與 `DEFAULTS` 做 spread 合併（缺的鍵補 `false`，不因少一個欄位整體作廢）。寫入降級 → 靜默吞下。 | `src/core/tools.ts` |
 | `rht.commissions.v1` | JSON：`{ date:string; done:[boolean,boolean,boolean] }` | 讀取降級 → 退回記憶體 `mem`。JSON 解析失敗，或形狀不符（`date` 非字串／`done` 非長度 3 陣列）→ `null`（`statusFor` 對任何日期一律回傳 `[false,false,false]`）；形狀正確但陣列元素非布林（如外部工具寫入 `1`/`0`）→ 逐格 `Boolean()` 轉型，不整體作廢。寫入降級 → 靜默吞下。 | `src/core/commissions.ts` |
 | `rht.audio.v1` | 純字串 sentinel：`'0'` \| `'1'`（開關） | 讀取降級（`try/catch`）→ 沿用預設 `on = true`。值不是 `'0'`/`'1'` → 同樣沿用預設。寫入降級（`persist()` 內 `try/catch`）→ 靜默吞下，僅本次工作階段的開關正確。 | `src/core/audio.ts` |
-| `rht.score.v1` **（本期 Task 7 新增，尚未實作，此列為 Phase 3 W3 押注續追設計預告）** | 依 `docs/superpowers/specs/2026-09-01-phase3-longtail-design.md` §W3：JSON `{ banked:number; pot:number; multiplier:number; bestRun:number }`（`banked`＝已入袋分數、`pot`＝本輪未入袋分數、`multiplier`＝連追倍率 `1→1.5→2→2.5` 封頂、`bestRun`＝歷史最佳入袋） | 設計文件明言「降級同 runstate」：預期比照 `rht.run.v1` 模式（讀取拋例外 → 退回記憶體；JSON 壞掉或形狀不符 → 預設值 `{banked:0, pot:0, multiplier:1, bestRun:0}`；寫入拋例外 → 靜默吞下）。**實際實作以屆時程式碼為準**，此處僅記錄設計意圖，新增時務必回頭校正本列。 | 預計 `src/core/score.ts`（尚未建立） |
+| `rht.score.v1`（Task 7 新增） | JSON：`{ banked:number; pot:number; multiplier:number; bestRun:number }`（`banked`＝已入袋分數、`pot`＝本輪未入袋分數、`multiplier`＝連追倍率、`bestRun`＝歷史最佳入袋總額） | 讀取降級 → 退回記憶體 `mem`。JSON 解析失敗，或形狀不符（`banked`/`pot`/`multiplier`/`bestRun` 任一非有限數或 `<0`，或 `multiplier` 不落在 `MULTIPLIERS`〔`[1, 1.5, 2, 2.5]`〕階梯上）→ 整筆重置為 `DEFAULTS`（`{banked:0, pot:0, multiplier:1, bestRun:0}`），同 `rht.run.v1` 的防禦壞資料手法。寫入降級 → 靜默吞下，僅記憶體生效。 | `src/core/score.ts` |
 
 ---
 
@@ -59,9 +59,9 @@ registry 鍵沒有「格式降級」的概念——寫入方保證型別正確�
 | `lastComms` | `ResultScene`（結算時算出「本次新完成的委託」索引清單並暫存） | `ResultScene`（同上，渲染委託完成行；`describeCommission` 取回描述文字） | 同 `lastUnlocks`：`MapScene.create()`／`CampScene.create()` 開頭清空為 `[]`。 |
 | `qteOutcome` | `QteScene`（判讀結束時寫入 `QteState`，含命中精準度） | `ResultScene`（換算品質 `qualityFromQte(qte)`） | 從不主動清空／`remove`；下一次進入 `QteScene` 時會被覆寫。若某局跳過 QTE（如失敗/逃跑），`ResultScene` 讀到的是上一局殘留值，但 `qte` 只在 `caught` 分支才會被使用，故不影響正確性。 |
 | `dailyKey` | `CampScene`（點擊「今日行蹤」時，取樣當下日期一次存入，供本局與結算共用同一 dateKey） | `ResultScene`（`s.mode === 'daily'` 時讀取，取代現場重新取樣，避免跨 UTC 午夜分歧） | `CampScene.create()` 開頭 `registry.remove('dailyKey')`——代表「回到營地＝本次 daily（若有）已結算完畢」，防止下一局改走主線時誤讀到舊值。 |
-| `score` **（本期新增，Task 8，尚未實作）** | 預計 `main.ts`（`registry.set('score', createScoreStore(storage))`，比照 `codex`/`tools`/`streak` 的 store 掛載方式） | 預計 `ResultScene`（caught 時計分＋雙卡「安全歇腳／乘勝續追」）、`CampScene`（顯示 `bestRun` 與進行中 `banked`/`pot`） | 預計從不清空，`rht.score.v1` 的薄包裝，比照現有 store 慣例。 |
-| `lastGain` **（本期新增，Task 8，尚未實作）** | 預計 `ResultScene`（caught 時暫存本局 `catchScore(...)` 增量，供結算畫面顯示「+N 分」） | 預計 `ResultScene`（同一次 `create()` 內渲染） | 預計比照 `lastUnlocks`／`lastComms` 模式：離開 Result 時（`MapScene`／`CampScene` 開頭）清空，避免殘留到下一次進場。 |
-| `lastLoss` **（本期新增，Task 8，尚未實作）** | 預計 `ResultScene`（escaped／exhausted 時暫存本輪 `pot` 消散量，供結算畫面顯示「散進霧裡了……」文案帶數字） | 預計 `ResultScene`（同一次 `create()` 內渲染） | 預計同 `lastGain`：離開 Result 時清空。 |
+| `score`（Task 8 新增） | `main.ts`（preBoot：`registry.set('score', createScoreStore(storage))`，比照 `codex`/`tools`/`streak` 的 store 掛載方式） | `ResultScene`（caught 時記帳＋顯示；雙卡「安全歇腳／乘勝續追」的 `bank()`/`push()` 呼叫）、`CampScene`（右上角顯示 `bestRun` 與進行中的 `banked`/`pot`） | 從不清空；`rht.score.v1` 的薄包裝，比照現有 store 慣例。 |
+| `lastGain`（Task 8 新增） | `ResultScene`（`!s.resolved` 記帳區塊內，僅 `caught && s.mode === 'run'` 時，暫存 `score.addCatch(catchScore(...))` 的實得分數，供結算畫面顯示「+N 分」） | `ResultScene`（`if (!s.resolved)` 區塊之外的渲染段讀取，含 resize 重啟時的重讀） | `CampScene.create()`／`MapScene.create()` 開頭各自 `registry.remove('lastGain')`——離開 Result 即清空，避免殘留到下一次進場。 |
+| `lastLoss`（Task 8 新增） | `ResultScene`（同一 `!s.resolved` 區塊內，`!caught && s.mode === 'run'` 時，於 `score.loseRun()` 歸零 pot **之前**先讀出 `score.state().pot` 暫存，供結算畫面顯示「散進霧裡了……」文案帶數字） | `ResultScene`（同 `lastGain`：`if (!s.resolved)` 區塊之外讀取顯示） | 同 `lastGain`：`CampScene.create()`／`MapScene.create()` 開頭各自 `registry.remove('lastLoss')`。 |
 
 ---
 

@@ -7,7 +7,7 @@ export type MsgKey =
   | 'result.escaped.title' | 'result.escaped.body'
   | 'result.exhausted.title' | 'result.exhausted.body'
   | 'result.quality' | 'result.notes' | 'result.research' | 'result.copied'
-  | 'btn.next' | 'btn.retry' | 'btn.guide' | 'btn.back' | 'btn.start'
+  | 'btn.retry' | 'btn.guide' | 'btn.back' | 'btn.start'
   | 'btn.camp' | 'btn.copy'
   | 'help.title' | 'help.goal'
   | 'help.footprint' | 'help.disturbance' | 'help.scent'
@@ -44,7 +44,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'result.notes': 'Field notes +{n}',
     'result.research': 'Research {cur} / {next}',
     'result.copied': 'Copied!',
-    'btn.next': '[ Next Hunt ]',
     'btn.retry': '[ Track Again ]',
     'btn.guide': '[ Field Guide ]',
     'btn.back': '[ Back to Trail ]',
@@ -123,7 +122,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'result.notes': '觀察筆記 +{n}',
     'result.research': '研究度 {cur} / {next}',
     'result.copied': '已複製！',
-    'btn.next': '［下一場狩獵］',
     'btn.retry': '［重新追蹤］',
     'btn.guide': '［生態圖鑑］',
     'btn.back': '［返回山徑］',
