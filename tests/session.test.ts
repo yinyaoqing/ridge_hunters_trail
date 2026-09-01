@@ -23,7 +23,7 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
   return {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
     readClues: new Set(), marks: new Set(), phase: 'explore',
-    steps: 0, mode: 'run', resolved: false, bellUsed: false,
+    steps: 0, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
     ...overrides,
   };
 }
@@ -156,6 +156,7 @@ describe('steps / mode / resolved', () => {
     expect(s.steps).toBe(0);
     expect(s.mode).toBe('run');
     expect(s.resolved).toBe(false);
+    expect(s.microEvents).toBe(0);
   });
   it('mode can be set to daily', () => {
     expect(newSession(5, mulberry32(1), 'daily').mode).toBe('daily');

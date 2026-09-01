@@ -24,6 +24,7 @@ export interface SessionState {
   mode: SessionMode;      // 主線 run / 每日挑戰 daily
   resolved: boolean;      // Result 已記帳（防場景重啟重複記錄）
   bellUsed: boolean;      // 微光鈴本局是否已使用（一局一次）
+  microEvents: number;    // 微事件本局計數
 }
 
 function startPos(level: Level): Vec2 {
@@ -46,6 +47,7 @@ export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): 
     mode,
     resolved: false,
     bellUsed: false,
+    microEvents: 0,
   };
 }
 
