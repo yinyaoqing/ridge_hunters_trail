@@ -30,6 +30,8 @@ export class MapScene extends Phaser.Scene {
   private pressAt: { t: number; x: number; y: number } | null = null;
   private markChipG?: Phaser.GameObjects.Graphics;
   private markChipText?: Phaser.GameObjects.Text;
+  private markChipX = 0;
+  private markChipY = 0;
 
   constructor() {
     super('Map');
@@ -232,7 +234,9 @@ export class MapScene extends Phaser.Scene {
         this.openHelp();
       });
 
-    // 標記模式鈕（開/關填色不同，需獨立 Graphics 供重繪）
+    // 標記模式鈕（開/關填色不同，需獨立 Graphics 供重繪；座標存為欄位供 updateHud 重繪標籤時使用）
+    this.markChipX = xMark;
+    this.markChipY = chipY;
     this.markChipG = this.add.graphics();
     this.markChipText = this.add.text(xMark + 30, chipY + chipH / 2, '', {
       fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
@@ -345,6 +349,7 @@ export class MapScene extends Phaser.Scene {
     this.roundText.setText(i18n.t('hud.round', { n: s.round }));
     this.stamLabel.setText(`${i18n.t('hud.stamina', { n: s.stamina })} / ${budget}`.toUpperCase());
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
+    if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
 
     const bw = Math.max(120, Math.min(210, this.scale.width - 320));
     const bh = 12;
