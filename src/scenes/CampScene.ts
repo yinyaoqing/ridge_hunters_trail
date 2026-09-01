@@ -165,7 +165,8 @@ export class CampScene extends Phaser.Scene {
       fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(done ? pal.paperDim : pal.paper),
     }).setOrigin(0, 0.5);
     if (done) {
-      this.add.text(cx + w / 2 - 14, y + h / 2, '✓', {
+      // comm.done 消費點：右側完成勾附上在地化文字（非純符號），符合規格要求的 i18n key 用途
+      this.add.text(cx + w / 2 - 14, y + h / 2, `✓ ${i18n.t('comm.done')}`, {
         fontFamily: FONTS.body, fontSize: '15px', color: cssHex(pal.gold), fontStyle: 'bold',
       }).setOrigin(1, 0.5);
     } else {

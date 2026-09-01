@@ -307,6 +307,8 @@ export class ResultScene extends Phaser.Scene {
   }
 
   // 委託完成行：單行淡入（供給綠），格式「✓ 描述 — 獎勵」
+  // 這裡不套用 comm.done（該 key 由 CampScene.drawCommissionRow 的完成勾消費）——本行已含描述＋
+  // 獎勵文字，語意自明，「✓ 已完成 描述 — 獎勵」會顯得冗長重複，故刻意不重複標示「已完成」
   private renderCommissionLine(cx: number, y: number, comm: Commission, i18n: I18n) {
     const text = `✓ ${this.describeCommission(comm, i18n)} — ${i18n.t('comm.reward', { n: COMMISSION_REWARD_NOTES })}`;
     const t = this.add.text(cx, y, text, {
