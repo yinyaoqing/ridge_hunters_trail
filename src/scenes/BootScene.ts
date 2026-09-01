@@ -12,6 +12,21 @@ export class BootScene extends Phaser.Scene {
     super('Boot');
   }
 
+  // 選配美術管線：嘗試載入生物 sprite（public/assets/creatures/<id>.png，見 docs/ASSETS.md）。
+  // 缺檔時 FILE_LOAD_ERROR 靜默吞下（僅 debug log），create() 的剪影後備完全不受影響——
+  // preload 先於 create 執行是 Phaser 場景生命週期的既定順序，故不需額外同步機制。
+  preload() {
+    this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
+      console.debug(`[assets] optional sprite missing, using silhouette fallback: ${file.key}`);
+    });
+    for (const c of CREATURES) {
+      // 相對路徑（無前導斜線）：搭配 vite.config.ts 的 base: './'，
+      // 讓 index.html 與 public/ 素材在任何部署子路徑（itch.io、CrazyGames iframe 等）下
+      // 都以「相對於目前頁面」解析，與瀏覽器對相對 URL 的預設行為一致。
+      this.load.image(`spr-${c.id}`, `assets/creatures/${c.id}.png`);
+    }
+  }
+
   create() {
     let loaded = 0;
     let started = false;

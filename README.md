@@ -11,6 +11,7 @@ that evade you simply slip away.
 - `npm run dev` — local dev server
 - `npm run test` — unit tests (Vitest)
 - `npm run build` — production build to `dist/`
+- Placing art assets (creature sprites, terrain tiles) — see `docs/ASSETS.md`
 
 ## Design docs
 

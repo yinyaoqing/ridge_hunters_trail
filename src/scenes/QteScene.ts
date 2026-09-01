@@ -6,7 +6,7 @@ import { getPalette, type Palette } from '../core/palette';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
-import { cssHex, FONTS, displayFont } from './paint';
+import { cssHex, FONTS, displayFont, creatureTexKey } from './paint';
 import { fadeIn, fadeToScene, addGlowIfWebGL } from './fx';
 
 const DIAL_BG_KEY = 'qte-dial-bg';
@@ -52,10 +52,10 @@ export class QteScene extends Phaser.Scene {
       fontFamily: FONTS.body, fontSize: '15px', color: cssHex(this.pal.paperDim),
     }).setOrigin(0.5);
 
-    // 目標生物的朦朧剪影（設計板：轉盤中央淡影）
-    const silKey = `sil-${s.level.creatureId}`;
-    if (this.textures.exists(silKey)) {
-      this.sil = this.add.image(cx, cy + 6, silKey).setScale(1.35).setAlpha(0.16);
+    // 目標生物的朦朧剪影（設計板：轉盤中央淡影）；sprite 素材優先、剪影後備
+    const texKey = creatureTexKey(this, s.level.creatureId);
+    if (this.textures.exists(texKey)) {
+      this.sil = this.add.image(cx, cy + 6, texKey).setScale(1.35).setAlpha(0.16);
     }
 
     this.g = this.add.graphics();

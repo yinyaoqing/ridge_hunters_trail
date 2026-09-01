@@ -19,7 +19,7 @@ import {
 } from '../core/commissions';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
-  displayFont, stripBrackets,
+  displayFont, stripBrackets, creatureTexKey,
 } from './paint';
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, addGlowIfWebGL, PARTICLE_CAPS,
@@ -353,9 +353,9 @@ export class ResultScene extends Phaser.Scene {
     }
     const ring = this.add.graphics();
     dashedCircle(ring, cx, cy, 92, color, 0.35, 1.4, 2, 8);
-    const silKey = `sil-${creatureId}`;
-    if (this.textures.exists(silKey)) {
-      const sil = this.add.image(cx, cy + 4, silKey).setScale(1.05);
+    const texKey = creatureTexKey(this, creatureId);
+    if (this.textures.exists(texKey)) {
+      const sil = this.add.image(cx, cy + 4, texKey).setScale(1.05);
       addGlowIfWebGL(this, sil, this.pal.glow);
     } else {
       this.add.circle(cx, cy, 60, color);

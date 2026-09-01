@@ -8,7 +8,7 @@ import { CREATURES } from '../data/creatures';
 import type { I18n } from '../core/i18n';
 import type { Locale } from '../core/types';
 import {
-  cssHex, BRUSH_RADIUS, FONTS, QUALITY_COLORS, displayFont, stripBrackets,
+  cssHex, BRUSH_RADIUS, FONTS, QUALITY_COLORS, displayFont, stripBrackets, creatureTexKey,
 } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
@@ -97,9 +97,9 @@ export class CodexScene extends Phaser.Scene {
       g.lineStyle(1, pal.paper, 0.09).lineBetween(60, y + ROW_H / 2, w - 60, y + ROW_H / 2);
     }
 
-    const silKey = `sil-${id}`;
-    if (this.textures.exists(silKey)) {
-      const img = this.add.image(92, y + 2, silKey).setScale(0.3);
+    const texKey = creatureTexKey(this, id);
+    if (this.textures.exists(texKey)) {
+      const img = this.add.image(92, y + 2, texKey).setScale(0.3);
       if (!discovered) img.setTintFill(0x10160f).setAlpha(0.85); // 墨影 teaser
       row.add(img);
     } else {

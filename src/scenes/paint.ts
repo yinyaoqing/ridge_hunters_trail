@@ -137,6 +137,11 @@ export const FONTS: Fonts = {
 export const displayFont = (locale: Locale): string =>
   locale === 'zh-TW' ? FONTS.displayZh : FONTS.display;
 
+// 生物貼圖 key：sprite 素材優先（美術管線選配，見 docs/ASSETS.md），未提供時剪影後備
+export function creatureTexKey(scene: Phaser.Scene, id: string): string {
+  return scene.textures.exists(`spr-${id}`) ? `spr-${id}` : `sil-${id}`;
+}
+
 // 去除字串前後的方括號（含全形），用於按鈕文字裁切「[ ]」外框
 export const stripBrackets = (s: string): string =>
   s.replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '');
