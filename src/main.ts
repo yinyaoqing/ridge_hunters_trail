@@ -3,7 +3,9 @@ import { mulberry32 } from './core/rng';
 import { newSession } from './core/session';
 import { createCodex } from './core/codex';
 import { createI18n, detectLocale } from './core/i18n';
+import { createStreak } from './core/daily';
 import { BootScene } from './scenes/BootScene';
+import { CampScene } from './scenes/CampScene';
 import { MapScene } from './scenes/MapScene';
 import { QteScene } from './scenes/QteScene';
 import { ResultScene } from './scenes/ResultScene';
@@ -26,7 +28,7 @@ function launch(): void {
     height: window.innerHeight,
     backgroundColor: '#131a17',
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [BootScene, MapScene, QteScene, ResultScene, CodexScene, HelpScene],
+    scene: [BootScene, CampScene, MapScene, QteScene, ResultScene, CodexScene, HelpScene],
     callbacks: {
       preBoot: (game) => {
         const rng = mulberry32(Date.now() >>> 0);
@@ -37,6 +39,7 @@ function launch(): void {
         game.registry.set('i18n', createI18n(detectLocale(navigator.language), storage));
         game.registry.set('session', newSession(1, rng));
         game.registry.set('runRound', 1);
+        game.registry.set('streak', createStreak(storage));
       },
     },
   });

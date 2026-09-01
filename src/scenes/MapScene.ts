@@ -89,7 +89,7 @@ export class MapScene extends Phaser.Scene {
   }
 
   private openHelp() {
-    this.scene.launch('Help');
+    this.scene.launch('Help', { from: 'Map' });
     this.scene.pause();
   }
 

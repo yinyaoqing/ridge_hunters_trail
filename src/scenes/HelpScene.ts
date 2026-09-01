@@ -8,9 +8,14 @@ import { cssHex, drawClueToken, drawSupply, BRUSH_RADIUS, FONTS } from './paint'
 // 首次啟動由 MapScene 自動開啟，之後可從 HUD 的「?」鈕重開。
 export class HelpScene extends Phaser.Scene {
   private pal!: Palette;
+  private from: 'Camp' | 'Map' = 'Map';
 
   constructor() {
     super('Help');
+  }
+
+  init(data: { from?: 'Camp' | 'Map' }) {
+    this.from = data.from ?? 'Map';
   }
 
   create() {
@@ -136,6 +141,6 @@ export class HelpScene extends Phaser.Scene {
 
   private close() {
     this.scene.stop();
-    this.scene.resume('Map');
+    this.scene.resume(this.from);
   }
 }

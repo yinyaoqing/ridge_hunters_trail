@@ -18,7 +18,7 @@ export class BootScene extends Phaser.Scene {
     const begin = () => {
       if (!started) {
         started = true;
-        this.scene.start(this.devTargetScene() ?? 'Map');
+        this.scene.start(this.devTargetScene() ?? 'Camp');
       }
     };
     this.textures.on(Phaser.Textures.Events.ADD, () => {
@@ -36,7 +36,7 @@ export class BootScene extends Phaser.Scene {
     if (!import.meta.env.DEV) return null;
     const params = new URLSearchParams(window.location.hash.slice(1));
     const target = params.get('scene');
-    if (!target || !['Map', 'Qte', 'Result', 'Codex'].includes(target)) return null;
+    if (!target || !['Camp', 'Map', 'Qte', 'Result', 'Codex'].includes(target)) return null;
     if (target === 'Result') {
       const phase = params.get('phase');
       const s = this.registry.get('session');
