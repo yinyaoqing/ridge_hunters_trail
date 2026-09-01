@@ -1,22 +1,29 @@
 import type { Locale } from './types';
 
 export type MsgKey =
-  | 'hud.round' | 'hud.stamina' | 'hud.hint'
+  | 'hud.round' | 'hud.stamina' | 'hud.hint' | 'hud.mark'
   | 'qte.title' | 'qte.instruction' | 'qte.progress'
   | 'result.recorded'
   | 'result.escaped.title' | 'result.escaped.body'
   | 'result.exhausted.title' | 'result.exhausted.body'
+  | 'result.quality' | 'result.notes' | 'result.research' | 'result.copied'
   | 'btn.next' | 'btn.retry' | 'btn.guide' | 'btn.back' | 'btn.start'
+  | 'btn.camp' | 'btn.copy'
   | 'help.title' | 'help.goal'
   | 'help.footprint' | 'help.disturbance' | 'help.scent'
   | 'help.decoy' | 'help.stamina' | 'help.mark' | 'help.qte'
-  | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded' | 'codex.times';
+  | 'camp.continue' | 'camp.daily' | 'camp.dailyDone' | 'camp.streak'
+  | 'quality.bronze' | 'quality.silver' | 'quality.gold'
+  | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded' | 'codex.times'
+  | 'codex.research' | 'codex.rumored'
+  | 'share.stats';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
     'hud.round': 'Round {n}',
     'hud.stamina': 'Stamina {n}',
     'hud.hint': 'Move: click/arrow keys · Mark: Shift+click',
+    'hud.mark': 'Mark',
     'qte.title': 'Close Encounter',
     'qte.instruction': 'Tap or press SPACE when the needle crosses the glowing arc',
     'qte.progress': 'Hits {hits}/{needed}   Attempts {attempt}/{rounds}',
@@ -25,11 +32,17 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'result.escaped.body': 'The trail went cold. Every clue is lost — start the tracking again.',
     'result.exhausted.title': 'You ran out of stamina.',
     'result.exhausted.body': 'Rest up. The mountain keeps its secrets for now.',
+    'result.quality': 'Record quality',
+    'result.notes': 'Field notes +{n}',
+    'result.research': 'Research {cur} / {next}',
+    'result.copied': 'Copied!',
     'btn.next': '[ Next Hunt ]',
     'btn.retry': '[ Track Again ]',
     'btn.guide': '[ Field Guide ]',
     'btn.back': '[ Back to Trail ]',
     'btn.start': '[ Begin the Hunt ]',
+    'btn.camp': '[ Back to Camp ]',
+    'btn.copy': '[ Copy Result ]',
     'help.title': 'How to Play',
     'help.goal': 'Read the clues a creature leaves behind, deduce where it hides, and get close enough to record it in your field guide. No harm done — if you fail, it simply slips away.',
     'help.footprint': 'Footprint — points roughly toward the creature, within the shown cone.',
@@ -39,16 +52,27 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.stamina': 'Every step costs stamina; thickets and rock cost more. Mistleaf and dewfruit restore it.',
     'help.mark': 'Shift+click marks a cell for your notes. Step onto a clue to read it.',
     'help.qte': 'Up close, tap or press SPACE when the needle sweeps the glowing arc.',
+    'camp.continue': 'Hit the Trail · Round {n}',
+    'camp.daily': "Today's Trail",
+    'camp.dailyDone': 'Done today',
+    'camp.streak': 'Streak {n}',
+    'quality.bronze': 'Bronze Record',
+    'quality.silver': 'Silver Record',
+    'quality.gold': 'Gold Record',
     'codex.title': 'Field Guide',
     'codex.count': '{found} / {total} recorded',
     'codex.unknown': '???',
     'codex.notRecorded': 'Not yet recorded',
     'codex.times': 'recorded x{n}',
+    'codex.research': 'Research',
+    'codex.rumored': 'Traces found in the field...',
+    'share.stats': 'Steps {steps} · Stamina {stam} · Streak {streak}',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
     'hud.stamina': '體力 {n}',
     'hud.hint': '移動：點擊/方向鍵 · 標記：Shift+點擊',
+    'hud.mark': '標記',
     'qte.title': '近距離判讀',
     'qte.instruction': '指針掃過發光弧區時點擊或按空白鍵',
     'qte.progress': '命中 {hits}/{needed}   嘗試 {attempt}/{rounds}',
@@ -57,11 +81,17 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'result.escaped.body': '蹤跡已冷，線索全數消散——重新開始追蹤吧。',
     'result.exhausted.title': '體力耗盡了。',
     'result.exhausted.body': '休息一下，山林暫時守住了牠的祕密。',
+    'result.quality': '記錄品質',
+    'result.notes': '觀察筆記 +{n}',
+    'result.research': '研究度 {cur} / {next}',
+    'result.copied': '已複製！',
     'btn.next': '［下一場狩獵］',
     'btn.retry': '［重新追蹤］',
     'btn.guide': '［生態圖鑑］',
     'btn.back': '［返回山徑］',
     'btn.start': '［開始追蹤］',
+    'btn.camp': '［返回營地］',
+    'btn.copy': '［複製成績］',
     'help.title': '玩法說明',
     'help.goal': '判讀生物留下的線索，推理出牠的藏身處，悄悄接近並記入圖鑑。全程無傷害——失敗時牠只是悄悄溜走。',
     'help.footprint': '足跡——大致指向生物所在，方向落在顯示的錐形範圍內。',
@@ -71,11 +101,21 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.stamina': '每一步都消耗體力；密叢與岩坡消耗更多。霧葉與露珠果可以回復體力。',
     'help.mark': 'Shift+點擊可在格子上做標記筆記；踩上線索即可判讀。',
     'help.qte': '逼近目標後，趁指針掃過發光弧區時點擊或按空白鍵。',
+    'camp.continue': '上山追蹤｜第 {n} 局',
+    'camp.daily': '今日行蹤',
+    'camp.dailyDone': '今日已完成',
+    'camp.streak': '連勝 {n}',
+    'quality.bronze': '銅級記錄',
+    'quality.silver': '銀級記錄',
+    'quality.gold': '金級記錄',
     'codex.title': '生態圖鑑',
     'codex.count': '已記錄 {found} / {total} 種',
     'codex.unknown': '？？？',
     'codex.notRecorded': '尚未記錄',
     'codex.times': '記錄 ×{n}',
+    'codex.research': '研究度',
+    'codex.rumored': '山野間已見蹤跡……',
+    'share.stats': '步數 {steps}｜剩餘體力 {stam}｜連勝 {streak}',
   },
 };
 
