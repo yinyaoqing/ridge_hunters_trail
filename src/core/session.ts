@@ -95,6 +95,7 @@ export function toggleMark(s: SessionState, p: Vec2): void {
 }
 
 export function resolveQte(s: SessionState, success: boolean): void {
+  if (s.phase !== 'qte') return;
   s.phase = success ? 'caught' : 'escaped';
 }
 

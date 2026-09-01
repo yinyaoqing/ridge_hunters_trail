@@ -14,7 +14,7 @@ export type MsgKey =
   | 'help.decoy' | 'help.stamina' | 'help.mark' | 'help.qte'
   | 'camp.continue' | 'camp.daily' | 'camp.dailyDone' | 'camp.streak'
   | 'quality.bronze' | 'quality.silver' | 'quality.gold'
-  | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded' | 'codex.times'
+  | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded'
   | 'codex.research' | 'codex.rumored'
   | 'share.stats';
 
@@ -63,7 +63,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.count': '{found} / {total} recorded',
     'codex.unknown': '???',
     'codex.notRecorded': 'Not yet recorded',
-    'codex.times': 'recorded x{n}',
     'codex.research': 'Research',
     'codex.rumored': 'Traces found in the field...',
     'share.stats': 'Steps {steps} · Stamina {stam} · Streak {streak}',
@@ -112,7 +111,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.count': '已記錄 {found} / {total} 種',
     'codex.unknown': '？？？',
     'codex.notRecorded': '尚未記錄',
-    'codex.times': '記錄 ×{n}',
     'codex.research': '研究度',
     'codex.rumored': '山野間已見蹤跡……',
     'share.stats': '步數 {steps}｜剩餘體力 {stam}｜連勝 {streak}',

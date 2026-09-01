@@ -149,11 +149,11 @@ export class CodexScene extends Phaser.Scene {
     const bh = 46;
     const btn = this.add.graphics();
     btn.lineStyle(1.5, pal.gold, 0.65).strokeRoundedRect(cx - bw / 2, by - bh / 2, bw, bh, BRUSH_RADIUS);
-    this.add.text(cx, by, i18n.t('btn.back').replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '').toUpperCase(), {
+    this.add.text(cx, by, i18n.t('btn.camp').replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '').toUpperCase(), {
       fontFamily: FONTS.body, fontSize: '15px', color: cssHex(pal.gold),
     }).setOrigin(0.5).setLetterSpacing(2);
     this.add.rectangle(cx, by, bw, bh, 0, 0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => fadeToScene(this, 'Map'));
+      .on('pointerdown', () => fadeToScene(this, 'Camp'));
   }
 }

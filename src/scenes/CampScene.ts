@@ -63,7 +63,10 @@ export class CampScene extends Phaser.Scene {
       ? `${i18n.t('camp.daily')} · ${i18n.t('camp.dailyDone')} ✓`
       : `${i18n.t('camp.daily')} · ${today}`;
     this.button(cx, by, bw, 50, dailyLabel, false, () => {
-      this.registry.set('session', createDailySession(new Date()));
+      const now = new Date();
+      this.registry.set('session', createDailySession(now));
+      // 單一取樣：與 ResultScene 記帳/分享卡共用同一 dateKey，避免跨 UTC 午夜時分歧
+      this.registry.set('dailyKey', dailyKey(now));
       fadeToScene(this, 'Map');
     });
     by += 64;

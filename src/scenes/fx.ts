@@ -18,6 +18,7 @@ export function fadeIn(scene: Phaser.Scene, ms = 240): void {
 }
 
 export function fadeToScene(scene: Phaser.Scene, key: string, ms = 200): void {
+  if (scene.cameras.main.fadeEffect.isRunning) return; // 防止雙擊等連續觸發重複 fade/重複 scene.start
   scene.cameras.main.fadeOut(ms, 0, 0, 0);
   scene.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
     scene.scene.start(key));

@@ -133,6 +133,20 @@ describe('resolveQte / nextSession', () => {
     expect(next.round).toBe(1);
     expect(next.readClues.size).toBe(0);
   });
+  it('is a no-op when phase is not qte (e.g. caught or explore)', () => {
+    const caughtState = makeState({ phase: 'caught' });
+    resolveQte(caughtState, true);
+    expect(caughtState.phase).toBe('caught');
+
+    const exploreState = makeState({ phase: 'explore' });
+    resolveQte(exploreState, false);
+    expect(exploreState.phase).toBe('explore');
+  });
+  it('still resolves normally when phase is qte', () => {
+    const s = makeState({ phase: 'qte' });
+    resolveQte(s, true);
+    expect(s.phase).toBe('caught');
+  });
 });
 
 describe('steps / mode / resolved', () => {

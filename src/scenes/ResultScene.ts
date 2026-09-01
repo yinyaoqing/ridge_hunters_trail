@@ -12,7 +12,7 @@ import { shareText } from '../core/share';
 import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
 } from './paint';
-import { fadeIn, fadeToScene } from './fx';
+import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
 const GLOW_KEY = 'result-glow';
 
@@ -40,6 +40,9 @@ export class ResultScene extends Phaser.Scene {
     const qte = this.registry.get('qteOutcome') as QteState | undefined;
     const quality: Quality | null = caught && qte ? qualityFromQte(qte) : null;
     const notes = caught ? 0 : notesForRun(s.readClues.size);
+    // 單一取樣：daily 的 dateKey 由 Camp 進入時取樣一次存進 registry，
+    // 記帳與分享卡都讀同一值，避免跨 UTC 午夜時分歧（沒有存到值時退回現場取樣）
+    const dk = (this.registry.get('dailyKey') as string | undefined) ?? dailyKey(new Date());
 
     // 記帳一次（resize 造成的場景重啟不重複）
     if (!s.resolved) {
@@ -51,14 +54,16 @@ export class ResultScene extends Phaser.Scene {
         codex.addNotes(creature.id, notes);
       }
       if (s.mode === 'daily') {
-        (this.registry.get('streak') as StreakStore).recordPlay(dailyKey(new Date()));
+        (this.registry.get('streak') as StreakStore).recordPlay(dk);
       }
     }
 
     const pal = this.pal;
     this.cameras.main.setBackgroundColor(pal.bg);
     fadeIn(this);
+    restartOnResize(this);
     const cx = this.scale.width / 2;
+    const h = this.scale.height;
 
     let title: string;
     let body: string;
@@ -98,15 +103,16 @@ export class ResultScene extends Phaser.Scene {
     if (!caught) this.showNotesDrop(cx, 486, creature.id, notes, codex, i18n);
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
+    // 依視窗高度夾限座標，避免矮視窗（如橫向手機）裁切按鈕；780 全高時維持原座標不變
     const runRound: number = this.registry.get('runRound');
     if (s.mode === 'daily') {
       // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊
-      const streakY = caught ? 500 : 542;
+      const streakY = caught ? Math.min(500, h - 148) : Math.min(542, h - 150);
       const copyY = streakY + 52;
-      const campY = caught ? 614 : streakY + 112;
+      const campY = Math.min(caught ? 614 : streakY + 112, h - 30);
       const streak: StreakStore = this.registry.get('streak');
       const text = shareText(i18n, {
-        dateKey: dailyKey(new Date()), caught, quality,
+        dateKey: dk, caught, quality,
         steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
       });
       this.add.text(cx, streakY, i18n.t('camp.streak', { n: streak.state().streak }).toUpperCase(), {
@@ -117,18 +123,22 @@ export class ResultScene extends Phaser.Scene {
       this.button(cx, campY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
-      this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
+      const yPrimary = Math.min(552, h - 96);
+      const ySecondary = Math.min(614, h - 34);
+      this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
         this.registry.set('session', newSession(runRound, rng));
         fadeToScene(this, 'Map');
       });
-      this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+      this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else {
-      this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
+      const yPrimary = Math.min(552, h - 96);
+      const ySecondary = Math.min(614, h - 34);
+      this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
         this.registry.set('session', newSession(s.round, rng, s.mode));
         fadeToScene(this, 'Map');
       });
-      this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+      this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     }
   }
@@ -169,7 +179,10 @@ export class ResultScene extends Phaser.Scene {
     const g = this.add.graphics();
     g.lineStyle(2.5, color, 0.9).strokeCircle(0, 0, 30);
     g.lineStyle(1, color, 0.4).strokeCircle(0, 0, 24);
-    const label = this.add.text(0, 0, i18n.t(QUALITY_KEY[q]).split(' ')[0], {
+    // zh-TW 章印用單字（銅/銀/金），避免 4 個全形字塞進 30px 半徑圓章
+    const full = i18n.t(QUALITY_KEY[q]);
+    const stampLabel = i18n.locale() === 'zh-TW' ? full.slice(0, 1) : full.split(' ')[0];
+    const label = this.add.text(0, 0, stampLabel, {
       fontFamily: FONTS.display, fontSize: '13px', color: cssHex(color),
     }).setOrigin(0.5);
     const holder = this.add.container(x, y, [g, label]).setScale(1.8).setAlpha(0);

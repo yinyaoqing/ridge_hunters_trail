@@ -25,4 +25,18 @@ describe('shareText', () => {
     expect(text.split('\n')[1]).toContain('🌫️');
     expect(text).not.toContain('🥇');
   });
+  it('renders the bronze medal for a bronze-quality catch', () => {
+    const text = shareText(createI18n('en'), {
+      dateKey: '2026-08-31', caught: true, quality: 'bronze',
+      steps: 15, staminaLeft: 5, streak: 2,
+    });
+    expect(text.split('\n')[1]).toContain('🥉');
+  });
+  it('renders the silver medal for a silver-quality catch', () => {
+    const text = shareText(createI18n('en'), {
+      dateKey: '2026-08-31', caught: true, quality: 'silver',
+      steps: 18, staminaLeft: 8, streak: 3,
+    });
+    expect(text.split('\n')[1]).toContain('🥈');
+  });
 });

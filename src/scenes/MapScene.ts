@@ -42,6 +42,11 @@ export class MapScene extends Phaser.Scene {
 
   create() {
     const s = this.session();
+    // 防護：Codex 只能從 Camp 進入，若 session 已結束（非 explore）誤導回 Map 會卡死畫面
+    if (s.phase !== 'explore') {
+      this.scene.start('Camp');
+      return;
+    }
     const w = this.scale.width;
     const h = this.scale.height;
     this.pal = getPalette(s.round);
@@ -310,7 +315,7 @@ export class MapScene extends Phaser.Scene {
         this.animating = false;
         floatText(this, dest.x, dest.y - cs * 0.5, `-${cost}`, cssRgba(this.pal.paper, 0.75));
         if (gotSupply) {
-          floatText(this, dest.x, dest.y - cs, '+10', cssHex(this.pal.supply));
+          floatText(this, dest.x, dest.y - cs, `+${getDifficulty(s.round).supplyRestore}`, cssHex(this.pal.supply));
         }
         if (s.readClues.size > readBefore) {
           const clue = s.level.clues.find((c) => key(c.position) === key(to));
@@ -414,10 +419,17 @@ export class MapScene extends Phaser.Scene {
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
 
-    const bw = Math.max(120, Math.min(210, this.scale.width - 320));
-    const bh = 12;
-    const bx = w / 2 - bw / 2;
-    const by = 27;
+    // 窄螢幕（手機直向）：置中條會撞上右側 chip（chip 左緣 = w-192）。
+    // 左靠齊改在 roundText 下方另起一列（label 於 y30、bar 於 y46），與 buildHud
+    // 的 compact 斷點（w<560）一致，避免產生第二個斷點造成 560~599 間的縫隙碰撞。
+    const compact = w < 560;
+    const bw = compact
+      ? Math.max(60, Math.min(210, w - 250)) // 確保 bx+bw ≤ (w-192)-8，與 mark chip 保持 8px 間距
+      : Math.max(120, Math.min(210, w - 320));
+    const bh = compact ? 10 : 12;
+    const bx = compact ? 50 : w / 2 - bw / 2;
+    const by = compact ? 46 : 27;
+    this.stamLabel.setPosition(compact ? bx + bw / 2 : w / 2, compact ? 30 : 8);
     this.hudG.clear();
     this.hudG.fillStyle(0x0d1310, 1).fillRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
     this.hudG.lineStyle(1, pal.paper, 0.18).strokeRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
