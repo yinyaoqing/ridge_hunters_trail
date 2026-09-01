@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="fog" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs><g transform="translate(-64,-64)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(0,-64)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(64,-64)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(-64,0)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(0,0)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(64,0)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(-64,64)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(0,64)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g><g transform="translate(64,64)">
+    <g stroke="#000000" fill="none" opacity="0.055" stroke-linecap="round" stroke-width="1.1">
+      <path d="M-4 14 L12 20 L26 10 L44 18 L58 8 L70 16"/>
+      <path d="M-4 42 L10 34 L28 44 L46 36 L62 46 L70 40"/>
+      <path d="M18 -4 L14 12 L22 26"/>
+      <path d="M50 22 L54 38 L48 52"/>
+      <path d="M32 44 L30 58 L38 68"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.04" stroke-linecap="round" stroke-width="0.9">
+      <path d="M-4 16 L12 22 L26 12 L44 20"/>
+      <path d="M10 36 L28 46 L46 38"/>
+      <path d="M52 24 L56 40"/>
+    </g>
+</g></svg>

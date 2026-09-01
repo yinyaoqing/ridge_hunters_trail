@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="fog" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs><g transform="translate(-64,-64)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(0,-64)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(64,-64)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(-64,0)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(0,0)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(64,0)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(-64,64)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(0,64)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g><g transform="translate(64,64)">
+    <g opacity="0.5">
+      <ellipse cx="14" cy="16" rx="24" ry="11" fill="url(#fog)"/>
+      <ellipse cx="50" cy="10" rx="18" ry="8" fill="url(#fog)"/>
+      <ellipse cx="55" cy="41" rx="26" ry="12" fill="url(#fog)"/>
+      <ellipse cx="10" cy="55" rx="20" ry="9" fill="url(#fog)"/>
+      <ellipse cx="34" cy="29" rx="30" ry="13" fill="url(#fog)"/>
+    </g>
+    <g stroke="#ffffff" fill="none" opacity="0.03" stroke-linecap="round" stroke-width="1.4">
+      <path d="M-4 25 Q16 20 34 25 Q52 30 68 24"/>
+      <path d="M-4 47 Q14 42 30 47 Q48 53 68 46"/>
+    </g></g></svg>

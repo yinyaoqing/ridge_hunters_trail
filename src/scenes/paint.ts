@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { ClueType, Locale } from '../core/types';
+import type { ClueType, Locale, TerrainType } from '../core/types';
 import { CLUE_GOLD, type Palette } from '../core/palette';
 import type { Quality } from '../core/quality';
 
@@ -140,6 +140,16 @@ export const displayFont = (locale: Locale): string =>
 // 生物貼圖 key：sprite 素材優先（美術管線選配，見 docs/ASSETS.md），未提供時剪影後備
 export function creatureTexKey(scene: Phaser.Scene, id: string): string {
   return scene.textures.exists(`spr-${id}`) ? `spr-${id}` : `sil-${id}`;
+}
+
+// 地形紋理（選配）：載入成功回傳可平鋪的貼圖來源，否則回傳 null（呼叫端維持純色塊）。
+export function terrainTexImage(
+  scene: Phaser.Scene, type: TerrainType,
+): HTMLImageElement | HTMLCanvasElement | null {
+  const key = `terr-${type}`;
+  if (!scene.textures.exists(key)) return null;
+  const src = scene.textures.get(key).getSourceImage();
+  return src instanceof HTMLImageElement || src instanceof HTMLCanvasElement ? src : null;
 }
 
 // 剪影母檔 208×176（實際墨形寬約 144px）與 sprite 128×128（實際造型寬約 112px）

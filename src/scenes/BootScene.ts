@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CREATURES } from '../data/creatures';
+import { TERRAIN_TYPES } from '../core/types';
 import { silhouetteDataUri } from '../data/silhouettes';
 import { cssHex } from './paint';
 
@@ -12,20 +13,24 @@ export class BootScene extends Phaser.Scene {
     super('Boot');
   }
 
-  // 選配美術管線：嘗試載入生物 sprite（public/assets/creatures/<id>.png，見 docs/ASSETS.md）。
-  // 缺檔時 FILE_LOAD_ERROR 靜默吞下（僅 debug log），create() 的剪影後備完全不受影響——
+  // 選配美術管線：嘗試載入生物 sprite 與地形紋理（見 docs/ASSETS.md）。
+  // 兩者皆為選配：缺檔時 FILE_LOAD_ERROR 靜默吞下（僅 debug log），
+  // create() 的剪影後備與 MapScene 的純色塊後備完全不受影響——
   // preload 先於 create 執行是 Phaser 場景生命週期的既定順序，故不需額外同步機制。
   preload() {
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
-      // 僅吞可選 sprite 的缺檔——未來地形等必要資源不得沿用此靜默路徑
-      if (!file.key.startsWith('spr-')) return;
-      console.debug(`[assets] optional sprite missing, using silhouette fallback: ${file.key}`);
+      // 僅吞「選配」素材的缺檔（sprite 與地形紋理）——其餘必要資源不得沿用此靜默路徑
+      if (!file.key.startsWith('spr-') && !file.key.startsWith('terr-')) return;
+      console.debug(`[assets] optional asset missing, using built-in fallback: ${file.key}`);
     });
     for (const c of CREATURES) {
       // 相對路徑（無前導斜線）：搭配 vite.config.ts 的 base: './'，
       // 讓 index.html 與 public/ 素材在任何部署子路徑（itch.io、CrazyGames iframe 等）下
       // 都以「相對於目前頁面」解析，與瀏覽器對相對 URL 的預設行為一致。
       this.load.image(`spr-${c.id}`, `assets/creatures/${c.id}.png`);
+    }
+    for (const t of TERRAIN_TYPES) {
+      this.load.image(`terr-${t}`, `assets/terrain/${t}.png`);
     }
   }
 

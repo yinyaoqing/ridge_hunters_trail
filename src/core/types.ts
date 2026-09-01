@@ -3,6 +3,9 @@ import type { Weather } from './weather';
 
 export type TerrainType = 'meadow' | 'mist' | 'thicket' | 'rock';
 
+// 地形型別的執行期清單（載入地形紋理、逐型別繪製時需要可列舉的來源）
+export const TERRAIN_TYPES: readonly TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
+
 // 支援語系：英文（預設）與繁體中文
 export type Locale = 'en' | 'zh-TW';
 

@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="fog" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs><g transform="translate(-64,-64)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(0,-64)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(64,-64)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(-64,0)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(0,0)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(64,0)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(-64,64)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(0,64)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g><g transform="translate(64,64)">
+    <g stroke="#ffffff" fill="none" stroke-linecap="round" opacity="0.065">
+      <path d="M6 22 Q7 16 5 11" stroke-width="1.2"/>
+      <path d="M11 27 Q13 21 12 15" stroke-width="0.9"/>
+      <path d="M23 13 Q24 7 21 2" stroke-width="1.1"/>
+      <path d="M28 19 Q30 13 29 8" stroke-width="0.9"/>
+      <path d="M38 31 Q39 25 36 20" stroke-width="1.2"/>
+      <path d="M44 35 Q46 29 45 24" stroke-width="0.9"/>
+      <path d="M54 20 Q55 13 52 8" stroke-width="1.1"/>
+      <path d="M59 27 Q61 21 60 16" stroke-width="0.9"/>
+      <path d="M14 53 Q15 46 12 41" stroke-width="1.2"/>
+      <path d="M32 59 Q34 52 33 47" stroke-width="0.9"/>
+      <path d="M47 55 Q48 48 45 43" stroke-width="1.1"/>
+      <path d="M62 49 Q63 42 60 37" stroke-width="0.9"/>
+    </g>
+    <g fill="#000000" opacity="0.035">
+      <ellipse cx="18" cy="38" rx="6" ry="2.4" transform="rotate(-8 18 38)"/>
+      <ellipse cx="50" cy="10" rx="4.5" ry="1.8" transform="rotate(6 50 10)"/>
+      <ellipse cx="36" cy="62" rx="5.5" ry="2.2" transform="rotate(-4 36 62)"/>
+    </g></g></svg>

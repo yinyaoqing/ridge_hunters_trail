@@ -35,25 +35,26 @@
 
 ### 內建素材與重新產生
 
-本倉庫已附一套原創生物 sprite（`public/assets/creatures/*.png`，8 隻，合計約 39 KB）。
-造型為程式化向量原稿，母檔與產生器如下：
+本倉庫已附一套原創素材：生物 sprite 8 張（約 40 KB）與地形紋理 4 張（約 7 KB），
+合計約 47 KB。造型皆為程式化向量原稿，母檔與產生器如下：
 
 | 檔案 | 用途 |
 |---|---|
 | `scripts/creature-art.mjs` | 8 隻生物的向量原稿（可編輯的美術母檔），含造型註解與設計意圖 |
-| `scripts/build-sprites.mjs` | 光柵化腳本：輸出 `art/creatures/*.svg` 與 `public/assets/creatures/*.png`，並檢查 ≤64 KB 預算 |
-| `art/creatures/*.svg` | 產生出的 SVG 母檔（供外部向量軟體再加工） |
+| `scripts/terrain-art.mjs` | 4 種地形紋理的向量原稿（無色相、3×3 位移重複確保無縫平鋪） |
+| `scripts/build-assets.mjs` | 光柵化腳本：一次產出兩類素材的 SVG 母檔與 PNG，並檢查各自的體積預算 |
+| `art/creatures/*.svg`、`art/terrain/*.svg` | 產生出的 SVG 母檔（供外部向量軟體再加工） |
 
 重新產生（光柵器 `@resvg/resvg-js` 僅為建置期工具，刻意不寫入 `package.json` 相依，
 以維持執行期零額外相依）：
 
 ```bash
 npm i --no-save @resvg/resvg-js
-node scripts/build-sprites.mjs
+node scripts/build-assets.mjs
 npm r --no-save @resvg/resvg-js
 ```
 
-要替換為其他來源（例如 AI 生成後手工簡化）的素材時，直接覆蓋 `public/assets/creatures/<id>.png`
+要替換為其他來源（例如 AI 生成後手工簡化）的素材時，直接覆蓋 `public/assets/` 下對應檔案
 即可，無須理會上述腳本；腳本僅是內建這套向量素材的可重現產生路徑。
 
 ### 路徑寫法（相對路徑，無前導斜線）
@@ -66,18 +67,30 @@ npm r --no-save @resvg/resvg-js
 （如 `/assets/creatures/x.png`），瀏覽器會改為相對於網域根目錄解析，
 一旦部署在子路徑（例如 itch.io 的 `https://x.itch.io/game/` 或平台 iframe 沙盒）下就會 404。
 
-## 2. 地形貼圖（預留章節，本階段未接線）
+## 2. 地形紋理
 
 | 項目 | 規格 |
 |---|---|
 | 尺寸 | 64×64 px，可平鋪（seamless tile） |
-| 格式 | PNG |
+| 格式 | PNG，透明背景 |
 | 檔案大小上限 | 每檔 ≤ 32 KB |
-| 路徑與命名 | `public/assets/terrain/<type>.png`（`type`：`mist` / `rock` / `thicket` / `meadow`，對照 `src/core/types.ts` 的 `TerrainType`） |
+| 路徑與命名 | `public/assets/terrain/<type>.png`（`type`：`meadow` / `mist` / `thicket` / `rock`，對照 `src/core/types.ts` 的 `TerrainType`） |
 
-目前地圖地形完全以程式繪製的色塊呈現（`MapScene`），尚未有對應的載入/後備邏輯。
-本節僅預留規格與命名慣例，供未來任務接線時沿用；在該任務完成前，即使放入符合命名的
-檔案也不會被讀取或顯示。
+> **必須無色相**：地圖色塊的色相來自 `palette.ts` 的 `pal.terrain[type]`，且**隨難度循環三套配色**
+> （霧綠／赭石／暮色紫）。紋理若自帶顏色會破壞循環，因此紋理只能是「明暗質感」——
+> 僅用白（高光）與黑（陰影）加透明度，疊在色塊之上，色相仍由配色決定。
+> 內建這套紋理即依此原則製作。
+
+### 運作方式
+
+- `BootScene.preload()` 對每個地形 type 嘗試載入 `terr-<type>`（`assets/terrain/<type>.png`）；
+  缺檔時 `FILE_LOAD_ERROR` 靜默吞下（僅 `console.debug`），與生物 sprite 同一條選配路徑。
+- `paint.ts` 的 `terrainTexImage(scene, type)` 回傳可平鋪的貼圖來源，未載入則回傳 `null`。
+- `MapScene.buildBackground()` 在地形色塊繪製完成後呼叫 `paintTerrainTexture()`：
+  **逐地形**把該型別的所有格子設為裁切區，再以「整張畫布連續平鋪」填入紋理。
+  刻意不逐格重畫——否則同型別每一格都會長得一模一樣、出現明顯的格狀重複感；
+  連續平鋪讓相鄰同型別格子的紋理彼此接續。
+- 任一地形缺檔即略過該型別，維持原本的純色塊；移除檔案後下次載入自動恢復，行為不受影響。
 
 ## 3. 內容審查清單（正式入庫前，人工簽核）
 

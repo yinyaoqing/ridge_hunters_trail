@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { canMove, move, toggleMark, useBell, TERRAIN_COST, type SessionState } from '../core/session';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
+import { TERRAIN_TYPES } from '../core/types';
 import { key, intersect } from '../core/clues';
 import { cheb, dist, type Vec2 } from '../core/geometry';
 import { rollMicroEvent, type MicroEvent } from '../core/events';
@@ -14,7 +15,7 @@ import type { ToolStore } from '../core/tools';
 import type { RunState } from '../core/runstate';
 import {
   cssHex, cssRgba, dashedCircle, dashedArc, dashedLine, drawClueToken, drawSupply,
-  BRUSH_RADIUS, FONTS, displayFont,
+  BRUSH_RADIUS, FONTS, displayFont, terrainTexImage,
 } from './paint';
 import {
   restartOnResize, fadeIn, fadeToScene, floatText, pulseHighlight,
@@ -302,6 +303,8 @@ export class MapScene extends Phaser.Scene {
     }
     ctx.filter = 'none';
 
+    this.paintTerrainTexture(ctx, s);
+
     ctx.strokeStyle = cssRgba(this.pal.paper, 0.06);
     ctx.lineWidth = 1;
     for (let i = 0; i <= L.mapSize; i++) {
@@ -371,6 +374,38 @@ export class MapScene extends Phaser.Scene {
       },
     });
     guardLowFps(this, emitter);
+  }
+
+  // 選配地形紋理（docs/ASSETS.md §2）：逐地形把該型別所有格子設為裁切區，
+  // 再以「整張畫布連續平鋪」填入紋理——不逐格重畫，故同型別相鄰格的紋理彼此接續，
+  // 不會出現每格一模一樣的重複感。紋理本身無色相（僅明暗），色相仍由 pal.terrain 決定，
+  // 配色循環不受影響。任一地形缺檔即略過該型別，維持原本的純色塊。
+  private paintTerrainTexture(ctx: CanvasRenderingContext2D, s: SessionState) {
+    const L = s.level;
+    const cs = this.cell;
+    for (const type of TERRAIN_TYPES) {
+      const img = terrainTexImage(this, type);
+      if (!img) continue;
+      const pattern = ctx.createPattern(img, 'repeat');
+      if (!pattern) continue;
+
+      ctx.save();
+      ctx.beginPath();
+      let any = false;
+      for (let y = 0; y < L.mapSize; y++) {
+        for (let x = 0; x < L.mapSize; x++) {
+          if (L.terrain[y][x] !== type) continue;
+          ctx.rect(x * cs + 1, y * cs + 1, cs - 2, cs - 2);
+          any = true;
+        }
+      }
+      if (any) {
+        ctx.clip();
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, cs * L.mapSize, cs * L.mapSize);
+      }
+      ctx.restore();
+    }
   }
 
   private buildHud() {
