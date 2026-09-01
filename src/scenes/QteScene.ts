@@ -7,7 +7,7 @@ import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
 import { cssHex, FONTS, displayFont } from './paint';
-import { fadeIn, fadeToScene } from './fx';
+import { fadeIn, fadeToScene, addGlowIfWebGL } from './fx';
 
 const DIAL_BG_KEY = 'qte-dial-bg';
 const R = 150;
@@ -63,6 +63,10 @@ export class QteScene extends Phaser.Scene {
     this.info = this.add.text(cx, cy + R + 62, '', {
       fontFamily: FONTS.body, fontSize: '16px', color: cssHex(this.pal.gold),
     }).setOrigin(0.5).setLetterSpacing(1);
+
+    // WebGL 時疊加發光後製；Canvas fallback 完全不受影響（弧線/剪影疊圈畫法照舊）
+    addGlowIfWebGL(this, this.g, this.pal.gold);
+    if (this.sil) addGlowIfWebGL(this, this.sil, this.pal.glow);
 
     this.input.on('pointerdown', () => this.onPress());
     this.input.keyboard?.on('keydown-SPACE', () => this.onPress());

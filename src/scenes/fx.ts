@@ -36,3 +36,45 @@ export function floatText(
     onComplete: () => t.destroy(),
   });
 }
+
+// 氛圍粒子存活上限（低密度，避免搶戲或拖慢低階裝置）
+export const PARTICLE_CAPS = { mist: 20, spore: 30, ember: 8 } as const;
+
+// 減少動態偏好：match → 不生成任何粒子；API 缺席（舊瀏覽器/測試環境）一律視為 OK
+export function motionOK(): boolean {
+  try {
+    return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return true;
+  }
+}
+
+// 產生單色圓點材質供粒子重複使用；同 key 已存在即跳過（場景 restart 不重建）
+export function ensureDotTexture(scene: Phaser.Scene, key: string, color: number, radius: number): void {
+  if (scene.textures.exists(key)) return;
+  const g = scene.make.graphics({}, false);
+  g.fillStyle(color, 1).fillCircle(radius, radius, radius);
+  g.generateTexture(key, radius * 2, radius * 2);
+  g.destroy();
+}
+
+// 低階裝置防護：建立 3 秒後若 fps 掉到 40 以下就停止並隱藏該 emitter
+export function guardLowFps(scene: Phaser.Scene, emitter: Phaser.GameObjects.Particles.ParticleEmitter): void {
+  scene.time.delayedCall(3000, () => {
+    if (scene.game.loop.actualFps < 40) {
+      emitter.stop();
+      emitter.setVisible(false);
+    }
+  });
+}
+
+// 僅 WebGL 才疊加光暈後製（Canvas renderer 無此能力，靜默跳過不影響既有畫法）
+export function addGlowIfWebGL(
+  scene: Phaser.Scene,
+  obj: Phaser.GameObjects.GameObject & { postFX?: Phaser.GameObjects.Components.FX },
+  color: number,
+): void {
+  try {
+    if (scene.game.renderer.type === Phaser.WEBGL) obj.postFX?.addGlow(color, 4, 0);
+  } catch { /* 舊環境靜默 */ }
+}

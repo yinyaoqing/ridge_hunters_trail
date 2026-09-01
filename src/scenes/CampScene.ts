@@ -8,7 +8,9 @@ import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
 import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
-import { fadeIn, fadeToScene, restartOnResize } from './fx';
+import {
+  fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, guardLowFps, PARTICLE_CAPS,
+} from './fx';
 
 export class CampScene extends Phaser.Scene {
   private pal!: Palette;
@@ -150,6 +152,20 @@ export class CampScene extends Phaser.Scene {
     glow.fillStyle(pal.gold, 0.25).fillCircle(w / 2, h * 0.9, 22);
     glow.fillStyle(0xe8b06a, 0.9).fillTriangle(
       w / 2 - 7, h * 0.9 + 8, w / 2 + 7, h * 0.9 + 8, w / 2, h * 0.9 - 12);
+
+    // 營火火星：低密度上飄粒子，減少動態偏好時完全不生成
+    if (motionOK()) {
+      ensureDotTexture(this, 'dot-ember', 0xe8b06a, 3);
+      const emitter = this.add.particles(w / 2, h * 0.9 - 6, 'dot-ember', {
+        frequency: 400,
+        lifespan: 1400,
+        speedY: { min: -40, max: -15 },
+        speedX: { min: -8, max: 8 },
+        alpha: { start: 0.8, end: 0 },
+        maxAliveParticles: PARTICLE_CAPS.ember,
+      });
+      guardLowFps(this, emitter);
+    }
   }
 
   // 與 ResultScene.button 同樣式（hover 增亮、按下微縮）

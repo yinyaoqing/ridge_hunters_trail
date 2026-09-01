@@ -15,7 +15,9 @@ import {
   cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
   displayFont, stripBrackets,
 } from './paint';
-import { fadeIn, fadeToScene, restartOnResize } from './fx';
+import {
+  fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, addGlowIfWebGL, PARTICLE_CAPS,
+} from './fx';
 
 const GLOW_KEY = 'result-glow';
 
@@ -253,9 +255,25 @@ export class ResultScene extends Phaser.Scene {
     dashedCircle(ring, cx, cy, 92, color, 0.35, 1.4, 2, 8);
     const silKey = `sil-${creatureId}`;
     if (this.textures.exists(silKey)) {
-      this.add.image(cx, cy + 4, silKey).setScale(1.05);
+      const sil = this.add.image(cx, cy + 4, silKey).setScale(1.05);
+      addGlowIfWebGL(this, sil, this.pal.glow);
     } else {
       this.add.circle(cx, cy, 60, color);
+    }
+
+    // 補獲慶祝孢子：一次性 explode，texture 依生物上色（key 帶 id 避免跨生物撞色沿用舊材質）
+    if (motionOK()) {
+      const sporeKey = `dot-spore-${creatureId}`;
+      ensureDotTexture(this, sporeKey, color, 4);
+      const spores = this.add.particles(cx, cy, sporeKey, {
+        lifespan: 1800,
+        speedY: { min: 20, max: 60 },
+        speedX: { min: -30, max: 30 },
+        alpha: { start: 0.9, end: 0 },
+        scale: { start: 1, end: 0.4 },
+        emitting: false,
+      });
+      spores.explode(PARTICLE_CAPS.spore);
     }
   }
 

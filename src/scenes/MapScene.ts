@@ -11,7 +11,10 @@ import {
   cssHex, cssRgba, dashedCircle, dashedLine, drawClueToken, drawSupply,
   BRUSH_RADIUS, FONTS, displayFont,
 } from './paint';
-import { restartOnResize, fadeIn, fadeToScene, floatText } from './fx';
+import {
+  restartOnResize, fadeIn, fadeToScene, floatText,
+  PARTICLE_CAPS, motionOK, ensureDotTexture, guardLowFps,
+} from './fx';
 
 const HUD_HEIGHT = 56;
 const BG_KEY = 'map-bg';
@@ -74,6 +77,7 @@ export class MapScene extends Phaser.Scene {
     this.audio = this.registry.get('audio');
 
     this.buildBackground(s);
+    this.spawnMistParticles(s);
     this.buildHud();
     this.g = this.add.graphics();
     this.pg = this.add.graphics();
@@ -184,6 +188,51 @@ export class MapScene extends Phaser.Scene {
 
     tex.refresh();
     this.add.image(this.ox, this.oy, BG_KEY).setOrigin(0);
+  }
+
+  // 霧氣氛圍粒子：僅在有「霧」地形格時生成，抽樣 ≤12 個格中心作為發射點。
+  // 用 RandomZoneSource（而非單一 Rectangle 區域）是因為霧格散落於地圖各處、
+  // 形狀不規則，Rectangle 會覆蓋非霧格；改成從抽樣格中心 ±半格 jitter 隨機取點，
+  // 讓粒子只在真正的霧地形附近飄，且抽樣上限 12 個發射點避免大地圖時逐格建 emitter。
+  private spawnMistParticles(s: SessionState) {
+    if (!motionOK()) return;
+    const L = s.level;
+    const cs = this.cell;
+    const cells: Vec2[] = [];
+    for (let y = 0; y < L.mapSize; y++) {
+      for (let x = 0; x < L.mapSize; x++) {
+        if (L.terrain[y][x] === 'mist') cells.push({ x, y });
+      }
+    }
+    if (cells.length === 0) return;
+    const sampleCount = Math.min(12, cells.length);
+    const step = cells.length / sampleCount;
+    const centers = Array.from({ length: sampleCount }, (_, i) => {
+      const c = cells[Math.floor(i * step)];
+      return { x: this.ox + c.x * cs + cs / 2, y: this.oy + c.y * cs + cs / 2 };
+    });
+
+    ensureDotTexture(this, 'dot-mist', 0xcfe0da, 12);
+    const emitter = this.add.particles(0, 0, 'dot-mist', {
+      quantity: 1,
+      frequency: 900,
+      lifespan: 4000,
+      alpha: { start: 0.08, end: 0 },
+      scale: { start: 1.4, end: 2.2 },
+      speedY: { min: -6, max: -2 },
+      maxAliveParticles: PARTICLE_CAPS.mist,
+      emitZone: {
+        type: 'random',
+        source: {
+          getRandomPoint: (p: Phaser.Types.Math.Vector2Like) => {
+            const c = centers[Math.floor(Math.random() * centers.length)];
+            p.x = c.x + (Math.random() - 0.5) * cs;
+            p.y = c.y + (Math.random() - 0.5) * cs;
+          },
+        },
+      },
+    });
+    guardLowFps(this, emitter);
   }
 
   private buildHud() {
