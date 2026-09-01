@@ -125,9 +125,11 @@ export class ResultScene extends Phaser.Scene {
     let title: string;
     let body: string;
     if (caught) {
-      this.drawCreaturePortrait(cx, 212, creature.id, creature.color);
+      // 異彩變種：肖像光暈／虛線環／剪影 tint 改用 pal.iris；標題名稱前綴異彩字樣（見下方 name 組字）
+      this.drawCreaturePortrait(cx, 212, creature.id, s.level.iris ? pal.iris : creature.color, s.level.iris);
       if (quality) this.stampQuality(cx + 128, 268, quality, i18n);
-      title = i18n.t('result.recorded', { name: creature.names[loc] });
+      const name = (s.level.iris ? i18n.t('iris.prefix') : '') + creature.names[loc];
+      title = i18n.t('result.recorded', { name });
       body = creature.descs[loc];
     } else if (outcome === 'escaped') {
       title = i18n.t('result.escaped.title');
@@ -352,7 +354,9 @@ export class ResultScene extends Phaser.Scene {
     }
   }
 
-  private drawCreaturePortrait(cx: number, cy: number, creatureId: string, color: number) {
+  // color：一般為生物色，異彩變種時呼叫端傳入 pal.iris（driving 輻射光暈與虛線環）；
+  // iris 旗標另外決定是否對剪影疊染 setTint（非異彩時剪影維持原始貼圖明暗，不作全染）
+  private drawCreaturePortrait(cx: number, cy: number, creatureId: string, color: number, iris: boolean) {
     const size = 250;
     if (this.textures.exists(GLOW_KEY)) this.textures.remove(GLOW_KEY);
     const tex = this.textures.createCanvas(GLOW_KEY, size, size);
@@ -372,6 +376,8 @@ export class ResultScene extends Phaser.Scene {
     const texKey = creatureTexKey(this, creatureId);
     if (this.textures.exists(texKey)) {
       const sil = this.add.image(cx, cy + 4, texKey).setScale(1.05);
+      // setTint（非 tintFill）疊染異彩色，保留貼圖原始形狀明暗
+      if (iris) sil.setTint(color);
       addGlowIfWebGL(this, sil, this.pal.glow);
     } else {
       this.add.circle(cx, cy, 60, color);

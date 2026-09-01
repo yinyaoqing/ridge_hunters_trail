@@ -18,6 +18,7 @@ export type MsgKey =
   | 'codex.title' | 'codex.count' | 'codex.unknown' | 'codex.notRecorded'
   | 'codex.research' | 'codex.rumored' | 'codex.quirk'
   | 'share.stats'
+  | 'iris.prefix'
   | 'tool.windstone.name' | 'tool.windstone.desc'
   | 'tool.glowbell.name' | 'tool.glowbell.desc'
   | 'result.toolUnlocked' | 'hud.bell'
@@ -79,6 +80,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.rumored': 'Traces found in the field...',
     'codex.quirk': 'Field instinct',
     'share.stats': 'Steps {steps} · Stamina {stam} · Streak {streak}',
+    'iris.prefix': 'Iridescent ',
     'tool.windstone.name': 'Windstone',
     'tool.windstone.desc': 'Scent rings now lean toward the source.',
     'tool.glowbell.name': 'Glowbell',
@@ -150,6 +152,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'codex.rumored': '山野間已見蹤跡……',
     'codex.quirk': '判讀心得',
     'share.stats': '步數 {steps}｜剩餘體力 {stam}｜連勝 {streak}',
+    'iris.prefix': '異彩·',
     'tool.windstone.name': '風向石',
     'tool.windstone.desc': '氣味環將偏向來源方向。',
     'tool.glowbell.name': '微光鈴',

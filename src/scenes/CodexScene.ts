@@ -156,6 +156,18 @@ export class CodexScene extends Phaser.Scene {
         fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.gold),
       }).setOrigin(1, 0.5));
     }
+
+    // 異彩星標：×count 左側；曾記錄異彩變種 → 實心金星（pal.iris 色）、
+    // 已發現但未見異彩 → 空心星（半透明提示尚缺）、未發現則不顯示任何星標
+    if (e.irisSeen) {
+      row.add(this.add.text(w - 92, y, '★', {
+        fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.iris),
+      }).setOrigin(0.5));
+    } else if (discovered) {
+      row.add(this.add.text(w - 92, y, '☆', {
+        fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.paperDim),
+      }).setOrigin(0.5).setAlpha(0.5));
+    }
     return row;
   }
 

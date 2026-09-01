@@ -56,6 +56,8 @@ export class QteScene extends Phaser.Scene {
     const texKey = creatureTexKey(this, s.level.creatureId);
     if (this.textures.exists(texKey)) {
       this.sil = this.add.image(cx, cy + 6, texKey).setScale(1.35).setAlpha(0.16);
+      // 異彩變種：setTint（非 tintFill）疊染異彩色，保留原本形狀明暗層次
+      if (s.level.iris) this.sil.setTint(this.pal.iris);
     }
 
     this.g = this.add.graphics();
@@ -66,7 +68,7 @@ export class QteScene extends Phaser.Scene {
 
     // WebGL 時疊加發光後製；Canvas fallback 完全不受影響（弧線/剪影疊圈畫法照舊）
     addGlowIfWebGL(this, this.g, this.pal.gold);
-    if (this.sil) addGlowIfWebGL(this, this.sil, this.pal.glow);
+    if (this.sil) addGlowIfWebGL(this, this.sil, s.level.iris ? this.pal.iris : this.pal.glow);
 
     this.input.on('pointerdown', () => this.onPress());
     this.input.keyboard?.on('keydown-SPACE', () => this.onPress());
