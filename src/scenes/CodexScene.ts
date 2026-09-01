@@ -152,22 +152,26 @@ export class CodexScene extends Phaser.Scene {
     }).setOrigin(0, 0.5).setLetterSpacing(1.5));
 
     if (discovered) {
-      row.add(this.add.text(w - 68, y, `×${e.count}`, {
+      const countText = this.add.text(w - 68, y, `×${e.count}`, {
         fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.gold),
-      }).setOrigin(1, 0.5));
-    }
+      }).setOrigin(1, 0.5);
+      row.add(countText);
 
-    // 異彩星標：×count 左側；曾記錄異彩變種 → 實心金星（pal.iris 色）、
-    // 已發現但未見異彩 → 空心星（半透明提示尚缺）、未發現則不顯示任何星標
-    if (e.irisSeen) {
-      row.add(this.add.text(w - 92, y, '★', {
-        fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.iris),
-      }).setOrigin(0.5));
-    } else if (discovered) {
-      row.add(this.add.text(w - 92, y, '☆', {
-        fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.paperDim),
-      }).setOrigin(0.5).setAlpha(0.5));
+      // 異彩星標：定位在 ×count 實際左緣再退 14px（而非固定座標），
+      // 避免二位數以上的次數（如 ×10）把星標擠壓／重疊——
+      // countText 為 origin(1, 0.5)，其左緣 = countText.x - countText.width
+      const starX = countText.x - countText.width - 14;
+      if (e.irisSeen) {
+        row.add(this.add.text(starX, y, '★', {
+          fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.iris),
+        }).setOrigin(0.5));
+      } else {
+        row.add(this.add.text(starX, y, '☆', {
+          fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.paperDim),
+        }).setOrigin(0.5).setAlpha(0.5));
+      }
     }
+    // 未發現：不顯示 ×count，亦不顯示星標（irisSeen 必伴隨 discovered，無需額外分支）
     return row;
   }
 
