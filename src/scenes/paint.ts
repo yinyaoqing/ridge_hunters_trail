@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { ClueType } from '../core/types';
-import type { Palette } from '../core/palette';
+import { CLUE_GOLD, type Palette } from '../core/palette';
+import type { Quality } from '../core/quality';
 
 type Gfx = Phaser.GameObjects.Graphics;
 
@@ -95,6 +96,13 @@ export function drawSupply(
 
 // 筆觸感不規則圓角（設計板：體力條/按鈕）
 export const BRUSH_RADIUS = { tl: 9, tr: 4, br: 8, bl: 5 };
+
+// 品質蓋印色（結算場景）：銅／銀／金
+export const QUALITY_COLORS: Record<Quality, number> = {
+  bronze: 0xb08d57,
+  silver: 0xc3ccd2,
+  gold: CLUE_GOLD,
+};
 
 export interface Fonts {
   display: string;

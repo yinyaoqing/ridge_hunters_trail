@@ -1,11 +1,15 @@
 import Phaser from 'phaser';
-import { nextSession, type SessionState } from '../core/session';
+import { newSession, type SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
-import type { CodexStore } from '../core/codex';
+import { notesForRun, MILESTONE_NAME, MILESTONE_DETAIL, type CodexStore } from '../core/codex';
+import { qualityFromQte, type Quality } from '../core/quality';
+import type { QteState } from '../core/qte';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
-import { cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS } from './paint';
+import {
+  cssHex, cssRgba, dashedCircle, BRUSH_RADIUS, FONTS, QUALITY_COLORS,
+} from './paint';
 import { fadeIn, fadeToScene } from './fx';
 
 const GLOW_KEY = 'result-glow';
@@ -21,7 +25,6 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create() {
-    fadeIn(this);
     const s: SessionState = this.registry.get('session');
     const rng: Rng = this.registry.get('rng');
     const codex: CodexStore = this.registry.get('codex');
@@ -29,45 +32,50 @@ export class ResultScene extends Phaser.Scene {
     const loc = i18n.locale();
     const creature = CREATURES.find((c) => c.id === s.level.creatureId)!;
     const outcome = s.phase;
+    const caught = outcome === 'caught';
     this.pal = getPalette(s.round);
 
-    if (outcome === 'caught') codex.addRecord(creature.id, 'bronze');
-    // 立刻推進 session，之後所有按鈕只做場景切換，避免重複記錄
-    this.registry.set('session', nextSession(s, rng));
+    const qte = this.registry.get('qteOutcome') as QteState | undefined;
+    const quality: Quality | null = caught && qte ? qualityFromQte(qte) : null;
+    const notes = caught ? 0 : notesForRun(s.readClues.size);
+
+    // 記帳一次（resize 造成的場景重啟不重複）
+    if (!s.resolved) {
+      s.resolved = true;
+      if (caught) {
+        codex.addRecord(creature.id, quality ?? 'bronze');
+        if (s.mode === 'run') this.registry.set('runRound', s.round + 1);
+      } else {
+        codex.addNotes(creature.id, notes);
+      }
+    }
 
     const pal = this.pal;
     this.cameras.main.setBackgroundColor(pal.bg);
+    fadeIn(this);
     const cx = this.scale.width / 2;
 
     let title: string;
     let body: string;
-    let action: string;
-    if (outcome === 'caught') {
+    if (caught) {
       this.drawCreaturePortrait(cx, 212, creature.id, creature.color);
+      if (quality) this.stampQuality(cx + 128, 268, quality, i18n);
       title = i18n.t('result.recorded', { name: creature.names[loc] });
       body = creature.descs[loc];
-      action = i18n.t('btn.next');
     } else if (outcome === 'escaped') {
       title = i18n.t('result.escaped.title');
       body = i18n.t('result.escaped.body');
-      action = i18n.t('btn.retry');
     } else {
       title = i18n.t('result.exhausted.title');
       body = i18n.t('result.exhausted.body');
-      action = i18n.t('btn.retry');
     }
 
     this.add.text(cx, 336, title, {
       fontFamily: FONTS.display, fontSize: '30px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(1);
 
-    const counts = codex.counts();
-    const found = CREATURES.filter((c) => (counts[c.id] ?? 0) > 0).length;
-    this.add.text(cx, 372, i18n.t('codex.count', { found, total: CREATURES.length }).toUpperCase(), {
-      fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
-    }).setOrigin(0.5).setLetterSpacing(3);
+    this.drawCodexDots(cx, 372, codex);
 
-    // 筆觸分隔線（微波形）
     const divider = this.add.graphics();
     divider.lineStyle(1.6, pal.gold, 0.5);
     divider.beginPath();
@@ -77,16 +85,80 @@ export class ResultScene extends Phaser.Scene {
     }
     divider.strokePath();
 
-    this.add.text(cx, 442, body, {
+    this.add.text(cx, 438, body, {
       fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.paperDim),
       wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 6,
     }).setOrigin(0.5);
 
-    this.button(cx, 532, 250, 52, stripBrackets(action), true, () => fadeToScene(this, 'Map'));
-    this.button(cx, 596, 250, 50, stripBrackets(i18n.t('btn.guide')), false, () => fadeToScene(this, 'Codex'));
+    if (!caught) this.showNotesDrop(cx, 486, creature.id, notes, codex, i18n);
+
+    // 按鈕列（每日挑戰的按鈕在 Task 13 擴充；本 task 維持主線流程）
+    const runRound: number = this.registry.get('runRound');
+    if (caught) {
+      this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.next')), true, () => {
+        this.registry.set('session', newSession(runRound, rng));
+        fadeToScene(this, 'Map');
+      });
+    } else {
+      this.button(cx, 552, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
+        this.registry.set('session', newSession(s.round, rng, s.mode));
+        fadeToScene(this, 'Map');
+      });
+    }
+    this.button(cx, 614, 250, 48, stripBrackets(i18n.t('btn.guide')), false,
+      () => fadeToScene(this, 'Codex'));
   }
 
-  // 收錄成功的生物肖像：發光徑向底＋虛線環＋剪影（設計板）
+  // 品質墨章：蓋印動畫（縮放 1.8 → 1、Back ease）
+  private stampQuality(x: number, y: number, q: Quality, i18n: I18n) {
+    const color = QUALITY_COLORS[q];
+    const g = this.add.graphics();
+    g.lineStyle(2.5, color, 0.9).strokeCircle(0, 0, 30);
+    g.lineStyle(1, color, 0.4).strokeCircle(0, 0, 24);
+    const label = this.add.text(0, 0, i18n.t(QUALITY_KEY[q]).split(' ')[0], {
+      fontFamily: FONTS.display, fontSize: '13px', color: cssHex(color),
+    }).setOrigin(0.5);
+    const holder = this.add.container(x, y, [g, label]).setScale(1.8).setAlpha(0);
+    this.tweens.add({
+      targets: holder, scale: 1, alpha: 1, duration: 350, delay: 400, ease: 'Back.easeOut',
+    });
+  }
+
+  // 圖鑑進度點列：8 顆點，已發現者以生物色實心
+  private drawCodexDots(cx: number, y: number, codex: CodexStore) {
+    const g = this.add.graphics();
+    const gap = 22;
+    const x0 = cx - ((CREATURES.length - 1) * gap) / 2;
+    CREATURES.forEach((c, i) => {
+      const x = x0 + i * gap;
+      if (codex.entry(c.id).count > 0) g.fillStyle(c.color, 1).fillCircle(x, y, 5);
+      else g.lineStyle(1.2, this.pal.paperDim, 0.5).strokeCircle(x, y, 5);
+    });
+  }
+
+  // 失敗軟著陸：筆記掉落＋該生物研究度（目前值 / 下一里程碑）
+  private showNotesDrop(
+    cx: number, y: number, creatureId: string, notes: number, codex: CodexStore, i18n: I18n,
+  ) {
+    const pal = this.pal;
+    const e = codex.entry(creatureId);
+    const next = e.research >= MILESTONE_DETAIL ? MILESTONE_DETAIL
+      : e.research >= MILESTONE_NAME ? MILESTONE_DETAIL : MILESTONE_NAME;
+    const t = this.add.text(cx, y, i18n.t('result.notes', { n: notes }), {
+      fontFamily: FONTS.body, fontSize: '15px', color: cssHex(pal.supply), fontStyle: 'bold',
+    }).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({ targets: t, alpha: 1, y: y - 6, duration: 400, delay: 300 });
+
+    const bw = 180;
+    const g = this.add.graphics();
+    g.fillStyle(0x0d1310, 1).fillRoundedRect(cx - bw / 2, y + 18, bw, 8, 4);
+    const ratio = Math.min(1, e.research / next);
+    if (ratio > 0) g.fillStyle(pal.glow, 0.9).fillRoundedRect(cx - bw / 2 + 1, y + 19, (bw - 2) * ratio, 6, 3);
+    this.add.text(cx, y + 40, i18n.t('result.research', { cur: e.research, next }), {
+      fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
+    }).setOrigin(0.5).setLetterSpacing(1.5);
+  }
+
   private drawCreaturePortrait(cx: number, cy: number, creatureId: string, color: number) {
     const size = 250;
     if (this.textures.exists(GLOW_KEY)) this.textures.remove(GLOW_KEY);
@@ -112,24 +184,39 @@ export class ResultScene extends Phaser.Scene {
     }
   }
 
+  // 按鈕：hover 增亮、按下內縮
   private button(
     x: number, y: number, w: number, h: number,
     label: string, filled: boolean, onClick: () => void,
   ) {
     const pal = this.pal;
     const g = this.add.graphics();
-    if (filled) {
-      g.fillStyle(pal.gold, 1).fillRoundedRect(x - w / 2, y - h / 2, w, h, BRUSH_RADIUS);
-    } else {
-      g.lineStyle(1.5, pal.gold, 0.65).strokeRoundedRect(x - w / 2, y - h / 2, w, h, BRUSH_RADIUS);
-    }
-    this.add.text(x, y, label.toUpperCase(), {
+    const draw = (hover: boolean) => {
+      g.clear();
+      if (filled) {
+        g.fillStyle(pal.gold, hover ? 1 : 0.92)
+          .fillRoundedRect(x - w / 2, y - h / 2, w, h, BRUSH_RADIUS);
+      } else {
+        g.lineStyle(1.5, pal.gold, hover ? 1 : 0.65)
+          .strokeRoundedRect(x - w / 2, y - h / 2, w, h, BRUSH_RADIUS);
+      }
+    };
+    draw(false);
+    const txt = this.add.text(x, y, label.toUpperCase(), {
       fontFamily: FONTS.body, fontSize: filled ? '17px' : '16px',
       color: filled ? cssHex(pal.bg) : cssHex(pal.gold),
       fontStyle: filled ? 'bold' : 'normal',
     }).setOrigin(0.5).setLetterSpacing(2);
-    this.add.rectangle(x, y, w, h, 0, 0)
+    this.add.rectangle(x, y, w, Math.max(h, 44), 0, 0)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', onClick);
+      .on('pointerover', () => draw(true))
+      .on('pointerout', () => { draw(false); txt.setScale(1); })
+      .on('pointerdown', () => txt.setScale(0.96))
+      .on('pointerup', () => { txt.setScale(1); onClick(); });
   }
 }
+
+// 品質字串鍵映射：避免模板字面型別在部分 tsc 設定下無法收斂為 MsgKey 聯集
+const QUALITY_KEY = {
+  bronze: 'quality.bronze', silver: 'quality.silver', gold: 'quality.gold',
+} as const;

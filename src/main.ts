@@ -36,6 +36,7 @@ function launch(): void {
         game.registry.set('codex', createCodex(storage));
         game.registry.set('i18n', createI18n(detectLocale(navigator.language), storage));
         game.registry.set('session', newSession(1, rng));
+        game.registry.set('runRound', 1);
       },
     },
   });
