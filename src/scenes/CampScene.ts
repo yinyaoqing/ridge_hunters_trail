@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { newSession } from '../core/session';
-import { createDailySession, dailyKey, type StreakStore } from '../core/daily';
+import { createDailySession, createDailySessionFromKey, dailyKey, type StreakStore } from '../core/daily';
 import { getPalette, type Palette } from '../core/palette';
 import { CREATURES } from '../data/creatures';
 import type { CodexStore } from '../core/codex';
 import type { Rng } from '../core/rng';
-import type { I18n } from '../core/i18n';
+import type { Weather } from '../core/weather';
+import type { I18n, MsgKey } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
 import {
   dailyCommissions, COMMISSION_REWARD_NOTES, type Commission, type CommissionStore,
@@ -77,9 +78,12 @@ export class CampScene extends Phaser.Scene {
     });
     by += 68;
 
-    const dailyLabel = dailyDone
+    // 今日天氣：僅生成一次每日 session 取其 weather 欄位（成本可忽略），不存入 registry/session——
+    // 真正要玩的 session 仍由下方按鈕的 createDailySession(now) 產生
+    const todayWeather = createDailySessionFromKey(today).level.weather;
+    const dailyLabel = (dailyDone
       ? `${i18n.t('camp.daily')} · ${i18n.t('camp.dailyDone')} ✓`
-      : `${i18n.t('camp.daily')} · ${today}`;
+      : `${i18n.t('camp.daily')} · ${today}`) + `｜${i18n.t(WEATHER_KEY[todayWeather])}`;
     this.button(cx, by, bw, 50, dailyLabel, false, () => {
       const now = new Date();
       this.registry.set('session', createDailySession(now));
@@ -286,3 +290,8 @@ export class CampScene extends Phaser.Scene {
 const QUALITY_KEY = {
   bronze: 'quality.bronze', silver: 'quality.silver', gold: 'quality.gold',
 } as const;
+
+// 天氣字串鍵映射：同 MapScene 的 WEATHER_KEY，場景自成一體慣例下重複宣告
+const WEATHER_KEY: Record<Weather, MsgKey> = {
+  clear: 'weather.clear', mist: 'weather.mist', wind: 'weather.wind', drizzle: 'weather.drizzle',
+};

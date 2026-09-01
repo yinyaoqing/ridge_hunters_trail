@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { SessionState } from '../core/session';
 import type { TerrainType } from '../core/types';
+import type { Weather } from '../core/weather';
 import { getPalette, type Palette } from '../core/palette';
 import type { I18n } from '../core/i18n';
 import { cssHex, drawClueToken, drawSupply, BRUSH_RADIUS, FONTS, displayFont } from './paint';
@@ -74,12 +75,39 @@ export class HelpScene extends Phaser.Scene {
     const icons = this.add.graphics();
     const rowX = px0 + 46;
     const textX = px0 + 84;
+
+    // 天氣小圖形（同 MapScene 徽章筆觸，HelpScene 場景自成一體慣例下重複實作而非共用私有方法）：
+    // 晴＝圓圈、霧＝兩短橫、風＝三斜線、雨＝兩斜點
+    const drawWeatherGlyph = (gx: number, gy: number, wtr: Weather) => {
+      icons.lineStyle(1.3, pal.paperDim, 0.9);
+      switch (wtr) {
+        case 'clear':
+          icons.strokeCircle(gx, gy, 4);
+          break;
+        case 'mist':
+          icons.lineBetween(gx - 4, gy - 2, gx + 4, gy - 2);
+          icons.lineBetween(gx - 4, gy + 2, gx + 4, gy + 2);
+          break;
+        case 'wind':
+          icons.lineBetween(gx - 6, gy - 5, gx + 4, gy - 3);
+          icons.lineBetween(gx - 6, gy - 1, gx + 4, gy + 1);
+          icons.lineBetween(gx - 6, gy + 3, gx + 4, gy + 5);
+          break;
+        case 'drizzle':
+          icons.lineBetween(gx - 4, gy - 4, gx - 2, gy + 2);
+          icons.lineBetween(gx + 2, gy - 4, gx + 4, gy + 2);
+          break;
+      }
+    };
+
+    // 9 列版面預算：列距 48→44px 騰出第 9 列（help.weather）空間，面板高度 ph 維持 636 不變。
+    // 第 9 列 y=py0+530，開始按鈕上緣＝py0+ph-56-24=py0+556，間距 26px（≥18px 需求）。
     const rows: { y: number; key: Parameters<I18n['t']>[0]; icon: (y: number) => void }[] = [
       { y: py0 + 178, key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
-      { y: py0 + 226, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
-      { y: py0 + 274, key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
+      { y: py0 + 222, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
+      { y: py0 + 266, key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
       {
-        y: py0 + 322, key: 'help.decoy',
+        y: py0 + 310, key: 'help.decoy',
         icon: (y) => {
           drawClueToken(icons, rowX, y, 15, 'footprint', pal);
           icons.lineStyle(2, pal.mark, 0.9);
@@ -88,14 +116,14 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 370, key: 'help.stamina',
+        y: py0 + 354, key: 'help.stamina',
         icon: (y) => {
           drawSupply(icons, rowX - 8, y, 34, 0, pal);
           drawSupply(icons, rowX + 10, y, 34, 1, pal);
         },
       },
       {
-        y: py0 + 418, key: 'help.mark',
+        y: py0 + 398, key: 'help.mark',
         icon: (y) => {
           icons.lineStyle(3, pal.mark, 0.9);
           icons.lineBetween(rowX - 9, y - 9, rowX + 9, y + 9);
@@ -103,7 +131,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 466, key: 'help.qte',
+        y: py0 + 442, key: 'help.qte',
         icon: (y) => {
           icons.lineStyle(2.5, 0x5c6b73, 1).strokeCircle(rowX, y, 14);
           icons.lineStyle(4, pal.gold, 1);
@@ -115,8 +143,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        // 第 8 列（py0+514）：與開始按鈕（py0+ph-56=py0+580）仍保有 66px 間距，未擠壓版面
-        y: py0 + 514, key: 'help.terrain',
+        y: py0 + 486, key: 'help.terrain',
         icon: (y) => {
           const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
           const sq = 6;
@@ -126,6 +153,19 @@ export class HelpScene extends Phaser.Scene {
           for (const t of order) {
             icons.fillStyle(pal.terrain[t], 1).fillRect(x, y - sq / 2, sq, sq);
             x += sq + gap;
+          }
+        },
+      },
+      {
+        // 第 9 列：與開始按鈕上緣（py0+556）保有 26px 間距，見上方版面預算註解
+        y: py0 + 530, key: 'help.weather',
+        icon: (y) => {
+          const order: Weather[] = ['clear', 'mist', 'wind', 'drizzle'];
+          const gap = 20;
+          let x = rowX - (gap * (order.length - 1)) / 2;
+          for (const wtr of order) {
+            drawWeatherGlyph(x, y, wtr);
+            x += gap;
           }
         },
       },

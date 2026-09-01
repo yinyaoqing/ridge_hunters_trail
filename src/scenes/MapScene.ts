@@ -5,6 +5,7 @@ import { getPalette, type Palette } from '../core/palette';
 import { key, intersect } from '../core/clues';
 import { cheb, dist, type Vec2 } from '../core/geometry';
 import type { Clue, TerrainType } from '../core/types';
+import type { Weather } from '../core/weather';
 import type { I18n, MsgKey } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
 import type { Rng } from '../core/rng';
@@ -32,6 +33,8 @@ export class MapScene extends Phaser.Scene {
   private lowTween?: Phaser.Tweens.Tween;
   private hudG!: Phaser.GameObjects.Graphics;
   private roundText!: Phaser.GameObjects.Text;
+  private weatherG!: Phaser.GameObjects.Graphics; // 天氣徽章圖形（roundText 右側，每次 updateHud 依文字寬度重新定位）
+  private weatherText?: Phaser.GameObjects.Text; // compact（<560）不建立，僅顯示圖形
   private stamLabel!: Phaser.GameObjects.Text;
   private hintText?: Phaser.GameObjects.Text;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -330,9 +333,11 @@ export class MapScene extends Phaser.Scene {
     });
 
     ensureDotTexture(this, 'dot-mist', 0xcfe0da, 12);
+    // 霧日密度倍增、上限不變：frequency 900→450（caps/maxAliveParticles 沿用 PARTICLE_CAPS.mist）
+    const frequency = s.level.weather === 'mist' ? 450 : 900;
     const emitter = this.add.particles(0, 0, 'dot-mist', {
       quantity: 1,
-      frequency: 900,
+      frequency,
       lifespan: 4000,
       alpha: { start: 0.08, end: 0 },
       scale: { start: 1.4, end: 2.2 },
@@ -372,7 +377,13 @@ export class MapScene extends Phaser.Scene {
     this.roundText = this.add.text(50, 8, '', {
       fontFamily: displayFont(this.i18n().locale()), fontSize: '20px', color: cssHex(pal.paper),
     });
+    // 天氣徽章：緊接 roundText 之後（座標於 updateHud 依當前文字寬度重算，見該處註解）；
+    // compact 版面僅留圖形，省去文字避免與右側 chip 列搶版面
+    this.weatherG = this.add.graphics();
     if (!compact) {
+      this.weatherText = this.add.text(0, 0, '', {
+        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
+      }).setOrigin(0, 0.5).setLetterSpacing(1);
       this.add.text(50, 34, "RIDGE HUNTER'S TRAIL", {
         fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.paperDim),
       }).setLetterSpacing(2.5);
@@ -767,6 +778,7 @@ export class MapScene extends Phaser.Scene {
     const budget = getDifficulty(s.round).staminaBudget;
 
     this.roundText.setText(i18n.t('hud.round', { n: s.round }));
+    this.drawWeatherBadge(s);
     this.stamLabel.setText(`${i18n.t('hud.stamina', { n: s.stamina })} / ${budget}`.toUpperCase());
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
@@ -806,6 +818,45 @@ export class MapScene extends Phaser.Scene {
     }
   }
 
+  // 天氣徽章：緊接 roundText 之後——round 文字隨局數／語系換寬，每次 updateHud 都要
+  // 重新以 roundText.x + roundText.width 定位，不能寫死座標
+  private drawWeatherBadge(s: SessionState) {
+    const pal = this.pal;
+    const weather = s.level.weather;
+    const bx = this.roundText.x + this.roundText.width + 12;
+    const cy = this.roundText.y + this.roundText.height / 2;
+    this.weatherG.clear();
+    this.drawWeatherGlyph(this.weatherG, bx + 6, cy, weather, pal);
+    if (this.weatherText) {
+      this.weatherText.setText(this.i18n().t(WEATHER_KEY[weather])).setPosition(bx + 16, cy);
+    }
+  }
+
+  // 天氣小圖形（≤14px，paperDim 線條）：晴＝圓圈、霧＝兩短橫、風＝三斜線、雨＝兩斜點
+  private drawWeatherGlyph(
+    g: Phaser.GameObjects.Graphics, cx: number, cy: number, weather: Weather, pal: Palette,
+  ) {
+    g.lineStyle(1.3, pal.paperDim, 0.9);
+    switch (weather) {
+      case 'clear':
+        g.strokeCircle(cx, cy, 4);
+        break;
+      case 'mist':
+        g.lineBetween(cx - 4, cy - 2, cx + 4, cy - 2);
+        g.lineBetween(cx - 4, cy + 2, cx + 4, cy + 2);
+        break;
+      case 'wind':
+        g.lineBetween(cx - 6, cy - 5, cx + 4, cy - 3);
+        g.lineBetween(cx - 6, cy - 1, cx + 4, cy + 1);
+        g.lineBetween(cx - 6, cy + 3, cx + 4, cy + 5);
+        break;
+      case 'drizzle':
+        g.lineBetween(cx - 4, cy - 4, cx - 2, cy + 2);
+        g.lineBetween(cx + 2, cy - 4, cx + 4, cy + 2);
+        break;
+    }
+  }
+
   // 已判讀線索 token 金色小勾（右上角，兩段線，座標依 token 半徑 r 縮放）
   private drawReadCheck(x: number, y: number, r: number) {
     this.g.lineStyle(1.6, this.pal.gold, 1);
@@ -839,3 +890,9 @@ export class MapScene extends Phaser.Scene {
     }
   }
 }
+
+// 天氣字串鍵映射：同 CampScene describeCommission 的 QUALITY_KEY 手法，
+// 避免模板字面型別（`weather.${Weather}`）無法收斂為 MsgKey 聯集
+const WEATHER_KEY: Record<Weather, MsgKey> = {
+  clear: 'weather.clear', mist: 'weather.mist', wind: 'weather.wind', drizzle: 'weather.drizzle',
+};
