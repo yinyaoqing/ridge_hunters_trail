@@ -177,18 +177,26 @@ export class ResultScene extends Phaser.Scene {
       // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊；
       // 解鎖卡／委託完成行出現時再疊加 totalOffset，避免卡片與連勝列相撞
       const streakY = caught ? Math.min(500 + totalOffset, h - 148) : Math.min(542 + totalOffset, h - 150);
-      const copyY = streakY + 52;
       const campY = Math.min(caught ? 614 + totalOffset : streakY + 112, h - 30);
       const streak: StreakStore = this.registry.get('streak');
-      const text = shareText(i18n, {
-        dateKey: dk, caught, quality,
-        steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
-      });
       this.add.text(cx, streakY, i18n.t('camp.streak', { n: streak.state().streak }).toUpperCase(), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
       }).setOrigin(0.5).setLetterSpacing(2);
-      this.button(cx, copyY, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
-        () => this.copyShare(text, i18n, copyY));
+      if (caught) {
+        const copyY = streakY + 52;
+        const text = shareText(i18n, {
+          dateKey: dk, caught, quality,
+          steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
+        });
+        this.button(cx, copyY, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
+          () => this.copyShare(text, i18n, copyY));
+      } else {
+        const retryY = streakY + 52;
+        this.button(cx, retryY, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
+          this.registry.set('session', createDailySessionFromKey(dk));
+          fadeToScene(this, 'Map');
+        });
+      }
       this.button(cx, campY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
@@ -201,11 +209,11 @@ export class ResultScene extends Phaser.Scene {
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else {
+      // Daily retry lives in the daily branch above; this is run mode only
       const yPrimary = Math.min(552 + toolOffset, h - 96);
       const ySecondary = Math.min(614 + toolOffset, h - 34);
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
-        this.registry.set('session',
-          s.mode === 'daily' ? createDailySessionFromKey(dk) : newSession(s.round, rng));
+        this.registry.set('session', newSession(s.round, rng));
         fadeToScene(this, 'Map');
       });
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
