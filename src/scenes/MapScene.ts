@@ -40,6 +40,7 @@ export class MapScene extends Phaser.Scene {
   private soundChipText?: Phaser.GameObjects.Text;
   private soundChipX = 0;
   private soundChipY = 0;
+  private chipRowLeft = 0; // chip 列最左緣（靜音 chip 左緣）：體力條需與其保持 ≥8px 間距
   private skipFirstRunHelp = false;
   private audio!: AudioBus;
 
@@ -233,6 +234,7 @@ export class MapScene extends Phaser.Scene {
     const xLang = xHelp - 8 - 72;                         // 語言 chip 左緣（僅非 compact 顯示）
     const xMark = compact ? xHelp - 8 - 60 : xLang - 8 - 60; // 標記 chip 左緣
     const xSound = xMark - 8 - 32;                        // 靜音 chip 左緣
+    this.chipRowLeft = xSound; // 供 updateHud 計算體力條寬度時保持間距
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
     if (!compact) {
@@ -277,6 +279,8 @@ export class MapScene extends Phaser.Scene {
       .on('pointerdown', (p: Phaser.Input.Pointer) => {
         p.event.stopPropagation();
         this.audio.toggle();
+        // 重新開啟時風聲需立刻恢復，不能等到下次進場；ambient() 內建 windGain 防重入
+        if (this.audio.enabled()) this.audio.ambient(true);
         this.drawSoundChip(xSound, chipY, 32, chipH);
       });
 
@@ -477,17 +481,17 @@ export class MapScene extends Phaser.Scene {
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
 
-    // 窄螢幕（手機直向）：置中條會撞上右側 chip（chip 左緣 = w-192）。
-    // 左靠齊改在 roundText 下方另起一列（label 於 y30、bar 於 y46），與 buildHud
-    // 的 compact 斷點（w<560）一致，避免產生第二個斷點造成 560~599 間的縫隙碰撞。
-    const compact = w < 560;
-    const bw = compact
-      ? Math.max(60, Math.min(210, w - 250)) // 確保 bx+bw ≤ (w-192)-8，與 mark chip 保持 8px 間距
-      : Math.max(120, Math.min(210, w - 400)); // w∈[560,610) 置中條同樣需與 chip 保持 ≥8px 間距
-    const bh = compact ? 10 : 12;
-    const bx = compact ? 50 : w / 2 - bw / 2;
-    const by = compact ? 46 : 27;
-    this.stamLabel.setPosition(compact ? bx + bw / 2 : w / 2, compact ? 30 : 8);
+    // 置中體力條在較窄視窗會撞上右側加寬後的 chip 列（新增 ♪ chip 後 chip 列左緣
+    // 隨寬度線性變動，見 chipRowLeft）。與其疊加新斷點修修補補，改用明確規則：
+    // w<700 一律採左靠齊版面（label 於 y30、bar 於 y46，bx=50），bar 寬度依
+    // chipRowLeft 動態夾限，保證與 chip 列保持 ≥8px 間距；w≥700 時 chip 列已遠離
+    // 中線，改回置中版面（bw 固定 210，見 task-4-report.md 驗算）。
+    const barLeft = w < 700;
+    const bx = barLeft ? 50 : w / 2 - 105;
+    const bw = barLeft ? Math.max(90, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
+    const bh = barLeft ? 10 : 12;
+    const by = barLeft ? 46 : 27;
+    this.stamLabel.setPosition(barLeft ? bx + bw / 2 : w / 2, barLeft ? 30 : 8);
     this.hudG.clear();
     this.hudG.fillStyle(0x0d1310, 1).fillRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
     this.hudG.lineStyle(1, pal.paper, 0.18).strokeRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
