@@ -17,7 +17,8 @@ import type { Rng } from '../core/rng';
 import type { ToolStore } from '../core/tools';
 import type { RunState } from '../core/runstate';
 import {
-  cssHex, cssRgba, dashedCircle, dashedArc, dashedLine, drawClueToken, drawSupply,
+  cssHex, cssRgba, dashedLine, drawClueToken, drawSupply,
+  drawClueOverlay, drawMark,
   BRUSH_RADIUS, FONTS, displayFont, terrainTexImage,
 } from './paint';
 import {
@@ -1279,7 +1280,9 @@ export class MapScene extends Phaser.Scene {
 
     L.clues.forEach((c, i) => {
       if (!s.seen.has(key(c.position))) return;
-      if (s.readClues.has(key(c.position)) && !s.mutedClues.has(i)) this.drawClueOverlay(c, px);
+      if (s.readClues.has(key(c.position)) && !s.mutedClues.has(i)) {
+        drawClueOverlay(this.g, c, px(c.position), cs, pal, this.tools.has('windstone'));
+      }
     });
     L.clues.forEach((c, i) => {
       if (!s.seen.has(key(c.position))) return;
@@ -1298,21 +1301,7 @@ export class MapScene extends Phaser.Scene {
     for (const [m, kind] of s.marks) {
       const [mx, my] = m.split(',').map(Number);
       const p = px({ x: mx, y: my });
-      const r = cs * 0.32;
-      if (kind === 'exclude') {
-        this.g.lineStyle(3, pal.mark, 0.9);
-        this.g.lineBetween(p.x - r, p.y - r, p.x + r, p.y + r);
-        this.g.lineBetween(p.x + r, p.y - r, p.x - r, p.y + r);
-      } else if (kind === 'suspect') {
-        this.g.lineStyle(2.4, pal.supply, 0.9);
-        this.g.strokeCircle(p.x, p.y, r * 0.85);
-        this.g.lineBetween(p.x, p.y - r * 0.3, p.x, p.y + r * 0.2);
-        this.g.fillStyle(pal.supply, 0.9).fillCircle(p.x, p.y + r * 0.5, 1.6);
-      } else {
-        this.g.lineStyle(2.6, pal.gold, 1).strokeCircle(p.x, p.y, r);
-        this.g.lineStyle(1.4, pal.gold, 0.7).strokeCircle(p.x, p.y, r * 0.55);
-        this.g.fillStyle(pal.gold, 1).fillCircle(p.x, p.y, r * 0.2);
-      }
+      drawMark(this.g, kind, p.x, p.y, cs, pal);
     }
 
     // 迷霧：沒看過的地面壓暗。不是全黑——地形輪廓仍隱約可見，
@@ -1440,32 +1429,6 @@ export class MapScene extends Phaser.Scene {
     this.g.lineStyle(1.6, this.pal.gold, 1);
     this.g.lineBetween(x + r * 0.5, y - r * 0.9, x + r * 0.8, y - r * 0.6);
     this.g.lineBetween(x + r * 0.8, y - r * 0.6, x + r * 1.3, y - r * 1.2);
-  }
-
-  // 已判讀線索覆蓋層（設計板）：足跡=金色錐形（淡填色＋點描邊線）、
-  // 擾動=金色虛線圓域、氣味=發光色虛線距離環
-  private drawClueOverlay(c: Clue, px: (v: Vec2) => { x: number; y: number }) {
-    const cs = this.cell;
-    const pal = this.pal;
-    const center = px(c.position);
-    if (c.type === 'footprint') {
-      const len = cs * 5;
-      const a1 = ((c.data.direction - c.data.angleSpread) * Math.PI) / 180;
-      const a2 = ((c.data.direction + c.data.angleSpread) * Math.PI) / 180;
-      const p1 = { x: center.x + len * Math.cos(a1), y: center.y + len * Math.sin(a1) };
-      const p2 = { x: center.x + len * Math.cos(a2), y: center.y + len * Math.sin(a2) };
-      this.g.fillStyle(pal.gold, 0.1).fillTriangle(center.x, center.y, p1.x, p1.y, p2.x, p2.y);
-      dashedLine(this.g, center.x, center.y, p1.x, p1.y, pal.gold, 0.55);
-      dashedLine(this.g, center.x, center.y, p2.x, p2.y, pal.gold, 0.55);
-    } else if (c.type === 'disturbance') {
-      this.g.fillStyle(pal.gold, 0.05).fillCircle(center.x, center.y, c.data.radius * cs);
-      dashedCircle(this.g, center.x, center.y, c.data.radius * cs, pal.gold, 0.45, 2, 6, 9);
-    } else if (this.tools.has('windstone')) {
-      // 風向石：完整距離環收窄為 240° 偏心弧，弧心指向 biasDirection（來源方向提示）
-      dashedArc(this.g, center.x, center.y, c.data.distance * cs, c.data.biasDirection, 240, pal.glow, 0.5, 2, 3, 8);
-    } else {
-      dashedCircle(this.g, center.x, center.y, c.data.distance * cs, pal.glow, 0.5, 2, 3, 8);
-    }
   }
 }
 

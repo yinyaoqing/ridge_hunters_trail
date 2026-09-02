@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import type { ClueType, Locale, TerrainType } from '../core/types';
+import type { Clue, ClueType, Locale, TerrainType } from '../core/types';
 import { CLUE_GOLD, type Palette } from '../core/palette';
 import type { Quality } from '../core/quality';
+import type { MarkKind } from '../core/marks';
 
 type Gfx = Phaser.GameObjects.Graphics;
 
@@ -108,6 +109,57 @@ export function drawSupply(
   } else {
     g.fillStyle(0x8fb8de, 1).fillCircle(cx, cy, cell * 0.22);
     g.fillStyle(pal.paper, 0.85).fillCircle(cx - cell * 0.07, cy - cell * 0.07, cell * 0.07);
+  }
+}
+
+// 已判讀線索的覆蓋層（設計板）：足跡＝金色錐形（淡填色＋點描邊線）、
+// 擾動＝金色虛線圓域、氣味＝發光色虛線距離環。
+// 由 MapScene 與 DemoScene 共用——示範看到的圖形必須與真實地圖逐像素相同，
+// 否則玩家在示範裡學到的形狀在真實地圖上認不出來。
+// windstone 為真時，氣味的完整距離環收窄為 240° 偏心弧（風向石效果）。
+export function drawClueOverlay(
+  g: Gfx, c: Clue, center: { x: number; y: number }, cell: number,
+  pal: Palette, windstone: boolean,
+): void {
+  if (c.type === 'footprint') {
+    const len = cell * 5;
+    const a1 = ((c.data.direction - c.data.angleSpread) * Math.PI) / 180;
+    const a2 = ((c.data.direction + c.data.angleSpread) * Math.PI) / 180;
+    const p1 = { x: center.x + len * Math.cos(a1), y: center.y + len * Math.sin(a1) };
+    const p2 = { x: center.x + len * Math.cos(a2), y: center.y + len * Math.sin(a2) };
+    g.fillStyle(pal.gold, 0.1).fillTriangle(center.x, center.y, p1.x, p1.y, p2.x, p2.y);
+    dashedLine(g, center.x, center.y, p1.x, p1.y, pal.gold, 0.55);
+    dashedLine(g, center.x, center.y, p2.x, p2.y, pal.gold, 0.55);
+  } else if (c.type === 'disturbance') {
+    g.fillStyle(pal.gold, 0.05).fillCircle(center.x, center.y, c.data.radius * cell);
+    dashedCircle(g, center.x, center.y, c.data.radius * cell, pal.gold, 0.45, 2, 6, 9);
+  } else if (windstone) {
+    dashedArc(g, center.x, center.y, c.data.distance * cell, c.data.biasDirection, 240, pal.glow, 0.5, 2, 3, 8);
+  } else {
+    dashedCircle(g, center.x, center.y, c.data.distance * cell, pal.glow, 0.5, 2, 3, 8);
+  }
+}
+
+// 玩家的三態標記：排除＝紅 X、存疑＝黃 ?、押注＝金色雙環（押注全場唯一）。
+// 由 MapScene 與 DemoScene 共用——排除／存疑／押注正是示範要教的三件事，
+// 它們在示範裡長的樣子必須與真實地圖一模一樣，否則玩家學到的記號在真圖上認不得。
+export function drawMark(
+  g: Gfx, kind: MarkKind, cx: number, cy: number, cell: number, pal: Palette,
+): void {
+  const r = cell * 0.32;
+  if (kind === 'exclude') {
+    g.lineStyle(3, pal.mark, 0.9);
+    g.lineBetween(cx - r, cy - r, cx + r, cy + r);
+    g.lineBetween(cx + r, cy - r, cx - r, cy + r);
+  } else if (kind === 'suspect') {
+    g.lineStyle(2.4, pal.supply, 0.9);
+    g.strokeCircle(cx, cy, r * 0.85);
+    g.lineBetween(cx, cy - r * 0.3, cx, cy + r * 0.2);
+    g.fillStyle(pal.supply, 0.9).fillCircle(cx, cy + r * 0.5, 1.6);
+  } else {
+    g.lineStyle(2.6, pal.gold, 1).strokeCircle(cx, cy, r);
+    g.lineStyle(1.4, pal.gold, 0.7).strokeCircle(cx, cy, r * 0.55);
+    g.fillStyle(pal.gold, 1).fillCircle(cx, cy, r * 0.2);
   }
 }
 
