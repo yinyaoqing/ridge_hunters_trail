@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { canMove, move, cycleMarkAt, toggleMute, useBell, TERRAIN_COST, type SessionState } from '../core/session';
+import { canMove, move, cycleMarkAt, toggleMute, useBell, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
 import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
@@ -317,6 +317,17 @@ export class MapScene extends Phaser.Scene {
     }
     ctx.filter = 'none';
 
+    // 崖壁：色塊之外再描一道細亮邊。純色差在暗色調配色下不夠可讀，
+    // 而「哪裡過不去」是玩家每一步都要判斷的事，不能靠猜。
+    ctx.strokeStyle = cssRgba(this.pal.paper, 0.22);
+    ctx.lineWidth = 1;
+    for (let y = 0; y < L.mapSize; y++) {
+      for (let x = 0; x < L.mapSize; x++) {
+        if (L.terrain[y][x] !== 'cliff') continue;
+        ctx.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3);
+      }
+    }
+
     this.paintTerrainTexture(ctx, s);
 
     ctx.strokeStyle = cssRgba(this.pal.paper, 0.06);
@@ -457,9 +468,10 @@ export class MapScene extends Phaser.Scene {
     if (w >= 900) {
       const legendG = this.add.graphics();
       const legendY = 36;
-      const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
-      const costs = order.map((t) => String(TERRAIN_COST[t])); // 由 TERRAIN_COST 推導，避免與實際成本脫鉤
-      let lx = 250;
+      const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock', 'cliff'];
+      // 崖壁成本為 Infinity，直接印會變成 "Infinity"——改用 ✕ 表示不可通行
+      const costs = order.map((t) => (isPassable(t) ? String(TERRAIN_COST[t]) : '✕'));
+      let lx = 232;
       order.forEach((t, i) => {
         legendG.fillStyle(pal.terrain[t], 1).fillRect(lx, legendY, 12, 12);
         this.add.text(lx + 16, legendY + 6, costs[i], {
@@ -710,8 +722,9 @@ export class MapScene extends Phaser.Scene {
     const y = this.oy + c.y * cs;
     this.hoverG.clear();
     this.hoverG.lineStyle(1, pal.gold, 0.5).strokeRect(x, y, cs, cs);
-    const cost = TERRAIN_COST[s.level.terrain[c.y][c.x]];
-    this.hoverCostText?.setText(String(cost)).setPosition(x + cs - 3, y + cs - 3).setVisible(true);
+    const t = s.level.terrain[c.y][c.x];
+    this.hoverCostText?.setText(isPassable(t) ? String(TERRAIN_COST[t]) : '✕')
+      .setPosition(x + cs - 3, y + cs - 3).setVisible(true);
   }
 
   private onPointerUp(p: Phaser.Input.Pointer) {

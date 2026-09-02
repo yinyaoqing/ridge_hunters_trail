@@ -122,8 +122,13 @@ export class HelpScene extends Phaser.Scene {
       {
         y: py0 + 354, key: 'help.stamina',
         icon: (y) => {
-          drawSupply(icons, rowX - 8, y, 34, 0, pal);
-          drawSupply(icons, rowX + 10, y, 34, 1, pal);
+          drawSupply(icons, rowX - 14, y, 34, 0, pal);
+          drawSupply(icons, rowX + 2, y, 34, 1, pal);
+          // 崖壁小方塊＋叉：與 HUD 圖例同一套語彙
+          icons.fillStyle(pal.terrain.cliff, 1).fillRect(rowX + 14, y - 5, 10, 10);
+          icons.lineStyle(1.4, pal.paperDim, 0.9);
+          icons.lineBetween(rowX + 16, y - 3, rowX + 22, y + 3);
+          icons.lineBetween(rowX + 22, y - 3, rowX + 16, y + 3);
         },
       },
       {
