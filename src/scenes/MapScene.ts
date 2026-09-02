@@ -909,7 +909,8 @@ export class MapScene extends Phaser.Scene {
       if (this.tutStep >= 0) this.finishTutorial(); // 引導收尾：進 QTE 即視為引導完成，寫入兩把旗標
       fadeToScene(this, 'Qte');
     } else if (s.phase === 'exhausted') {
-      fadeToScene(this, 'Result'); // 中途力竭不寫旗標：下次 round1 仍會重新引導
+      // 力竭也一律先揭曉再結算（診斷 D-01）；不寫教學旗標：下次 round1 仍會重新引導
+      fadeToScene(this, 'Reveal');
     }
   }
 

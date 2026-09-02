@@ -138,7 +138,7 @@ export class QteScene extends Phaser.Scene {
         ? { targets: this.sil, alpha: 0.85, scale: 1.5, duration: 600, ease: 'Cubic.easeOut' }
         : { targets: this.sil, alpha: 0, x: this.sil.x + 60, duration: 600, ease: 'Cubic.easeIn' });
     }
-    this.time.delayedCall(900, () => fadeToScene(this, 'Result'));
+    this.time.delayedCall(900, () => fadeToScene(this, 'Reveal'));
   }
 
   private draw() {
