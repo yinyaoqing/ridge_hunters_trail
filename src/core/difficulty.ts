@@ -22,6 +22,9 @@ export interface DifficultyParams {
   qte: QteParams;
 }
 
+// 體力預算對應 Phase 5 的四層地形成本（平均約 1.6/步，舊版為 1.3）。
+// 三檔皆換算約 37–81 步，與改動前的步數區間相當——變的是「每一步值多少」，
+// 不是「總共能走幾步」。
 export function getDifficulty(round: number): DifficultyParams {
   if (round <= 3) {
     return {
@@ -29,7 +32,7 @@ export function getDifficulty(round: number): DifficultyParams {
       footprintSpread: 40, disturbanceRadius: 4, scentTolerance: 1.0,
       minClueDist: 3, maxClueDist: 6,
       typeRatio: { footprint: 60, disturbance: 30, scent: 10 },
-      staminaBudget: 45, supplyCount: 3, supplyRestore: 10,
+      staminaBudget: 60, supplyCount: 3, supplyRestore: 10,
       qte: { speed: 180, arcSize: 70, rounds: 3, needed: 2 },
     };
   }
@@ -39,7 +42,7 @@ export function getDifficulty(round: number): DifficultyParams {
       footprintSpread: 25, disturbanceRadius: 3, scentTolerance: 0.75,
       minClueDist: 4, maxClueDist: 8,
       typeRatio: { footprint: 40, disturbance: 35, scent: 25 },
-      staminaBudget: 70, supplyCount: 4, supplyRestore: 10,
+      staminaBudget: 95, supplyCount: 4, supplyRestore: 10,
       qte: { speed: 240, arcSize: 55, rounds: 3, needed: 2 },
     };
   }
@@ -48,7 +51,7 @@ export function getDifficulty(round: number): DifficultyParams {
     footprintSpread: 15, disturbanceRadius: 2, scentTolerance: 0.5,
     minClueDist: 5, maxClueDist: 10,
     typeRatio: { footprint: 20, disturbance: 30, scent: 50 },
-    staminaBudget: 95, supplyCount: 5, supplyRestore: 10,
+    staminaBudget: 130, supplyCount: 5, supplyRestore: 10,
     qte: { speed: 300, arcSize: 40, rounds: 4, needed: 3 },
   };
 }

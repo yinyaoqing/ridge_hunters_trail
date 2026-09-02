@@ -1,6 +1,7 @@
 import { valueNoise, layered } from './noise';
 import type { Rng } from './rng';
 import type { TerrainType } from './types';
+import { dist, type Vec2 } from './geometry';
 
 // 高程分帶門檻（第一版，待實測調整）。value noise 的取值集中在 0.5 附近，
 // 因此 0.82 以上只佔少數——崖壁要夠稀少才不會把地圖切碎，但必須真的存在，
@@ -51,4 +52,23 @@ export function buildTerrain(
     elevation.push(erow);
   }
   return { terrain, elevation };
+}
+
+// 地形成本四層（第一版，待實測調整）：草地／霧谷 1、密叢 2、岩坡 4、崖壁不可通行。
+// 拉開層級是為了讓「繞路」真的值得算——舊版只有 1 和 2 兩檔，省下的體力太少，
+// 玩家兩局後就不再思考路線。cliff 用 Infinity 而非旗標：canMove 既有的
+// 「stamina >= cost」判斷對 Infinity 恆為 false，通行性因此自動成立，
+// 不需要在每個呼叫點多一條分支。
+export const TERRAIN_COST: Record<TerrainType, number> = {
+  meadow: 1, mist: 1, thicket: 2, rock: 4, cliff: Infinity,
+};
+
+export const isPassable = (t: TerrainType): boolean => Number.isFinite(TERRAIN_COST[t]);
+
+// 出生角：離目標最遠的那個角落。Task 4 的可達性保證（generate.ts）與 session 的
+// 開局位置共用同一份定義——兩邊各算一次遲早會不一致。
+export function startCorner(mapSize: number, target: Vec2): Vec2 {
+  const s = mapSize - 1;
+  const corners: Vec2[] = [{ x: 0, y: 0 }, { x: s, y: 0 }, { x: 0, y: s }, { x: s, y: s }];
+  return corners.reduce((a, b) => (dist(b, target) > dist(a, target) ? b : a));
 }

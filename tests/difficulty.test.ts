@@ -44,3 +44,20 @@ describe('getDifficulty follows spec 4.5 table', () => {
     expect(t1.qte.speed).toBeLessThan(t3.qte.speed);
   });
 });
+
+describe('stamina budget vs terrain cost', () => {
+  it('scales with the new cost tiers — roughly 45-55 steps per tier', () => {
+    // 新地形分布的加權平均成本約 1.6/步（草地霧谷 1、密叢 2、岩坡 4）。
+    // 預算除以平均成本應落在「夠走完一趟推理、但不夠亂走」的區間。
+    for (const round of [1, 5, 9]) {
+      const steps = getDifficulty(round).staminaBudget / 1.6;
+      expect(steps).toBeGreaterThan(30);
+      expect(steps).toBeLessThan(90);
+    }
+  });
+
+  it('grows monotonically with the difficulty tiers', () => {
+    expect(getDifficulty(1).staminaBudget).toBeLessThan(getDifficulty(5).staminaBudget);
+    expect(getDifficulty(5).staminaBudget).toBeLessThan(getDifficulty(9).staminaBudget);
+  });
+});

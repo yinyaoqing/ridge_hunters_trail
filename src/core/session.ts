@@ -1,19 +1,18 @@
-import { cheb, dist, type Vec2 } from './geometry';
-import type { Level, TerrainType } from './types';
+import { cheb, type Vec2 } from './geometry';
+import type { Level } from './types';
 import { getDifficulty } from './difficulty';
 import { generateLevel } from './generate';
 import { key } from './clues';
 import type { Rng } from './rng';
 import { cycleMark, type MarkMap } from './marks';
+import { TERRAIN_COST, isPassable, startCorner } from './terrain';
+
+// 實作已移至 terrain.ts 以打斷 session → generate → reach → session 的循環匯入；
+// 既有呼叫端（MapScene、測試）沿用 session 的匯入點不變
+export { TERRAIN_COST, isPassable, startCorner };
 
 export type Phase = 'explore' | 'qte' | 'caught' | 'escaped' | 'exhausted';
 export type SessionMode = 'run' | 'daily';
-
-export const TERRAIN_COST: Record<TerrainType, number> = {
-  // 崖壁設為 Infinity：canMove/hasAffordableMove 都用「體力 >= 成本」判斷可否移動，
-  // 有限體力永遠小於 Infinity，因此崖壁天生不可通行，不需要另開一條「地形是否可走」的判斷路徑
-  meadow: 1, mist: 1, thicket: 2, rock: 2, cliff: Infinity,
-};
 
 // 線索判讀記錄：哪一條線索、在第幾步被踩到。供揭曉畫面回推「資訊在第幾步就已完備」
 export interface ClueRead {
@@ -39,15 +38,9 @@ export interface SessionState {
   microEvents: number;    // 微事件本局計數
 }
 
-function startPos(level: Level): Vec2 {
-  const s = level.mapSize - 1;
-  const corners: Vec2[] = [{ x: 0, y: 0 }, { x: s, y: 0 }, { x: 0, y: s }, { x: s, y: s }];
-  return corners.reduce((a, b) => (dist(b, level.targetPos) > dist(a, level.targetPos) ? b : a));
-}
-
 export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): SessionState {
   const level = generateLevel(round, rng);
-  const player = startPos(level);
+  const player = startCorner(level.mapSize, level.targetPos);
   return {
     round,
     level,

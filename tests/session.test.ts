@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   newSession, canMove, move, cycleMarkAt, toggleMute, resolveQte, nextSession, useBell,
-  TERRAIN_COST, type SessionState,
+  TERRAIN_COST, isPassable, type SessionState,
 } from '../src/core/session';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
@@ -276,5 +276,51 @@ describe('newSession', () => {
     expect(s.marks.size).toBe(0);
     expect(s.readLog).toHaveLength(0);
     expect(s.mutedClues.size).toBe(0);
+  });
+});
+
+describe('terrain cost tiers', () => {
+  it('spreads cost across three passable tiers plus an impassable one', () => {
+    expect(TERRAIN_COST.meadow).toBe(1);
+    expect(TERRAIN_COST.mist).toBe(1);
+    expect(TERRAIN_COST.thicket).toBe(2);
+    expect(TERRAIN_COST.rock).toBe(4);
+    expect(Number.isFinite(TERRAIN_COST.cliff)).toBe(false);
+  });
+
+  it('isPassable rejects only cliffs', () => {
+    expect(isPassable('meadow')).toBe(true);
+    expect(isPassable('rock')).toBe(true);
+    expect(isPassable('cliff')).toBe(false);
+  });
+});
+
+describe('canMove: cliffs', () => {
+  it('refuses to enter a cliff no matter how much stamina remains', () => {
+    const s = makeState({ stamina: 9999 });
+    s.level.terrain[1][0] = 'cliff';
+    expect(canMove(s, { x: 0, y: 1 })).toBe(false);
+  });
+
+  it('a blocked move changes nothing — no step, no stamina, no phase change', () => {
+    const s = makeState({ stamina: 10 });
+    s.level.terrain[1][1] = 'cliff';
+    move(s, { x: 1, y: 1 });
+    expect(s.player).toEqual({ x: 0, y: 0 });
+    expect(s.stamina).toBe(10);
+    expect(s.steps).toBe(0);
+    expect(s.phase).toBe('explore');
+  });
+
+  it('cliffs alone never strand the player — retreat is always available', () => {
+    const s = makeState({ stamina: 50 });
+    // 除了來路 (0,0) 之外，把 (1,1) 的所有界內鄰格封死
+    for (const [x, y] of [[1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]] as const) {
+      s.level.terrain[y][x] = 'cliff';
+    }
+    move(s, { x: 1, y: 1 });
+    expect(s.player).toEqual({ x: 1, y: 1 });
+    // 還退得回 (0,0)，所以不算力竭——力竭永遠來自體力歸零，不是被崖壁圍死
+    expect(s.phase).toBe('explore');
   });
 });
