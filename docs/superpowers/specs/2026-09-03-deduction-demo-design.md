@@ -57,24 +57,28 @@ export type DemoAction = 'exclude' | 'mute' | 'wager';
 export interface DemoStep {
   chapter: 1 | 2 | 3 | 4;
   narration: MsgKey;              // 旁白
-  narrationVars?: () => Record<string, number>;  // 數字由真實計算帶入
+  vars?: Record<string, number>;  // 旁白裡的數字，由 candidates()/intersect() 於模組載入時算出
   clues: number[];                // 本步已判讀的線索索引
   muted: number[];                // 本步已靜音的線索索引
-  overlay: 'none' | 'candidates' | 'heat' | 'intersect';
+  overlay: 'none' | 'heat' | 'intersect';
   seen: 'near' | 'all';           // 迷霧狀態
   player: Vec2;                   // 玩家位置（第四章會移動）
+  autoSuspect?: true;             // 為真時，11 格交集自動標成存疑
   action?: DemoAction;            // 有值時，此步必須玩家動手才能前進
 }
 
-export const DEMO_STEPS: DemoStep[];
+export const DEMO_STEPS: DemoStep[];   // 14 步
 
-// 動手點的驗證：回傳 null 表示接受，否則回傳該顯示的提示 MsgKey
-export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | null;
+// 動手點的驗證：回傳 null 表示接受，否則回傳該顯示的提示 MsgKey。
+// 拆成兩個函式而非一個吃 `Vec2 | number` 的聯集——格子動作與線索動作
+// 本來就是不同的東西，讓型別替呼叫端擋掉傳錯的參數。
+export function checkCellAction(action: 'exclude' | 'wager', cell: Vec2): MsgKey | null;
+export function checkMuteAction(clueIndex: number): MsgKey | null;
 ```
 
-`narrationVars` 是刻意的設計：旁白裡的「81 剩 33」「只有 11 格」全部由
-`candidates()` / `intersect()` 當場算出後帶入 `{n}`，不寫死成常數。
-如此文案與畫面**在結構上不可能對不上**。
+`vars` 是刻意的設計：旁白裡的「81 剩 33」「只有 11 格」全部由 `candidates()` / `intersect()`
+算出後帶入 `{n}`，一個都不寫死成常數；並有一條測試斷言每一步的 `{n}` 佔位符與它是否提供
+`vars` 恰好對稱。如此文案與畫面**在結構上不可能對不上**。
 
 ### 2.3 渲染層
 
@@ -112,9 +116,16 @@ export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | nul
 
 這三條性質是課程的地基，全部進 `tests/demo.test.ts` 釘死。
 
+### 3.2 迷霧
+
+示範不重現 `vision.ts` 的視野規則——那是 `help.vision` 的職責，在這裡只會分散注意力。
+迷霧在此只需成立一件事：**第四條線索藏在你看不見的地方**。因此直接以最上面兩列為未探索區：
+它剛好涵蓋線索 3 的 `(6,0)`，且完全不觸及 11 格交集區（其最小 y 為 2）。
+第 11 步眺望後全圖可見。
+
 ---
 
-## 4. 十三步腳本
+## 4. 十四步腳本
 
 ### 第一章　一條線索只會排除，不會指認
 
@@ -152,10 +163,14 @@ export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | nul
 | 10 | 「11 格還是太多，而遠處你看不見。」玩家往交集區移動 | — |
 | 11 | 眺望環掃過，迷霧退開，右上角露出第四條線索。「眺望不只找線索，也讓你看得見地。」 | — |
 | 12 | 判讀擾動 → 交集收斂到 1 格 | — |
-| 13 | 押注那一格 → 揭曉。「讀、疊、剔、望、押——每一局都是這五件事。」 | **③押注** |
+| 13 | 「就是這裡。把它押注下去。」 | **③押注** |
+| 14 | 揭曉：牠在這裡。「讀、疊、剔、望、押——每一局都是這五件事。」 | — |
 
-動手 ③ 驗證：點 `(6,2)` → 接受，畫金色雙環並進入揭曉；
-點其他格 → 提示該格不符合哪一條線索。
+動手 ③ 驗證：點 `(6,2)` → 接受，前進到第 14 步畫出金色雙環與揭曉；
+點其他格 → 提示該格不符合全部三條線索。
+
+揭曉獨立成第 14 步，而不是塞進第 13 步的動作回呼裡：**每一步恰好對應一個顯示狀態**，
+渲染因此可以是 `render(stepIndex)` 的純函式，上一步／下一步不會累積狀態漂移。
 
 ### 4.1 為什麼是這三個動手點
 
@@ -170,7 +185,7 @@ export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | nul
 |---|---|---|
 | `Help` | 標題下方一顆主鈕 | 永遠顯示。Help 先 `scene.stop()` 自關，再 launch Demo，並把自己的 `from` 傳下去，回程直接回到 Map/Camp |
 | `Camp` | 工具列 `?` 旁 | 永遠顯示 |
-| `Result` | `escaped` / `exhausted` 分支的按鈕組 | 僅失敗時顯示——玩家剛失敗、最想知道「我到底該怎麼想」的那一刻 |
+| `Result` | 主線失敗分支，主鈕上方的文字連結 | 玩家剛失敗、最想知道「我到底該怎麼想」的那一刻。**每日挑戰失敗分支刻意不接**——該分支的垂直預算已被連勝列＋重試鈕＋返回營地鈕佔滿（座標一路夾限到 `h - 30`），硬塞第三個元素會重演 F7 的重疊問題；每日挑戰玩家仍可從營地與說明頁進入 |
 
 首次遊玩維持現狀（`rht.help.v1` 控制的說明頁自動彈出），不強迫任何人上課。
 
@@ -185,9 +200,10 @@ export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | nul
 3. 線索 0 ∩ 線索 1 的大小 == 旁白帶入的數字（`narrationVars` 與 `intersect()` 同源）
 4. 三條真線索交集恰為 `{DEMO_TARGET}`（第四章的收斂成立）
 5. 三個動手點：正解通過、反例被拒（每點至少一個反例）
-6. `DEMO_STEPS` 結構完整：章節單調遞增、`clues`／`muted` 索引合法、
-   有 `action` 的步驟必定可被 `checkAction` 處理
-7. **每個 MsgKey 在 `en` 與 `zh-TW` 都存在**——Phase 4 出過孤兒 key，這條直接堵死
+6. `DEMO_STEPS` 恰為 14 步，結構完整：章節單調遞增、`clues`／`muted` 索引合法、
+   `muted` ⊆ `clues`、有 `action` 的步驟其型別可被對應的檢查函式處理
+7. 迷霧涵蓋線索 3 的位置，且不觸及 11 格交集區（第四章的「看不見」成立）
+8. **每個 MsgKey 在 `en` 與 `zh-TW` 都存在**——Phase 4 出過孤兒 key，這條直接堵死
 
 場景層一如既往由 `npm run build`（`tsc --noEmit && vite build`）加人工冒煙把關。
 
@@ -196,7 +212,7 @@ export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | nul
 ## 7. 版面與 i18n
 
 - 9×9 網格在 580px 寬的面板中每格約 34px，與 HelpScene 同寬，可讀
-- 面板需容納：標題列與進度（`3 / 13`）、網格、旁白（最多兩行）、上一步／下一步／關閉
+- 面板需容納：標題列與進度（`3 / 14`）、章節名、網格、旁白（最多三行）、上一步／下一步／關閉
 - 新增約 30 組 i18n 字串，雙語同步；命名前綴 `demo.*`
 - 窄視窗（`compact`）沿用 HelpScene 既有的斷點慣例，網格等比縮小
 
@@ -206,7 +222,7 @@ export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | nul
 
 - 不動任何遊戲規則、難度參數或 `generate.ts`
 - 不改現有 `tut.*` 四步實戰引導——它與示範互補，不是替代
-- 不做進度記憶（看到第幾步）。13 步的東西不值得一個 localStorage key 與它的降級路徑
+- 不做進度記憶（看到第幾步）。14 步的東西不值得一個 localStorage key 與它的降級路徑
 - 不做語音、不做動畫分鏡以外的演出
 
 ---
@@ -215,7 +231,7 @@ export function checkAction(step: DemoStep, picked: Vec2 | number): MsgKey | nul
 
 **最大風險是沒人點進來。** 三處入口是對策，但若實測顯示轉換率低，
 下一步是把失敗畫面那顆改成自動提示（而非把它塞進首次遊玩流程——
-把 13 步的課堵在遊戲最前面會勸退隨手點進來的人）。
+把 14 步的課堵在遊戲最前面會勸退隨手點進來的人）。
 
 次要風險：新增約 300–400 行的場景，且與 Phase 4／Phase 5 一樣**無法單元測試**。
 本專案目前已累積兩期未經瀏覽器實測的視覺改動，本階段會再疊一層。
