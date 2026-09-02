@@ -145,10 +145,12 @@ export class CampScene extends Phaser.Scene {
       by += 4; // 與工具列留一點呼吸空間
     }
 
-    // 小工具列：靜音＋說明＋語言（三鈕置中排列，18px 間距）
-    const xSound = cx - 80;
-    const xHelp = cx - 18;
-    const xLang = cx + 62;
+    // 小工具列：靜音＋說明＋示範＋語言（四鈕置中排列）。
+    // x 座標重排以容納示範入口，整列的視覺跨距維持對稱（-123 到 +123）。
+    const xSound = cx - 101;
+    const xHelp = cx - 45;
+    const xDemo = cx + 11;
+    const xLang = cx + 83;
     this.drawSoundGlyph(xSound, by, this.audio.enabled());
     this.add.rectangle(xSound, by, 44, 44, 0, 0)
       .setInteractive({ useHandCursor: true })
@@ -164,6 +166,17 @@ export class CampScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
         this.scene.launch('Help', { from: 'Camp' });
+        this.scene.pause();
+      });
+    // 示範入口：金色播放三角。營地是玩家在兩局之間停留的地方，
+    // 也是唯一不會打斷任何進行中狩獵的入口。
+    const demoG = this.add.graphics();
+    demoG.fillStyle(pal.gold, 1);
+    demoG.fillTriangle(xDemo - 6, by - 9, xDemo - 6, by + 9, xDemo + 10, by);
+    this.add.rectangle(xDemo, by, 44, 44, 0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        this.scene.launch('Demo', { from: 'Camp' });
         this.scene.pause();
       });
     this.add.text(xLang, by, 'EN / 中', {
