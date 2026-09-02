@@ -37,11 +37,14 @@ export class MapScene extends Phaser.Scene {
   private hoverCell: Vec2 | null = null;
   private animating = false;
   // 路線預覽與自動行走狀態（Task 13）：previewPath/previewTo 記錄「上一次預覽的是哪條路、到哪格」，
-  // 供 onPointerUp 判斷「同一格再點一次」；previewCostText 於首次預覽時延遲建立
+  // 供 onPointerUp 判斷「同一格再點一次」；previewCostText 與 hoverCostText 同款做法，
+  // 在 create() 中無條件建立（而非惰性 ??=）——場景會因語言切換／resize（見 fx.ts 的
+  // restartOnResize）頻繁 scene.restart()，restart 沿用同一個 Scene 實例，欄位值存活但
+  // GameObject 已被銷毀；惰性建立的 ??= 因此永遠不會補建，會撞上已銷毀的 Text（C1）。
   private previewPath: Vec2[] | null = null;
   private previewTo: Vec2 | null = null;
   private previewG!: Phaser.GameObjects.Graphics;
-  private previewCostText?: Phaser.GameObjects.Text;
+  private previewCostText!: Phaser.GameObjects.Text;
   private walking = false; // 自動行走中——與 animating（單步防重入）各司其職，見 doMove 註解
   private lowTween?: Phaser.Tweens.Tween;
   private hudG!: Phaser.GameObjects.Graphics;
@@ -109,6 +112,16 @@ export class MapScene extends Phaser.Scene {
       this.scene.start('Camp');
       return;
     }
+    // 語言 chip 直接呼叫 scene.restart()，fx.ts 的 restartOnResize 也會在
+    // Phaser.Scale.RESIZE 時（手機收合網址列即觸發）呼叫它——restart 沿用同一個 Scene
+    // 實例，欄位值會存活，但唯一清除這幾個旗標的機制（補間/計時器鏈）已隨場景 shutdown
+    // 被銷毀。不重置的話 walking 會卡在 true，永久鎖死移動（C2）；animating 是同款單步
+    // 防重入旗標，暴露窗口雖只有 100ms 仍一併重置；previewPath/previewTo 不重置則會讓
+    // 上一局/上個尺寸留下的過期路線在新局被誤判為仍然有效（C3 的殘留來源之一）。
+    this.walking = false;
+    this.animating = false;
+    this.previewPath = null;
+    this.previewTo = null;
     const w = this.scale.width;
     const h = this.scale.height;
     this.pal = getPalette(s.round);
@@ -139,12 +152,20 @@ export class MapScene extends Phaser.Scene {
     this.hoverCostText = this.add.text(0, 0, '', {
       fontFamily: FONTS.body, fontSize: '10px', color: cssHex(this.pal.paperDim),
     }).setOrigin(1, 1).setVisible(false);
+    // previewCostText 顏色隨路線可負擔與否而異，於 showPreview 每次呼叫時設定，這裡只建立空殼
+    this.previewCostText = this.add.text(0, 0, '', {
+      fontFamily: FONTS.body, fontSize: '13px', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(60).setVisible(false);
 
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.spaceKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.pressAt = { t: p.time, x: p.x, y: p.y };
-      this.clearHover(); // 按下後（可能拖曳/移動）暫時隱藏 hover，避免殘影
+      // 按下後（可能拖曳/移動）暫時隱藏 hover，避免殘影；但不連帶清預覽——這一下
+      // 很可能正是「點第二次確認先前預覽的路線」，onPointerUp 得靠 previewPath/
+      // previewTo 撐到 mouseup 才能判斷是否命中。若這裡也清掉，二次點擊確認自動
+      // 行走會永遠無法成立（見 clearHover 本身的預設行為與其註解）。
+      this.clearHover(false);
     });
     // F1 audio unlock hook：任何首次指標按下即視為使用者手勢，解除 AudioContext 靜音鎖
     // （unlock() 冪等，CampScene 亦掛同款 hook，兩邊皆可安全觸發）
@@ -275,11 +296,14 @@ export class MapScene extends Phaser.Scene {
     if (!this.cursors) return;
     const s = this.session();
     if (s.phase !== 'explore') return;
+    // 自動行走一讀到新東西就停是本任務的核心規則（眺望花體力揭示一大片區域，本身就是
+    // 「新東西」）；守衛必須排在眺望分支之前，不然行走途中按空白鍵能眺望，體力照花、
+    // 地圖照揭，行走卻不受影響（C5）
+    if (this.walking) return;
     if (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
       this.doSurvey();
       return;
     }
-    if (this.walking) return; // 自動行走中封鎖方向鍵，避免插隊
     const c = this.cursors;
     const jd = Phaser.Input.Keyboard.JustDown;
     // 任一方向鍵按下的那一幀才動作（維持既有「一次按鍵走一格」手感）
@@ -613,6 +637,7 @@ export class MapScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', (p: Phaser.Input.Pointer) => {
           p.event.stopPropagation();
+          if (this.walking) return; // 行走途中封鎖搖鈴——揭示幌子位置同樣是「新東西」（C5）
           const s = this.session();
           const pos = useBell(s, this.registry.get('rng') as Rng);
           if (pos) {
@@ -795,11 +820,16 @@ export class MapScene extends Phaser.Scene {
     this.drawHover(cellPos, s);
   }
 
-  private clearHover() {
+  // alsoClearPreview 預設 true：指標離開棋盤範圍或 phase 不再是 explore 時，金色路線與
+  // 花費標籤（previewG/previewCostText）本來就該跟著 hover 外框一起消失，否則會留下一條
+  // 看不見上下文、卻仍留在畫面上的預覽（C6）。唯一的例外是全域 pointerdown（見該呼叫點），
+  // 那一下可能是確認點擊本身，傳 false 讓預覽狀態撐到 onPointerUp 判斷完再清。
+  private clearHover(alsoClearPreview = true) {
     if (this.hoverCell === null) return;
     this.hoverCell = null;
     this.hoverG.clear();
     this.hoverCostText?.setVisible(false);
+    if (alsoClearPreview) this.clearPreview();
   }
 
   private drawHover(c: Vec2, s: SessionState) {
@@ -814,7 +844,10 @@ export class MapScene extends Phaser.Scene {
       .setPosition(x + cs - 3, y + cs - 3).setVisible(true);
     // 遠處：hover 直接預覽整條路線，桌機玩家不必先點一次
     if (cheb(s.player, c) > 1) this.showPreview(c);
-    else this.previewG.clear();
+    // 相鄰格改呼叫 clearPreview()（而非只清 previewG）：只清圖形會讓 previewPath/
+    // previewTo 繼續留著上一次的遠處路線，形成一條「畫面上看不見卻仍能被確認執行」
+    // 的路線，擴大 C3 的暴露面（C7）
+    else this.clearPreview();
   }
 
   private onPointerUp(p: Phaser.Input.Pointer) {
@@ -864,7 +897,14 @@ export class MapScene extends Phaser.Scene {
     }
     // 遠處：第一次點擊預覽路線與花費，同一格再點一次才走。
     // 觸控裝置沒有 hover，這個兩段式是它唯一能看到花費的機會。
-    if (this.previewTo && key(this.previewTo) === key(cellPos) && this.previewPath) {
+    // 確認前額外驗證路線第一步仍緊鄰玩家（C3）：drawHover→showPreview 不受 walking
+    // 封鎖，自動行走途中滑鼠停在半路格上會用「當下的中途位置」重算一條預覽；若手不動、
+    // 行走因讀到線索而停下，previewPath 仍是那條從舊位置起算、如今第一步已不相鄰的路線。
+    // 不驗證就信任 key 比對，點擊要嘛誤走一條起點不對的路線（若第一步恰好仍相鄰），
+    // 要嘛靜默失效。同一份殘留也會跨場景重啟／跨關卡存活，故不驗證通過時不靜默失敗，
+    // 改當成一次新的預覽請求，讓玩家看到從目前位置重算的路線。
+    if (this.previewTo && key(this.previewTo) === key(cellPos) && this.previewPath
+        && cheb(s.player, this.previewPath[0]) === 1) {
       const path = this.previewPath;
       this.clearPreview();
       this.walkPath(path);
@@ -916,9 +956,6 @@ export class MapScene extends Phaser.Scene {
     }
     const end = pc(path[path.length - 1]);
     this.previewG.fillStyle(color, 0.9).fillCircle(end.x, end.y, cs * 0.18);
-    this.previewCostText ??= this.add.text(0, 0, '', {
-      fontFamily: FONTS.body, fontSize: '13px', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(60);
     this.previewCostText
       .setText(this.i18n().t('hud.pathCost', { n: cost }))
       .setColor(cssHex(color))
@@ -930,12 +967,20 @@ export class MapScene extends Phaser.Scene {
     this.previewPath = null;
     this.previewTo = null;
     this.previewG.clear();
-    this.previewCostText?.setVisible(false);
+    this.previewCostText.setVisible(false);
   }
 
   // 沿預覽路線自動行走。每一步都走既有的 doMove，因此線索判讀、補給、微事件、
   // QTE 觸發與力竭判定全部照常發生——這裡只是替玩家連續按下同一個動作。
   // 停止條件是本任務的核心：一讀到新東西就交還控制權，讓自動化省掉的是搬運而非判斷。
+  // C4：不再用固定計時器猜補間何時結束，改由 doMove 自己在單步完全結束（含線索演出／
+  // 教學／微事件／afterMove）之後喊一聲。舊版用 delayedCall(130, …) 卡在補間的 100ms
+  // 之後，但 Phaser 的 Clock 排在 TweenManager 之前、兩者都掛在 SceneEvents.UPDATE，
+  // 單幀 delta ≥30ms（掉幀，或穩定的 ~30fps／~20fps）時計時器回呼會搶在補間 onComplete
+  // 之前跑：微事件還沒被 rollMicroEvent 遞增，該幀「學到新東西就停」直接失效；且
+  // stepOnce 會在 animating 仍為 true 時提前遞迴進 doMove，那次移動被 doMove 開頭的
+  // 防重入守衛吞掉，但路徑索引已經前進，下一輪目標格離玩家兩格遠，canMove 失敗，
+  // 行走就這樣靜默斷在半路。
   private walkPath(path: Vec2[]) {
     if (this.walking) return;
     this.walking = true;
@@ -947,12 +992,13 @@ export class MapScene extends Phaser.Scene {
       const eventsBefore = s.microEvents;
       const next = path[i++];
       if (!canMove(s, next)) { this.walking = false; return; }
-      this.doMove(next);
-      // doMove 的移動補間為 100ms，等它跑完再決定要不要續走
-      this.time.delayedCall(130, () => {
+      this.doMove(next, () => {
         const now = this.session();
         const learnedSomething = now.readClues.size > readBefore
           || now.microEvents > eventsBefore;
+        // afterMove() 若已切到 Qte／Reveal，s.phase 這裡已經不是 'explore'（move() 內部
+        // 先轉 phase，afterMove 只是照著淡出換場），這個檢查會讓行走自然收尾，
+        // 不必和轉場搶著收拾 walking
         if (now.phase !== 'explore' || learnedSomething) { this.walking = false; return; }
         stepOnce();
       });
@@ -960,7 +1006,11 @@ export class MapScene extends Phaser.Scene {
     stepOnce();
   }
 
-  private doMove(to: Vec2) {
+  // onStepDone 選用：供 walkPath 掛「這一步完全結束」的續走判斷，用完整的步後狀態
+  // （含微事件擲骰與 afterMove 的轉場判斷）決定要不要走下一步。鍵盤移動與單擊相鄰格
+  // 兩個既有呼叫端不傳這個參數，行為不變。回呼固定排在 onComplete 最後一行，
+  // 確保它看到的是這一步全部做完之後的狀態。
+  private doMove(to: Vec2, onStepDone?: () => void) {
     const s = this.session();
     if (this.animating || !canMove(s, to)) return;
     const cs = this.cell;
@@ -1013,6 +1063,7 @@ export class MapScene extends Phaser.Scene {
           if (ev) this.playMicroEvent(ev);
         }
         this.afterMove();
+        onStepDone?.();
       },
     });
   }
