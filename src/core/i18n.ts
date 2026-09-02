@@ -30,6 +30,9 @@ export type MsgKey =
   | 'reveal.noCall' | 'reveal.decoy' | 'reveal.infoAt' | 'reveal.dailyHidden'
   | 'btn.continue'
   | 'help.marks' | 'help.layer' | 'help.reveal'
+  | 'terrain.cliff'
+  | 'hud.survey' | 'hud.surveyCost' | 'hud.pathCost'
+  | 'help.vision' | 'help.survey' | 'help.route'
   | 'score.gain' | 'score.pot' | 'score.lost' | 'btn.bank' | 'btn.push' | 'camp.best' | 'camp.carry';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
@@ -126,6 +129,13 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.marks': 'Mark a cell again and again to cycle it: ruled out, maybe, my call. Your call sets your record quality.',
     'help.layer': 'Layer shades each cell by how many read clues agree. Mark a clue you already read to mute it.',
     'help.reveal': 'Every hunt ends by revealing where it really was and how close your call landed.',
+    'terrain.cliff': 'Cliff — no way through.',
+    'hud.survey': 'Look',
+    'hud.surveyCost': '-{n} to look around',
+    'hud.pathCost': '{n}',
+    'help.vision': 'You only see the ground near you. High ground sees further; thickets close in.',
+    'help.survey': 'Look costs stamina and sweeps the ground around you, uncovering clues you have not walked past.',
+    'help.route': 'Click a distant cell to preview the route and its cost, then click again to walk it. Walking stops the moment you read something new.',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -220,6 +230,13 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.marks': '反覆標記同一格可循環：排除、存疑、押注。押注格決定你的記錄品質。',
     'help.layer': '「圖層」依符合的已判讀線索數為格子上色；標記已判讀的線索可將它靜音。',
     'help.reveal': '每一局結束都會揭曉牠實際在哪，以及你的押注差了幾格。',
+    'terrain.cliff': '崖壁——過不去。',
+    'hud.survey': '眺望',
+    'hud.surveyCost': '眺望 -{n}',
+    'hud.pathCost': '{n}',
+    'help.vision': '你只看得見身邊的地面。高處望得遠，密叢裡看不遠。',
+    'help.survey': '「眺望」消耗體力，掃過身邊一圈地面，找出你還沒走過的線索。',
+    'help.route': '點遠處的格子會先預覽路線與總花費，再點一次才會走。一讀到新東西就會立刻停下。',
   },
 };
 
