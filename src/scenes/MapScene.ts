@@ -61,7 +61,7 @@ export class MapScene extends Phaser.Scene {
   private bellChipText?: Phaser.GameObjects.Text;
   private bellChipX = 0;
   private bellChipY = 0;
-  private chipRowLeft = 0; // chip 列最左緣（熱區圖層 chip 左緣，見 buildHud 的 xHeat）：體力條需與其保持 ≥8px 間距
+  private chipRowLeft = 0; // chip 列最左緣（眺望 chip 左緣，見 buildHud 的 xSurvey）：體力條需與其保持 ≥8px 間距
   private skipFirstRunHelp = false;
   private audio!: AudioBus;
   private tools!: ToolStore;
@@ -1155,8 +1155,8 @@ export class MapScene extends Phaser.Scene {
     const bx = barLeft ? 50 : w / 2 - 105;
     // F6：Math.max(90, ...) 這個下限本身會壓過 Math.min 的夾限——當 chipRowLeft - 8 - bx < 90，
     // 也就是 chipRowLeft < 148（bx=50 時），體力條寬度仍被撐到 90，右緣就超出 chipRowLeft - 8，
-    // 8px 間距保證在此失效。持有微光鈴的 compact（w<560）版面下 chipRowLeft = w - 288
-    // （見 buildHud 的 xHeat 推導），代入 chipRowLeft < 148 得 w < 436，不是 w < 368。
+    // 8px 間距保證在此失效。持有微光鈴的 compact（w<560）版面下 chipRowLeft = w - 356
+    // （見 buildHud 的 xSurvey 推導），代入 chipRowLeft < 148 得 w < 504，不是 w < 436。
     // 行動裝置尚非出貨目標，此處只記正確門檻，不改變數值。
     const bw = barLeft ? Math.max(90, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
     const bh = barLeft ? 10 : 12;
