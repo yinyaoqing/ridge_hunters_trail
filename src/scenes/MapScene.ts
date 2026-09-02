@@ -249,13 +249,17 @@ export class MapScene extends Phaser.Scene {
     if (!this.cursors) return;
     const s = this.session();
     if (s.phase !== 'explore') return;
+    const c = this.cursors;
     const jd = Phaser.Input.Keyboard.JustDown;
-    let to: Vec2 | null = null;
-    if (jd(this.cursors.left)) to = { x: s.player.x - 1, y: s.player.y };
-    else if (jd(this.cursors.right)) to = { x: s.player.x + 1, y: s.player.y };
-    else if (jd(this.cursors.up)) to = { x: s.player.x, y: s.player.y - 1 };
-    else if (jd(this.cursors.down)) to = { x: s.player.x, y: s.player.y + 1 };
-    if (to) this.doMove(to);
+    // 任一方向鍵按下的那一幀才動作（維持既有「一次按鍵走一格」手感）
+    if (!(jd(c.left) || jd(c.right) || jd(c.up) || jd(c.down))) return;
+    // 八方向（A-07）：以「此刻按住」的四鍵合成位移向量，讓「上＋右」這類同時按住的組合
+    // 走對角，與滑鼠點擊的 Chebyshev 相鄰規則一致。原本四方向版本會讓純鍵盤玩家
+    // 走同一段對角路多付約四成體力。
+    const dx = (c.right.isDown ? 1 : 0) - (c.left.isDown ? 1 : 0);
+    const dy = (c.down.isDown ? 1 : 0) - (c.up.isDown ? 1 : 0);
+    if (dx === 0 && dy === 0) return; // 左右或上下同時按住互相抵消
+    this.doMove({ x: s.player.x + dx, y: s.player.y + dy });
   }
 
   private session(): SessionState {
