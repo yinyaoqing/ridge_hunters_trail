@@ -17,6 +17,7 @@ import { ResultScene } from './scenes/ResultScene';
 import { RevealScene } from './scenes/RevealScene';
 import { CodexScene } from './scenes/CodexScene';
 import { HelpScene } from './scenes/HelpScene';
+import { DemoScene } from './scenes/DemoScene';
 
 function safeStorage(): Storage | undefined {
   try {
@@ -34,7 +35,7 @@ function launch(): void {
     height: window.innerHeight,
     backgroundColor: '#131a17',
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [BootScene, CampScene, MapScene, QteScene, RevealScene, ResultScene, CodexScene, HelpScene],
+    scene: [BootScene, CampScene, MapScene, QteScene, RevealScene, ResultScene, CodexScene, HelpScene, DemoScene],
     callbacks: {
       preBoot: (game) => {
         const rng = mulberry32(Date.now() >>> 0);
