@@ -299,13 +299,19 @@ export class ResultScene extends Phaser.Scene {
       // 是因為本畫面的按鈕列已被夾限到 h-34，沒有再加一列的預算（見 F7 的重疊教訓）。
       // 矮視窗下算出來的位置若會碰到次鈕，寧可整個不畫：少一個入口，
       // 好過一個疊在按鈕上的入口——營地工具列與說明頁仍然進得去。
-      const demoLinkY = Math.min(ySecondary + 44, h - 14);
-      if (demoLinkY >= ySecondary + 34) {
+      // 次鈕高 48、中心在 ySecondary，底緣因此在 ySecondary+24。
+      // 連結固定畫在 ySecondary+44，點擊區高 36（英文字串在 420px 寬會折成兩行，
+      // 需要 36 才涵蓋得住），上緣落在 ySecondary+26，離次鈕底緣有 2px。
+      // 不夾限、改為「畫得下才畫」：只要下緣 ySecondary+62 還在畫面內就畫，
+      // 否則整個略過。如此「不與按鈕重疊」與「不超出畫面」都是可證明的，
+      // 而不是靠一個近似的門檻值。
+      const demoLinkY = ySecondary + 44;
+      if (demoLinkY + 18 <= h) {
         this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
           fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
           wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
         }).setOrigin(0.5);
-        this.add.rectangle(cx, demoLinkY, 420, 32, 0, 0)
+        this.add.rectangle(cx, demoLinkY, 420, 36, 0, 0)
           .setInteractive({ useHandCursor: true })
           .on('pointerdown', () => {
             this.scene.launch('Demo', { from: 'Result' });
