@@ -5,7 +5,7 @@ import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { TERRAIN_TYPES } from '../core/types';
 import { key, intersect } from '../core/clues';
-import { cheb, dist, type Vec2 } from '../core/geometry';
+import { cheb, type Vec2 } from '../core/geometry';
 import { rollMicroEvent, type MicroEvent } from '../core/events';
 import type { Clue, TerrainType } from '../core/types';
 import type { Weather } from '../core/weather';
@@ -28,6 +28,7 @@ const BG_KEY = 'map-bg';
 
 export class MapScene extends Phaser.Scene {
   private g!: Phaser.GameObjects.Graphics;
+  private fogG!: Phaser.GameObjects.Graphics; // 迷霧層：蓋在線索與標記之上、玩家層之下
   private pg!: Phaser.GameObjects.Graphics; // 玩家專用層
   private hoverG!: Phaser.GameObjects.Graphics; // hover 高亮專用層（建於 pg 之後，疊在最上層）
   private hoverCostText?: Phaser.GameObjects.Text; // 重用單一 Text，hover 時移動＋顯示，不逐格重建
@@ -116,6 +117,7 @@ export class MapScene extends Phaser.Scene {
     this.buildHud();
     this.heatG = this.add.graphics(); // 熱區在最底層，不遮蔽線索覆蓋層與標記
     this.g = this.add.graphics();
+    this.fogG = this.add.graphics(); // 迷霧蓋在線索與標記之上、玩家層之下
     this.pg = this.add.graphics();
     this.hoverG = this.add.graphics(); // 建於 pg 之後，確保 hover 外框畫在玩家層之上
     this.hoverCostText = this.add.text(0, 0, '', {
@@ -158,18 +160,15 @@ export class MapScene extends Phaser.Scene {
     this.tutStep = (!done && s.mode === 'run' && s.round === 1 && s.phase === 'explore') ? 0 : -1;
   }
 
-  // 引導 step0：高亮離玩家最近的未讀真線索（round1 無幌子，全部皆為真線索）＋顯示引導字
+  // 引導 step0：高亮起始蹤跡（generate 保證它是真線索且開局即可見）
   private startTutStep0(s: SessionState) {
-    const unread = s.level.clues.filter((c) => !c.isDecoy && !s.readClues.has(key(c.position)));
-    if (unread.length === 0) return; // 防禦：理論上不會發生（round1 一定有未讀真線索）
-    let nearest = unread[0];
-    let best = dist(s.player, nearest.position);
-    for (const c of unread.slice(1)) {
-      const d = dist(s.player, c.position);
-      if (d < best) { best = d; nearest = c; }
-    }
+    const nearest = s.level.clues[s.level.trailheadIndex];
+    if (s.readClues.has(key(nearest.position))) return; // 防禦：已讀就不再引導
     const cs = this.cell;
-    const p = { x: this.ox + nearest.position.x * cs + cs / 2, y: this.oy + nearest.position.y * cs + cs / 2 };
+    const p = {
+      x: this.ox + nearest.position.x * cs + cs / 2,
+      y: this.oy + nearest.position.y * cs + cs / 2,
+    };
     pulseHighlight(this, p.x, p.y, cs * 0.6, this.pal.gold);
     this.showTut('tut.move');
   }
@@ -738,6 +737,8 @@ export class MapScene extends Phaser.Scene {
     if (!cellPos) return;
     const wantMark = (p.event as MouseEvent).shiftKey || this.markMode || held >= 350;
     if (wantMark) {
+      // 沒看過的地不能標記：玩家還不知道那裡有什麼，標了也只是猜
+      if (!s.seen.has(key(cellPos))) return;
       // 已判讀的線索格：標記手勢改為切換該線索的靜音（在該格上做標記本來就沒有意義，
       // 而「暫時拿掉這條線索看看」是玩家最需要的假說檢驗動作——診斷 B-03）
       // 同格可能不只一條線索（F1）：切換全部索引，不然斜槓／覆蓋層／熱度三者會不同步。
@@ -981,14 +982,17 @@ export class MapScene extends Phaser.Scene {
     }
 
     L.supplies.forEach((sup, i) => {
+      if (!s.seen.has(key(sup))) return;
       const p = px(sup);
       drawSupply(this.g, p.x, p.y, cs, sup.x + sup.y + i, pal);
     });
 
     L.clues.forEach((c, i) => {
+      if (!s.seen.has(key(c.position))) return;
       if (s.readClues.has(key(c.position)) && !s.mutedClues.has(i)) this.drawClueOverlay(c, px);
     });
     L.clues.forEach((c, i) => {
+      if (!s.seen.has(key(c.position))) return;
       const p = px(c.position);
       const r = Math.max(8, cs * 0.34);
       drawClueToken(this.g, p.x, p.y, r, c.type, pal);
@@ -1018,6 +1022,16 @@ export class MapScene extends Phaser.Scene {
         this.g.lineStyle(2.6, pal.gold, 1).strokeCircle(p.x, p.y, r);
         this.g.lineStyle(1.4, pal.gold, 0.7).strokeCircle(p.x, p.y, r * 0.55);
         this.g.fillStyle(pal.gold, 1).fillCircle(p.x, p.y, r * 0.2);
+      }
+    }
+
+    // 迷霧：沒看過的地面壓暗。不是全黑——地形輪廓仍隱約可見，
+    // 玩家才能規劃「往那片高地走」，而不是對著一片黑猜。
+    this.fogG.clear();
+    for (let y = 0; y < L.mapSize; y++) {
+      for (let x = 0; x < L.mapSize; x++) {
+        if (s.seen.has(key({ x, y }))) continue;
+        this.fogG.fillStyle(0x000000, 0.62).fillRect(this.ox + x * cs, this.oy + y * cs, cs, cs);
       }
     }
 
