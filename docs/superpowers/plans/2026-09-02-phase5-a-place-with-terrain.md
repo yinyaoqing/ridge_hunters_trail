@@ -1044,7 +1044,7 @@ Task 6、10、11、13 需要的所有面向玩家文字，一次補齊。
 - Modify: `src/core/i18n.ts`
 
 **Interfaces:**
-- Produces: `terrain.cliff`、`hud.survey`、`hud.surveyCost`、`hud.pathCost`、`help.vision`、`help.survey`、`help.route`、`reveal.unseen`
+- Produces: `terrain.cliff`、`hud.survey`、`hud.surveyCost`、`hud.pathCost`、`help.vision`、`help.survey`、`help.route`
 
 - [ ] **Step 1: 擴充 MsgKey 聯集**
 
