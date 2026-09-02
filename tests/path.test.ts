@@ -106,6 +106,37 @@ describe('findPath: only routes over ground the player has seen', () => {
   });
 });
 
+describe('findPath: handles ragged grids with per-row bounds', () => {
+  // 非方陣時 x 邊界應看「該列自己的」長度，不是全局的第一列長度。
+  // 否則：
+  // - 第一列短、後列長時：後列的有效格會被誤判為越界（BLOCKED）
+  // - 第一列長、後列短時：後列超出其範圍的位置會讀到 undefined（BUG）
+  it('routes correctly when a row is shorter than the first row', () => {
+    // 第一列 4 格，第二列 6 格。目標在第二列超出第一列範圍的位置。
+    const t: TerrainType[][] = [
+      ['meadow', 'meadow', 'meadow', 'meadow'],
+      ['meadow', 'meadow', 'meadow', 'meadow', 'meadow', 'meadow'],
+    ];
+    const seen = seenAll(t);
+    // 起點 (0,0)，目標 (5,1) ——在第二列內但超出第一列的 4 格
+    const p = findPath(t, { x: 0, y: 0 }, { x: 5, y: 1 }, seen);
+    expect(p).not.toBeNull();
+    expect(p![p!.length - 1]).toEqual({ x: 5, y: 1 });
+  });
+
+  it('refuses to route to a cell beyond a shorter row', () => {
+    // 第一列 6 格，第二列 4 格。試圖尋路到第二列超出其範圍的位置。
+    const t: TerrainType[][] = [
+      ['meadow', 'meadow', 'meadow', 'meadow', 'meadow', 'meadow'],
+      ['meadow', 'meadow', 'meadow', 'meadow'],
+    ];
+    const seen = seenAll(t);
+    // 起點 (0,0)，目標 (5,1) ——在第一列內但超出第二列的 4 格，應回傳 null
+    const p = findPath(t, { x: 0, y: 0 }, { x: 5, y: 1 }, seen);
+    expect(p).toBeNull();
+  });
+});
+
 describe('pathCost', () => {
   it('sums the cost of each entered cell, ignoring the origin', () => {
     const t = grid(['.tr']);

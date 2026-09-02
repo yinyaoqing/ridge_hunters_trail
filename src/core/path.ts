@@ -14,12 +14,14 @@ import type { TerrainType } from './types';
 export function findPath(
   terrain: TerrainType[][], from: Vec2, to: Vec2, seen: Set<string>,
 ): Vec2[] | null {
-  // 寬高分開算，不假設方陣：實際地圖固定 25×25，但這裡不依賴那個假設，
-  // 免得日後有非方陣的呼叫端（例如測試用的示意小圖）被錯誤地截斷。
+  // 高用列數、寬用「該列自己的」長度，不共用同一個 size。否則非方陣網格
+  // 會把 x 也夾在列數以內，漏掉整張圖的一部分；或反之讀到 undefined（reach.ts 同理）。
   const height = terrain.length;
-  const width = terrain[0]?.length ?? 0;
-  if (to.x < 0 || to.y < 0 || to.x >= width || to.y >= height) return null;
-  if (!seen.has(key(to)) || !isPassable(terrain[to.y][to.x])) return null;
+  if (to.y < 0 || to.y >= height) return null;
+  const toRow = terrain[to.y];
+  if (!toRow) return null;
+  if (to.x < 0 || to.x >= toRow.length) return null;
+  if (!seen.has(key(to)) || !isPassable(toRow[to.x])) return null;
   if (from.x === to.x && from.y === to.y) return [];
 
   const startKey = key(from);
@@ -51,10 +53,13 @@ export function findPath(
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue;
         const q = { x: p.x + dx, y: p.y + dy };
-        if (q.x < 0 || q.y < 0 || q.x >= width || q.y >= height) continue;
+        // y 邊界看列數、x 邊界看「該列自己的」長度——不可共用同一個 size
+        if (q.y < 0 || q.y >= height) continue;
+        const qRow = terrain[q.y];
+        if (!qRow || q.x < 0 || q.x >= qRow.length) continue;
         const qk = key(q);
         if (!seen.has(qk)) continue; // 沒看過的地不能拿來規劃路線
-        const t = terrain[q.y][q.x];
+        const t = qRow[q.x];
         if (!isPassable(t)) continue;
         const tentative = pg + TERRAIN_COST[t];
         if (tentative >= (gScore.get(qk) ?? Infinity)) continue;
