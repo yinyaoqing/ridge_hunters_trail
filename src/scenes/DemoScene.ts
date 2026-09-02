@@ -9,7 +9,9 @@ import type { MarkMap } from '../core/marks';
 import {
   DEMO_SIZE, DEMO_CLUES, DEMO_PAIR, DEMO_TARGET, DEMO_STEPS, demoUnseen, type DemoStep,
 } from '../core/demo';
-import { cssHex, FONTS, displayFont, drawClueToken, drawClueOverlay, drawMark } from './paint';
+import {
+  cssHex, FONTS, displayFont, drawClueToken, drawClueOverlay, drawMark, stripBrackets, BRUSH_RADIUS,
+} from './paint';
 
 type DemoFrom = 'Camp' | 'Map' | 'Result';
 
@@ -32,6 +34,11 @@ export class DemoScene extends Phaser.Scene {
   private excluded: Vec2 | null = null;
   // 已完成的動手步驟索引。用它讓「上一步」回頭後不必重做一次同樣的動作。
   private done = new Set<number>();
+  private prevG!: Phaser.GameObjects.Graphics;
+  private prevTxt!: Phaser.GameObjects.Text;
+  private nextG!: Phaser.GameObjects.Graphics;
+  private nextTxt!: Phaser.GameObjects.Text;
+  private navY = 0;
 
   constructor() {
     super('Demo');
@@ -113,6 +120,26 @@ export class DemoScene extends Phaser.Scene {
       fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.mark),
       wordWrap: { width: pw - 56, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
     }).setOrigin(0.5, 0);
+
+    // 導覽列：面板底部，上一步／下一步各半。關閉走右上角的 X 或 ESC。
+    this.navY = py0 + ph - 34;
+    const nbw = 150;
+    const nbh = 42;
+    this.prevG = this.add.graphics();
+    this.prevTxt = this.add.text(cx - 82, this.navY, stripBrackets(i18n.t('btn.prev')).toUpperCase(), {
+      fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.gold),
+    }).setOrigin(0.5).setLetterSpacing(2);
+    this.add.rectangle(cx - 82, this.navY, nbw, Math.max(nbh, 44), 0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.goto(this.step - 1));
+
+    this.nextG = this.add.graphics();
+    this.nextTxt = this.add.text(cx + 82, this.navY, stripBrackets(i18n.t('btn.next')).toUpperCase(), {
+      fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.bg), fontStyle: 'bold',
+    }).setOrigin(0.5).setLetterSpacing(2);
+    this.add.rectangle(cx + 82, this.navY, nbw, Math.max(nbh, 44), 0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.goto(this.step + 1));
 
     this.render();
 
@@ -230,6 +257,50 @@ export class DemoScene extends Phaser.Scene {
       i18n.t('demo.progress', { n: this.step + 1, total: DEMO_STEPS.length }));
     this.narrationText.setText(i18n.t(step.narration, step.vars));
     this.hintText.setText('');
+    this.drawNav();
+  }
+
+  // 動手步驟必須先完成才放行。做過一次之後(this.done 記著)，
+  // 回頭再前進就不必重做——玩家用「上一步」回去看畫面是常態，
+  // 不該因此被罰再操作一次。
+  private canAdvance(): boolean {
+    const step = DEMO_STEPS[this.step];
+    return !step.action || this.done.has(this.step);
+  }
+
+  private goto(i: number) {
+    if (i < 0 || i >= DEMO_STEPS.length) return;
+    if (i > this.step && !this.canAdvance()) return;
+    this.step = i;
+    this.render();
+  }
+
+  // 導覽鈕外觀：下一步在不可前進時以描邊＋暗色呈現，明確表示「還有事要做」。
+  private drawNav() {
+    const pal = this.pal;
+    const cx = this.scale.width / 2;
+    const nbw = 150;
+    const nbh = 42;
+    const box = (x: number) => ({ x: x - nbw / 2, y: this.navY - nbh / 2, w: nbw, h: nbh });
+
+    const pb = box(cx - 82);
+    this.prevG.clear();
+    const canBack = this.step > 0;
+    this.prevG.lineStyle(1.5, pal.gold, canBack ? 0.65 : 0.15)
+      .strokeRoundedRect(pb.x, pb.y, pb.w, pb.h, BRUSH_RADIUS);
+    this.prevTxt.setColor(cssHex(pal.gold)).setAlpha(canBack ? 1 : 0.3);
+
+    const nb = box(cx + 82);
+    const last = this.step === DEMO_STEPS.length - 1;
+    const open = this.canAdvance() && !last;
+    this.nextG.clear();
+    if (open) {
+      this.nextG.fillStyle(pal.gold, 0.92).fillRoundedRect(nb.x, nb.y, nb.w, nb.h, BRUSH_RADIUS);
+      this.nextTxt.setColor(cssHex(pal.bg)).setAlpha(1);
+    } else {
+      this.nextG.lineStyle(1.5, pal.gold, 0.15).strokeRoundedRect(nb.x, nb.y, nb.w, nb.h, BRUSH_RADIUS);
+      this.nextTxt.setColor(cssHex(pal.gold)).setAlpha(0.3);
+    }
   }
 
   private close() {
