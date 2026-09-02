@@ -136,7 +136,7 @@ export const DEMO_STEPS: readonly DemoStep[] = [
   },
   {
     chapter: 4, narration: 'demo.s11',
-    clues: [0, 1, 2], muted: [DECOY_INDEX], overlay: 'heat', seen: 'all', player: DEMO_MID,
+    clues: [0, 1, 2, 3], muted: [DECOY_INDEX], overlay: 'heat', seen: 'all', player: DEMO_MID,
     autoSuspect: true,
   },
   {

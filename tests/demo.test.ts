@@ -143,11 +143,25 @@ describe('demo script', () => {
     }
   });
 
-  it('reveals the fourth clue only after the survey step lifts the fog', () => {
-    const firstWithClue3 = DEMO_STEPS.findIndex((s) => s.clues.includes(3));
-    const firstAllSeen = DEMO_STEPS.findIndex((s) => s.seen === 'all');
-    expect(firstAllSeen).toBeGreaterThan(0);
-    expect(firstWithClue3).toBeGreaterThan(firstAllSeen);
+  it('never reads the fourth clue while it is still under fog', () => {
+    // 第四條線索的存在感就是眺望的報酬。若腳本讓它在退霧之前就被讀到，
+    // 第 11 步的旁白（「霧退開，第四條線索浮了出來」）就會變成空話。
+    // 用「凡是讀到它的步驟，霧必定已退」而非比較首次出現的索引——
+    // 前者允許兩件事發生在同一步，後者會誤把那種正確的腳本判成錯的。
+    expect(DEMO_STEPS.some((s) => s.clues.includes(3))).toBe(true);
+    for (const step of DEMO_STEPS) {
+      if (step.clues.includes(3)) expect(step.seen).toBe('all');
+    }
+  });
+
+  it('never declares an overlay with no live clue to draw it from', () => {
+    // overlay 不是 'none' 卻沒有任何未靜音的已讀線索時，畫面會是一片空白，
+    // 而旁白照樣宣稱玩家看得到東西。
+    for (const step of DEMO_STEPS) {
+      if (step.overlay === 'none') continue;
+      const live = step.clues.filter((i) => !step.muted.includes(i));
+      expect(live.length).toBeGreaterThan(0);
+    }
   });
 
   it('moves the player to the overlap before the survey', () => {
