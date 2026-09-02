@@ -1,6 +1,7 @@
-import { intersect } from './clues';
+import { candidates, intersect } from './clues';
 import type { Vec2 } from './geometry';
 import type { Clue } from './types';
+import type { MsgKey } from './i18n';
 
 // 示範關卡：固定、可驗證、與真實關卡同一套規則。
 // 9×9 而非真實的 15/20/25——示範要教的是推理，不是耐力，小圖才看得完整張。
@@ -57,3 +58,101 @@ export const DEMO_CLUES: readonly Clue[] = [
 // 前兩條線索的交集（11 格）。腳本的旁白數字、第二章的自動存疑標記、
 // 以及 DEMO_MID 的位置驗證都讀它——單一來源，不手寫 11。
 export const DEMO_PAIR: Set<string> = intersect([DEMO_CLUES[0], DEMO_CLUES[1]], DEMO_SIZE);
+
+// 三個動手點。它們各自對應遊戲裡最容易被完全錯過的功能：
+// 排除標記、線索靜音、押注。靜音尤其——它目前只存在於說明頁一行字裡，
+// 沒人教就永遠不會有人用。
+export type DemoAction = 'exclude' | 'mute' | 'wager';
+
+export interface DemoStep {
+  chapter: 1 | 2 | 3 | 4;
+  narration: MsgKey;
+  // 旁白裡的數字。全部由 candidates()/intersect() 於模組載入時算出，一個都不手寫——
+  // 文案與畫面因此在結構上不可能對不上（tests/demo.test.ts 有佔位符對稱測試把關）。
+  vars?: Record<string, number>;
+  clues: readonly number[];   // 本步已判讀的線索索引
+  muted: readonly number[];   // 本步已靜音的線索索引（必為 clues 的子集）
+  overlay: 'none' | 'heat' | 'intersect';
+  seen: 'near' | 'all';       // 'near' = 最上兩列仍是未探索的暗區
+  player: Vec2;
+  autoSuspect?: true;         // 為真時，DEMO_PAIR 的 11 格自動標成存疑
+  action?: DemoAction;        // 有值時，此步必須玩家動手才能前進
+}
+
+const TOTAL_CELLS = DEMO_SIZE * DEMO_SIZE;
+const CONE = candidates(DEMO_CLUES[0], DEMO_SIZE);
+
+export const DEMO_STEPS: readonly DemoStep[] = [
+  // 第一章：一條線索只會排除
+  {
+    chapter: 1, narration: 'demo.s1', vars: { n: TOTAL_CELLS },
+    clues: [], muted: [], overlay: 'none', seen: 'near', player: DEMO_START,
+  },
+  {
+    chapter: 1, narration: 'demo.s2', vars: { n: CONE.size },
+    clues: [0], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+  },
+  {
+    chapter: 1, narration: 'demo.s3', vars: { n: TOTAL_CELLS - CONE.size },
+    clues: [0], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+    action: 'exclude',
+  },
+  // 第二章：交集才是答案
+  {
+    chapter: 2, narration: 'demo.s4', vars: { n: DEMO_SCENT_DISTANCE },
+    clues: [0, 1], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+  },
+  {
+    chapter: 2, narration: 'demo.s5', vars: { n: DEMO_PAIR.size },
+    clues: [0, 1], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+    autoSuspect: true,
+  },
+  // 第三章：落單的那條在說謊
+  {
+    chapter: 3, narration: 'demo.s6',
+    clues: [0, 1, 2], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+    autoSuspect: true,
+  },
+  {
+    chapter: 3, narration: 'demo.s7',
+    clues: [0, 1, 2], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+    autoSuspect: true,
+  },
+  {
+    chapter: 3, narration: 'demo.s8', vars: { n: DEMO_PAIR.size },
+    clues: [0, 1, 2], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+    autoSuspect: true,
+  },
+  {
+    chapter: 3, narration: 'demo.s9',
+    clues: [0, 1, 2], muted: [], overlay: 'heat', seen: 'near', player: DEMO_START,
+    autoSuspect: true, action: 'mute',
+  },
+  // 第四章：眺望，然後押注
+  {
+    chapter: 4, narration: 'demo.s10', vars: { n: DEMO_PAIR.size },
+    clues: [0, 1, 2], muted: [DECOY_INDEX], overlay: 'heat', seen: 'near', player: DEMO_MID,
+    autoSuspect: true,
+  },
+  {
+    chapter: 4, narration: 'demo.s11',
+    clues: [0, 1, 2], muted: [DECOY_INDEX], overlay: 'heat', seen: 'all', player: DEMO_MID,
+    autoSuspect: true,
+  },
+  {
+    chapter: 4, narration: 'demo.s12',
+    clues: [0, 1, 2, 3], muted: [DECOY_INDEX], overlay: 'intersect', seen: 'all', player: DEMO_MID,
+    autoSuspect: true,
+  },
+  {
+    chapter: 4, narration: 'demo.s13',
+    clues: [0, 1, 2, 3], muted: [DECOY_INDEX], overlay: 'intersect', seen: 'all', player: DEMO_MID,
+    autoSuspect: true, action: 'wager',
+  },
+  // 揭曉獨立成一步，而不是塞進押注的回呼裡：每一步恰好對應一個顯示狀態，
+  // 渲染因此可以是 render(stepIndex) 的純函式，上一步／下一步不會累積狀態漂移。
+  {
+    chapter: 4, narration: 'demo.s14',
+    clues: [0, 1, 2, 3], muted: [DECOY_INDEX], overlay: 'intersect', seen: 'all', player: DEMO_MID,
+  },
+];

@@ -3,7 +3,9 @@ import { candidates, intersect, key } from '../src/core/clues';
 import { heatMap, maxHeat } from '../src/core/deduction';
 import {
   DEMO_SIZE, DEMO_START, DEMO_TARGET, DEMO_MID, DEMO_CLUES, DECOY_INDEX, DEMO_PAIR,
+  DEMO_STEPS, type DemoStep,
 } from '../src/core/demo';
+import { STRINGS } from '../src/core/i18n';
 
 const real = DEMO_CLUES.filter((c) => !c.isDecoy);
 const decoy = DEMO_CLUES[DECOY_INDEX];
@@ -42,7 +44,6 @@ describe('demo level', () => {
 describe('demo level: chapter 2 — the overlap is the answer', () => {
   it('narrows to 11 cells once the first two clues are read', () => {
     expect(DEMO_PAIR.size).toBe(11);
-    expect(DEMO_PAIR).toEqual(intersect([DEMO_CLUES[0], DEMO_CLUES[1]], DEMO_SIZE));
   });
 });
 
@@ -69,5 +70,90 @@ describe('demo level: chapter 3 — the odd one out is the liar', () => {
 describe('demo level: chapter 4 — it converges', () => {
   it('collapses to exactly the target once all three honest clues are in', () => {
     expect(intersect(real, DEMO_SIZE)).toEqual(new Set([key(DEMO_TARGET)]));
+  });
+});
+
+describe('demo script', () => {
+  it('is exactly fourteen steps', () => {
+    expect(DEMO_STEPS).toHaveLength(14);
+  });
+
+  it('walks the four chapters in order without going back', () => {
+    const chapters = DEMO_STEPS.map((s) => s.chapter);
+    expect(chapters[0]).toBe(1);
+    expect(chapters[chapters.length - 1]).toBe(4);
+    for (let i = 1; i < chapters.length; i++) {
+      expect(chapters[i]).toBeGreaterThanOrEqual(chapters[i - 1]);
+      expect(chapters[i] - chapters[i - 1]).toBeLessThanOrEqual(1);
+    }
+    expect(new Set(chapters)).toEqual(new Set([1, 2, 3, 4]));
+  });
+
+  it('only ever references clues that exist, and only mutes ones already read', () => {
+    for (const step of DEMO_STEPS) {
+      for (const i of step.clues) {
+        expect(i).toBeGreaterThanOrEqual(0);
+        expect(i).toBeLessThan(DEMO_CLUES.length);
+      }
+      for (const i of step.muted) expect(step.clues).toContain(i);
+      expect(new Set(step.clues).size).toBe(step.clues.length);
+    }
+  });
+
+  it('never un-reads a clue', () => {
+    // 課程是單向累積的。若某一步的已讀集合比前一步小，代表腳本寫錯了，
+    // 而畫面上會表現為「線索憑空消失」——玩家只會覺得程式壞了。
+    for (let i = 1; i < DEMO_STEPS.length; i++) {
+      for (const c of DEMO_STEPS[i - 1].clues) expect(DEMO_STEPS[i].clues).toContain(c);
+    }
+  });
+
+  it('only ever mutes the decoy', () => {
+    for (const step of DEMO_STEPS) {
+      for (const i of step.muted) expect(i).toBe(DECOY_INDEX);
+    }
+  });
+
+  it('has exactly three hands-on beats, in the taught order', () => {
+    const actions = DEMO_STEPS.map((s) => s.action).filter(Boolean);
+    expect(actions).toEqual(['exclude', 'mute', 'wager']);
+  });
+
+  it('gives every step a narration string in both locales', () => {
+    for (const step of DEMO_STEPS) {
+      for (const loc of ['en', 'zh-TW'] as const) {
+        expect(STRINGS[loc][step.narration].length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('never uses the same narration twice', () => {
+    const keys = DEMO_STEPS.map((s) => s.narration);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('pairs every {n} placeholder with a vars value, in both locales', () => {
+    // 這條測試是「文案與畫面在結構上不可能對不上」的實際保證：
+    // 有 vars 卻沒有佔位符 → 算出來的數字不會被顯示；
+    // 有佔位符卻沒有 vars → 玩家會看到字面的「{n}」。
+    for (const step of DEMO_STEPS) {
+      for (const loc of ['en', 'zh-TW'] as const) {
+        expect(/\{n\}/.test(STRINGS[loc][step.narration])).toBe(step.vars !== undefined);
+      }
+    }
+  });
+
+  it('reveals the fourth clue only after the survey step lifts the fog', () => {
+    const firstWithClue3 = DEMO_STEPS.findIndex((s) => s.clues.includes(3));
+    const firstAllSeen = DEMO_STEPS.findIndex((s) => s.seen === 'all');
+    expect(firstAllSeen).toBeGreaterThan(0);
+    expect(firstWithClue3).toBeGreaterThan(firstAllSeen);
+  });
+
+  it('moves the player to the overlap before the survey', () => {
+    const firstMid = DEMO_STEPS.findIndex((s) => s.player === DEMO_MID);
+    const firstAllSeen = DEMO_STEPS.findIndex((s) => s.seen === 'all');
+    expect(firstMid).toBeGreaterThan(0);
+    expect(firstMid).toBeLessThanOrEqual(firstAllSeen);
   });
 });
