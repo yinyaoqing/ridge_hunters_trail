@@ -3,9 +3,10 @@ import { candidates, intersect, key } from '../src/core/clues';
 import { heatMap, maxHeat } from '../src/core/deduction';
 import {
   DEMO_SIZE, DEMO_START, DEMO_TARGET, DEMO_MID, DEMO_CLUES, DECOY_INDEX, DEMO_PAIR,
-  DEMO_STEPS, type DemoStep,
+  DEMO_STEPS, type DemoStep, demoUnseen, checkCellAction, checkMuteAction,
 } from '../src/core/demo';
 import { STRINGS } from '../src/core/i18n';
+import { parseKey } from '../src/core/marks';
 
 const real = DEMO_CLUES.filter((c) => !c.isDecoy);
 const decoy = DEMO_CLUES[DECOY_INDEX];
@@ -169,5 +170,74 @@ describe('demo script', () => {
     const firstAllSeen = DEMO_STEPS.findIndex((s) => s.seen === 'all');
     expect(firstMid).toBeGreaterThan(0);
     expect(firstMid).toBeLessThanOrEqual(firstAllSeen);
+  });
+});
+
+describe('demoUnseen', () => {
+  const nearStep = DEMO_STEPS.find((s) => s.seen === 'near')!;
+  const allStep = DEMO_STEPS.find((s) => s.seen === 'all')!;
+
+  it('hides the fourth clue before the survey', () => {
+    expect(demoUnseen(nearStep).has(key(DEMO_CLUES[3].position))).toBe(true);
+  });
+
+  it('never hides any of the eleven overlap cells', () => {
+    // 第二、三章整章都在講那 11 格。若迷霧蓋掉其中任何一格，
+    // 玩家會在畫面上看到與旁白不同的數字。
+    const unseen = demoUnseen(nearStep);
+    for (const k of DEMO_PAIR) expect(unseen.has(k)).toBe(false);
+  });
+
+  it('never hides the target, the start, or the mid-walk position', () => {
+    const unseen = demoUnseen(nearStep);
+    for (const p of [DEMO_TARGET, DEMO_START, DEMO_MID]) expect(unseen.has(key(p))).toBe(false);
+  });
+
+  it('hides nothing once the survey has run', () => {
+    expect(demoUnseen(allStep).size).toBe(0);
+  });
+});
+
+describe('checkCellAction: exclude', () => {
+  it('accepts a cell outside the cone', () => {
+    expect(checkCellAction('exclude', { x: 0, y: 0 })).toBe(null);
+  });
+
+  it('rejects a cell inside the cone and says why', () => {
+    const inside = parseKey([...candidates(DEMO_CLUES[0], DEMO_SIZE)][0]);
+    expect(checkCellAction('exclude', inside)).toBe('demo.hint.exclude');
+  });
+
+  it('rejects excluding the target, which is inside the cone', () => {
+    expect(checkCellAction('exclude', DEMO_TARGET)).toBe('demo.hint.exclude');
+  });
+});
+
+describe('checkCellAction: wager', () => {
+  it('accepts the target', () => {
+    expect(checkCellAction('wager', DEMO_TARGET)).toBe(null);
+  });
+
+  it('rejects a cell that is merely in the overlap', () => {
+    // 最容易踩的錯：玩家點了 11 格裡的另一格。這條確保提示會出現，而不是靜默接受。
+    const other = parseKey([...DEMO_PAIR].find((k) => k !== key(DEMO_TARGET))!);
+    expect(checkCellAction('wager', other)).toBe('demo.hint.wager');
+  });
+
+  it('rejects an empty cell', () => {
+    expect(checkCellAction('wager', { x: 0, y: 0 })).toBe('demo.hint.wager');
+  });
+});
+
+describe('checkMuteAction', () => {
+  it('accepts the decoy', () => {
+    expect(checkMuteAction(DECOY_INDEX)).toBe(null);
+  });
+
+  it('rejects every honest clue', () => {
+    for (let i = 0; i < DEMO_CLUES.length; i++) {
+      if (i === DECOY_INDEX) continue;
+      expect(checkMuteAction(i)).toBe('demo.hint.mute');
+    }
   });
 });

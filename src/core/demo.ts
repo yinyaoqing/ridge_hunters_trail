@@ -1,4 +1,4 @@
-import { candidates, intersect } from './clues';
+import { candidates, intersect, key } from './clues';
 import type { Vec2 } from './geometry';
 import type { Clue } from './types';
 import type { MsgKey } from './i18n';
@@ -156,3 +156,32 @@ export const DEMO_STEPS: readonly DemoStep[] = [
     clues: [0, 1, 2, 3], muted: [DECOY_INDEX], overlay: 'intersect', seen: 'all', player: DEMO_MID,
   },
 ];
+
+// 迷霧：示範不重現 vision.ts 的視野規則——那是 help.vision 的職責，在這裡只會分散注意力。
+// 迷霧在此只需成立一件事：第四條線索藏在你看不見的地方。因此直接以最上面兩列為未探索區，
+// 它剛好涵蓋線索 3 的 (6,0)，且完全不觸及 11 格交集區（其最小 y 為 2）——兩者皆有測試把關。
+export const DEMO_FOG_ROWS = 2;
+
+export function demoUnseen(step: DemoStep): Set<string> {
+  const out = new Set<string>();
+  if (step.seen === 'all') return out;
+  for (let y = 0; y < DEMO_FOG_ROWS; y++) {
+    for (let x = 0; x < DEMO_SIZE; x++) out.add(key({ x, y }));
+  }
+  return out;
+}
+
+// 動手點驗證。回傳 null 表示接受，否則回傳該顯示的提示 MsgKey。
+// 拆成兩個函式而非一個吃 `Vec2 | number` 的聯集——格子動作與線索動作本來就是
+// 不同的東西，讓型別替呼叫端擋掉傳錯的參數。
+//
+// 排除只接受錐形外的格子：這一步要教的正是「線索的作用是排除」，
+// 點進錐形內就代表這件事還沒學會，此時給提示比給通過更有價值。
+export function checkCellAction(action: 'exclude' | 'wager', cell: Vec2): MsgKey | null {
+  if (action === 'exclude') return CONE.has(key(cell)) ? 'demo.hint.exclude' : null;
+  return key(cell) === key(DEMO_TARGET) ? null : 'demo.hint.wager';
+}
+
+export function checkMuteAction(clueIndex: number): MsgKey | null {
+  return clueIndex === DECOY_INDEX ? null : 'demo.hint.mute';
+}
