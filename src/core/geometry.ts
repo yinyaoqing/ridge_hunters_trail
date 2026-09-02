@@ -28,3 +28,23 @@ export function pointOnCircle(center: Vec2, radius: number, deg: number): Vec2 {
   const rad = (deg * Math.PI) / 180;
   return { x: center.x + radius * Math.cos(rad), y: center.y + radius * Math.sin(rad) };
 }
+
+// 兩點間的整數格連線（含端點），相鄰兩格恆為 Chebyshev 相鄰——
+// 與玩家的八方向移動規則一致，因此挖出來的通道保證走得通。
+export function bresenham(a: Vec2, b: Vec2): Vec2[] {
+  const out: Vec2[] = [];
+  let x = a.x;
+  let y = a.y;
+  const dx = Math.abs(b.x - x);
+  const dy = Math.abs(b.y - y);
+  const sx = x < b.x ? 1 : -1;
+  const sy = y < b.y ? 1 : -1;
+  let err = dx - dy;
+  for (;;) {
+    out.push({ x, y });
+    if (x === b.x && y === b.y) return out;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+}

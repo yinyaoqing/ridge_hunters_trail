@@ -7,6 +7,7 @@ import { dist, angleDiff, angleDeg } from '../src/core/geometry';
 import { CREATURES } from '../src/data/creatures';
 import { applyQuirk } from '../src/core/quirks';
 import { applyWeather } from '../src/core/weather';
+import { reachableFrom } from '../src/core/reach';
 
 describe('generateLevel (property tests over 200 seeds)', () => {
   const cases = Array.from({ length: 200 }, (_, i) => ({
@@ -141,5 +142,34 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     expect(IRIS_RATE).toBeCloseTo(0.05);
     expect(rate).toBeGreaterThanOrEqual(0.02);
     expect(rate).toBeLessThanOrEqual(0.09);
+  });
+});
+
+describe('generateLevel: physical reachability', () => {
+  it('every clue, supply and the target is walkable from the spawn corner', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const round of [1, 5, 9]) {
+        const level = generateLevel(round, mulberry32(seed));
+        const s = level.mapSize - 1;
+        const corners = [{ x: 0, y: 0 }, { x: s, y: 0 }, { x: 0, y: s }, { x: s, y: s }];
+        const start = corners.reduce((a, b) =>
+          (dist(b, level.targetPos) > dist(a, level.targetPos) ? b : a));
+        const seen = reachableFrom(level.terrain, start);
+        expect(seen.has(key(level.targetPos))).toBe(true);
+        for (const c of level.clues) expect(seen.has(key(c.position))).toBe(true);
+        for (const p of level.supplies) expect(seen.has(key(p))).toBe(true);
+      }
+    }
+  });
+
+  it('never places the target on an impassable cell', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const level = generateLevel(5, mulberry32(seed));
+      expect(level.terrain[level.targetPos.y][level.targetPos.x]).not.toBe('cliff');
+    }
+  });
+
+  it('stays deterministic for a given seed', () => {
+    expect(generateLevel(5, mulberry32(33))).toEqual(generateLevel(5, mulberry32(33)));
   });
 });

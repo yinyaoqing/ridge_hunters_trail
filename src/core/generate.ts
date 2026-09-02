@@ -1,9 +1,11 @@
 import { randInt, pickWeighted, type Rng } from './rng';
 import { dist, clampToMap, angleDeg, pointOnCircle, type Vec2 } from './geometry';
-import type { Clue, ClueType, Level, TerrainType } from './types';
+import type { Clue, ClueType, Level } from './types';
 import { getDifficulty, type DifficultyParams } from './difficulty';
 import { key, intersect } from './clues';
-import { applyQuirk, terrainPoolFor } from './quirks';
+import { applyQuirk, elevationBiasFor } from './quirks';
+import { buildTerrain, startCorner } from './terrain';
+import { ensureReachable } from './reach';
 import { applyWeather, WEATHER_POOL } from './weather';
 import { CREATURES } from '../data/creatures';
 
@@ -88,30 +90,35 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
     }
   }
 
-  const pool = terrainPoolFor(creatureId);
-  const terrain: TerrainType[][] = [];
-  for (let y = 0; y < size; y++) {
-    const row: TerrainType[] = [];
-    for (let x = 0; x < size; x++) row.push(pickWeighted(rng, pool));
-    terrain.push(row);
-  }
+  const { terrain, elevation } = buildTerrain(rng, size, elevationBiasFor(creatureId));
+  // 目標所在格強制為該生物的偏好地形——這也順帶保證目標永遠不落在崖壁上
   terrain[targetPos.y][targetPos.x] = creature.terrain;
 
   const taken = new Set([key(targetPos), ...clues.map((c) => key(c.position))]);
   const supplies: Vec2[] = [];
   for (let i = 0; i < 200 && supplies.length < p2.supplyCount; i++) {
     const s = randomPos(rng, size);
-    if (!taken.has(key(s))) {
+    // 崖壁上放補給等於放不到——ensureReachable 只保證走得到，不會把崖壁變成好走的路
+    if (!taken.has(key(s)) && terrain[s.y][s.x] !== 'cliff') {
       taken.add(key(s));
       supplies.push(s);
     }
   }
 
-  // 暫時的均一高程（Task 4 改用 buildTerrain 之後即被取代）
-  const elevation: number[][] = terrain.map((row) => row.map(() => 0.2));
+  // 線索必須踩得到才能判讀；落在崖壁上的線索格先降級為岩坡（代價高但走得到）
+  for (const c of clues) {
+    if (terrain[c.position.y][c.position.x] === 'cliff') {
+      terrain[c.position.y][c.position.x] = 'rock';
+    }
+  }
+
+  // 物理可達性保證（見 reach.ts）：目標、所有線索、所有補給都必須從出生角走得到
+  const start = startCorner(size, targetPos);
+  ensureReachable(terrain, start, [targetPos, ...clues.map((c) => c.position), ...supplies]);
 
   return {
-    round, mapSize: size, targetPos, clues, terrain, elevation, supplies, creatureId: creature.id, weather, iris,
+    round, mapSize: size, targetPos, clues, terrain, elevation, supplies,
+    creatureId: creature.id, weather, iris,
   };
 }
 

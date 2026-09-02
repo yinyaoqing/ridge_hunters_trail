@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyQuirk, terrainPoolFor } from '../src/core/quirks';
+import { applyQuirk, elevationBiasFor } from '../src/core/quirks';
 import { getDifficulty } from '../src/core/difficulty';
 import { CREATURES } from '../src/data/creatures';
 
@@ -43,11 +43,14 @@ describe('applyQuirk', () => {
   });
 });
 
-describe('terrainPoolFor', () => {
-  it('ridgecrest triples rock weight; others use the base pool', () => {
-    const rock = (pool: [string, number][]) => pool.find(([t]) => t === 'rock')![1];
-    expect(rock(terrainPoolFor('ridgecrest'))).toBe(3);
-    expect(rock(terrainPoolFor('mistfawn'))).toBe(1);
+describe('elevationBiasFor', () => {
+  it('lifts ridgecrest onto higher ground', () => {
+    expect(elevationBiasFor('ridgecrest')).toBeGreaterThan(0);
+  });
+  it('leaves every other creature at the default elevation', () => {
+    for (const id of ['mistfawn', 'dewhopper', 'veilmoth', 'plumetail']) {
+      expect(elevationBiasFor(id)).toBe(0);
+    }
   });
 });
 

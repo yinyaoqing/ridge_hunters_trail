@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dist, cheb, angleDeg, angleDiff, clampToMap, pointOnCircle } from '../src/core/geometry';
+import { dist, cheb, angleDeg, angleDiff, clampToMap, pointOnCircle, bresenham } from '../src/core/geometry';
 
 describe('geometry', () => {
   it('dist is euclidean', () => {
@@ -33,5 +33,26 @@ describe('geometry', () => {
     const p = pointOnCircle({ x: 5, y: 5 }, 3, 0);
     expect(p.x).toBeCloseTo(8);
     expect(p.y).toBeCloseTo(5);
+  });
+});
+
+describe('bresenham', () => {
+  it('includes both endpoints', () => {
+    const line = bresenham({ x: 0, y: 0 }, { x: 3, y: 0 });
+    expect(line[0]).toEqual({ x: 0, y: 0 });
+    expect(line[line.length - 1]).toEqual({ x: 3, y: 0 });
+  });
+  it('walks a diagonal one cell at a time', () => {
+    expect(bresenham({ x: 0, y: 0 }, { x: 2, y: 2 }))
+      .toEqual([{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }]);
+  });
+  it('returns a single cell when both ends are the same', () => {
+    expect(bresenham({ x: 4, y: 4 }, { x: 4, y: 4 })).toEqual([{ x: 4, y: 4 }]);
+  });
+  it('every consecutive pair is chebyshev-adjacent', () => {
+    const line = bresenham({ x: 0, y: 0 }, { x: 7, y: 3 });
+    for (let i = 1; i < line.length; i++) {
+      expect(cheb(line[i - 1], line[i])).toBe(1);
+    }
   });
 });

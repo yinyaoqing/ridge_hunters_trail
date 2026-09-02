@@ -1,6 +1,7 @@
 import { cheb, angleDeg, type Vec2 } from './geometry';
 import { pickWeighted, type Rng } from './rng';
 import { key } from './clues';
+import { isPassable } from './terrain';
 import type { SessionState } from './session';
 import type { Level } from './types';
 
@@ -17,6 +18,8 @@ function isOccupiedCell(level: Level, p: Vec2): boolean {
   if (key(level.targetPos) === k) return true;
   if (level.clues.some((c) => key(c.position) === k)) return true;
   if (level.supplies.some((s) => key(s) === k)) return true;
+  // 崖壁上的補給撿不到——視同已佔用，讓 findNearbyEmptyCell 換下一格
+  if (!isPassable(level.terrain[p.y][p.x])) return true;
   return false;
 }
 
