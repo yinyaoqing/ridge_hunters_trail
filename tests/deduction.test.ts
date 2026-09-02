@@ -118,4 +118,33 @@ describe('misleadingDecoy', () => {
   it('ignores decoys the player never read', () => {
     expect(misleadingDecoy(level, [{ clueIndex: 0, step: 3 }], { x: 1, y: 2 })).toBe(null);
   });
+
+  it('returns null when the wager landed exactly on the target, even if a read decoy covers it', () => {
+    // 幌子 (1,1) 半徑2 涵蓋目標本身 (6,5)？不涵蓋；改造一個涵蓋目標的幌子並押中目標
+    const coveringTarget = makeLevel([
+      disturbance(5, 5, 2),
+      disturbance(6, 5, 9, true), // 幌子候選集合極大，涵蓋目標與押注格
+    ]);
+    const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 1, step: 2 }];
+    expect(misleadingDecoy(coveringTarget, log, { x: 6, y: 5 })).toBe(null);
+  });
+
+  it('returns null when the decoy candidate set also covers the true target (it did not mislead)', () => {
+    const coversBoth = makeLevel([
+      disturbance(5, 5, 2),
+      disturbance(6, 5, 9, true), // 涵蓋押注格 (1,2)？半徑9從(6,5)幾乎涵蓋全圖，含(1,2)與目標(6,5)
+    ]);
+    const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 1, step: 2 }];
+    expect(misleadingDecoy(coversBoth, log, { x: 1, y: 2 })).toBe(null);
+  });
+
+  it('picks the earlier-read decoy when two read decoys both cover the wager and neither covers the target', () => {
+    const twoDecoys = makeLevel([
+      disturbance(1, 1, 2, true),  // 涵蓋 (1,2)，不涵蓋目標 (6,5)
+      disturbance(0, 3, 2, true),  // 也涵蓋 (1,2)，不涵蓋目標 (6,5)
+    ]);
+    const log = [{ clueIndex: 1, step: 3 }, { clueIndex: 0, step: 7 }]; // 判讀順序：index1先、index0後
+    const found = misleadingDecoy(twoDecoys, log, { x: 1, y: 2 });
+    expect(found?.position).toEqual({ x: 0, y: 3 }); // 判讀順序在前的那一條（index1）
+  });
 });

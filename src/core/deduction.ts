@@ -1,5 +1,5 @@
 import { candidates, intersect, key } from './clues';
-import type { Vec2 } from './geometry';
+import { cheb, type Vec2 } from './geometry';
 import type { Clue, Level } from './types';
 import type { ClueRead } from './session';
 
@@ -57,16 +57,23 @@ export function infoCompleteStep(level: Level, readLog: ClueRead[]): number | nu
   return real[real.length - 1].step;
 }
 
-// 誤導你的那條假蹤跡：玩家已判讀的幌子中，候選集合涵蓋押注格的第一條。
-// 沒有押注、或押注不落在任何已讀幌子的範圍內時回傳 null（揭曉畫面就不顯示這一行）。
+// 誤導你的那條假蹤跡：玩家已判讀的幌子中，「真的把你帶偏」的第一條（判讀順序）。
+// 兩個條件缺一不可（F2）：①押注確實錯了——押中時就算幌子涵蓋該格，也不是它害的；
+// ②該幌子的候選集合不涵蓋真實目標格——涵蓋真相的幌子並沒有把你指往錯的地方，
+// 只是剛好也涵蓋了你押的格子，冤枉它沒有意義。
+// 沒有押注、或沒有任何已讀幌子同時滿足這兩個條件時回傳 null（揭曉畫面就不顯示這一行）。
 export function misleadingDecoy(
   level: Level, readLog: ClueRead[], wager: Vec2 | null,
 ): Clue | null {
   if (!wager) return null;
+  if (cheb(wager, level.targetPos) === 0) return null; // 押中了，沒有東西騙到你
   const wk = key(wager);
+  const tk = key(level.targetPos);
   for (const entry of readLog) {
     const clue = level.clues[entry.clueIndex];
-    if (clue && clue.isDecoy && candidates(clue, level.mapSize).has(wk)) return clue;
+    if (!clue || !clue.isDecoy) continue;
+    const cand = candidates(clue, level.mapSize);
+    if (cand.has(wk) && !cand.has(tk)) return clue;
   }
   return null;
 }

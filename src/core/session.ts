@@ -97,10 +97,14 @@ export function move(s: SessionState, to: Vec2): void {
     s.level.supplies.splice(supplyIdx, 1);
     s.stamina += getDifficulty(s.round).supplyRestore;
   }
-  const clueIndex = s.level.clues.findIndex((c) => key(c.position) === k);
-  if (clueIndex >= 0 && !s.readClues.has(k)) {
+  // 同格可能不只一條線索（generate.ts 的 clampToMap 會把出界點夾到同一邊緣格）；
+  // 用 findIndex 只記第一條會讓熱區少算、靜音留下漏網線索、揭曉畫面誤判幌子為真線索
+  // （見 F1）。改為一次記錄該格「所有」尚未記錄的線索索引，全部掛同一個 step。
+  if (!s.readClues.has(k)) {
     s.readClues.add(k);
-    s.readLog.push({ clueIndex, step: s.steps });
+    s.level.clues.forEach((c, clueIndex) => {
+      if (key(c.position) === k) s.readLog.push({ clueIndex, step: s.steps });
+    });
   }
 
   // 逼近目標的判定先於力竭判定：最後一步逼近仍可觸發 QTE

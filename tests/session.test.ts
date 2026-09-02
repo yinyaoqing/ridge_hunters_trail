@@ -218,6 +218,31 @@ describe('move: path and clue read log', () => {
     move(s, { x: 2, y: 0 });
     expect(s.readLog).toHaveLength(1);
   });
+
+  it('logs every clue co-located on the same cell in one move, at the same step', () => {
+    const s = makeState({ player: { x: 1, y: 0 } });
+    // 關卡生成允許兩條線索落在同一格（clampToMap 夾邊界），在此手工重現該情境
+    s.level.clues.push({
+      type: 'scent', position: { x: 2, y: 0 }, isDecoy: true,
+      data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
+    });
+    move(s, { x: 2, y: 0 });
+    expect(s.readLog).toHaveLength(2);
+    expect(s.readLog[0].step).toBe(s.readLog[1].step);
+    expect(s.readLog.map((r) => r.clueIndex).sort()).toEqual([0, 1]);
+  });
+
+  it('does not re-log a shared cell on repeat visits (readLog stays idempotent)', () => {
+    const s = makeState({ player: { x: 1, y: 0 } });
+    s.level.clues.push({
+      type: 'scent', position: { x: 2, y: 0 }, isDecoy: true,
+      data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
+    });
+    move(s, { x: 2, y: 0 });
+    move(s, { x: 1, y: 0 });
+    move(s, { x: 2, y: 0 });
+    expect(s.readLog).toHaveLength(2);
+  });
 });
 
 describe('toggleMute', () => {
