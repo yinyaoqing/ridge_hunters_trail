@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { canMove, move, cycleMarkAt, useBell, TERRAIN_COST, type SessionState } from '../core/session';
+import { canMove, move, cycleMarkAt, toggleMute, useBell, TERRAIN_COST, type SessionState } from '../core/session';
+import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { TERRAIN_TYPES } from '../core/types';
@@ -67,6 +68,14 @@ export class MapScene extends Phaser.Scene {
   private tutText?: Phaser.GameObjects.Text;
   private tutBg?: Phaser.GameObjects.Graphics;
 
+  // 候選熱區圖層（診斷 B-01）：預設開啟，玩家可用 HUD chip 關掉以看清底圖
+  private heatOn = true;
+  private heatG!: Phaser.GameObjects.Graphics;
+  private heatChipG?: Phaser.GameObjects.Graphics;
+  private heatChipText?: Phaser.GameObjects.Text;
+  private heatChipX = 0;
+  private heatChipY = 0;
+
   constructor() {
     super('Map');
   }
@@ -105,6 +114,7 @@ export class MapScene extends Phaser.Scene {
     this.buildBackground(s);
     this.spawnMistParticles(s);
     this.buildHud();
+    this.heatG = this.add.graphics(); // 熱區在最底層，不遮蔽線索覆蓋層與標記
     this.g = this.add.graphics();
     this.pg = this.add.graphics();
     this.hoverG = this.add.graphics(); // 建於 pg 之後，確保 hover 外框畫在玩家層之上
@@ -485,7 +495,8 @@ export class MapScene extends Phaser.Scene {
     const xSound = xMark - 8 - 32;                        // 靜音 chip 左緣
     const hasBell = this.tools.has('glowbell');
     const xBell = xSound - 8 - 60;                        // 鈴 chip 左緣（僅持有微光鈴時顯示）
-    this.chipRowLeft = hasBell ? xBell : xSound; // 供 updateHud 計算體力條寬度時保持間距
+    const xHeat = (hasBell ? xBell : xSound) - 8 - 60; // 熱區圖層 chip 左緣
+    this.chipRowLeft = xHeat; // 供 updateHud 計算體力條寬度時保持間距
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
     if (!compact) {
@@ -579,6 +590,23 @@ export class MapScene extends Phaser.Scene {
           }
         });
     }
+
+    // 候選熱區圖層 chip（診斷 B-01）：開＝金色填底，關＝金色描邊。位於鈴／♪ chip 左側。
+    this.heatChipX = xHeat;
+    this.heatChipY = chipY;
+    this.heatChipG = this.add.graphics();
+    this.heatChipText = this.add.text(xHeat + 30, chipY + chipH / 2, '', {
+      fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
+    }).setOrigin(0.5).setLetterSpacing(1);
+    this.drawHeatChip(xHeat, chipY, 60, chipH);
+    this.add.rectangle(xHeat + 30, chipY + chipH / 2, 60, 44, 0, 0) // 44px 命中區
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (p: Phaser.Input.Pointer) => {
+        p.event.stopPropagation();
+        this.heatOn = !this.heatOn;
+        this.drawHeatChip(xHeat, chipY, 60, chipH);
+        this.redraw();
+      });
   }
 
   // 鈴 chip：可用＝標記色描邊＋亮字；不可用（已用本局/無幌子線索）＝暗描邊＋暗字（僅視覺停用，
@@ -624,6 +652,21 @@ export class MapScene extends Phaser.Scene {
     } else {
       g.lineStyle(1.2, pal.mark, 0.7).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
       this.markChipText!.setColor(cssHex(pal.mark)).setText(this.i18n().t('hud.mark'));
+    }
+  }
+
+  // 熱區圖層 chip：開＝金色填底＋暗字，關＝金色描邊＋金字（沿用標記 chip 的開關語彙）
+  private drawHeatChip(x: number, y: number, w: number, h: number) {
+    const pal = this.pal;
+    const g = this.heatChipG!;
+    g.clear();
+    const label = this.i18n().t('hud.layer');
+    if (this.heatOn) {
+      g.fillStyle(pal.gold, 0.85).fillRoundedRect(x, y, w, h, BRUSH_RADIUS);
+      this.heatChipText!.setColor(cssHex(pal.bg)).setText(label);
+    } else {
+      g.lineStyle(1.2, pal.gold, 0.7).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
+      this.heatChipText!.setColor(cssHex(pal.gold)).setText(label);
     }
   }
 
@@ -682,7 +725,16 @@ export class MapScene extends Phaser.Scene {
     if (!cellPos) return;
     const wantMark = (p.event as MouseEvent).shiftKey || this.markMode || held >= 350;
     if (wantMark) {
-      cycleMarkAt(s, cellPos);
+      // 已判讀的線索格：標記手勢改為切換該線索的靜音（在該格上做標記本來就沒有意義，
+      // 而「暫時拿掉這條線索看看」是玩家最需要的假說檢驗動作——診斷 B-03）
+      const ck = key(cellPos);
+      const clueIndex = s.level.clues.findIndex((c) => key(c.position) === ck);
+      if (clueIndex >= 0 && s.readClues.has(ck)) {
+        toggleMute(s, clueIndex);
+        this.audio.play('click');
+      } else {
+        cycleMarkAt(s, cellPos);
+      }
       this.redraw();
       return;
     }
@@ -870,28 +922,60 @@ export class MapScene extends Phaser.Scene {
 
     this.g.clear();
 
+    // 候選熱區（診斷 B-01）：每格依「符合幾條未靜音的已判讀線索」上金色淡底，
+    // 熱度以最大值正規化。玩家可用 HUD 的「圖層」chip 關閉。
+    this.heatG.clear();
+    if (this.heatOn) {
+      const heat = heatMap(unmutedReadClues(L, s.readLog, s.mutedClues), L.mapSize);
+      const peak = maxHeat(heat);
+      if (peak > 0) {
+        for (const [hk, n] of heat) {
+          const [hx, hy] = hk.split(',').map(Number);
+          this.heatG.fillStyle(pal.gold, 0.06 + 0.16 * (n / peak))
+            .fillRect(this.ox + hx * cs, this.oy + hy * cs, cs, cs);
+        }
+      }
+    }
+
     L.supplies.forEach((sup, i) => {
       const p = px(sup);
       drawSupply(this.g, p.x, p.y, cs, sup.x + sup.y + i, pal);
     });
 
-    for (const c of L.clues) {
-      if (s.readClues.has(key(c.position))) this.drawClueOverlay(c, px);
-    }
-    for (const c of L.clues) {
+    L.clues.forEach((c, i) => {
+      if (s.readClues.has(key(c.position)) && !s.mutedClues.has(i)) this.drawClueOverlay(c, px);
+    });
+    L.clues.forEach((c, i) => {
       const p = px(c.position);
       const r = Math.max(8, cs * 0.34);
       drawClueToken(this.g, p.x, p.y, r, c.type, pal);
       if (s.readClues.has(key(c.position))) this.drawReadCheck(p.x, p.y, r);
-    }
+      // 靜音線索：疊一道斜槓，與 ♪ chip 的靜音語彙一致
+      if (s.mutedClues.has(i)) {
+        this.g.lineStyle(2, pal.paperDim, 0.95);
+        this.g.lineBetween(p.x - r, p.y + r, p.x + r, p.y - r);
+      }
+    });
 
-    for (const [m] of s.marks) {
+    // 三態標記：排除＝紅 ✕、存疑＝黃 ?、押注＝金色雙環（押注全場唯一）
+    for (const [m, kind] of s.marks) {
       const [mx, my] = m.split(',').map(Number);
       const p = px({ x: mx, y: my });
       const r = cs * 0.32;
-      this.g.lineStyle(3, pal.mark, 0.9);
-      this.g.lineBetween(p.x - r, p.y - r, p.x + r, p.y + r);
-      this.g.lineBetween(p.x + r, p.y - r, p.x - r, p.y + r);
+      if (kind === 'exclude') {
+        this.g.lineStyle(3, pal.mark, 0.9);
+        this.g.lineBetween(p.x - r, p.y - r, p.x + r, p.y + r);
+        this.g.lineBetween(p.x + r, p.y - r, p.x - r, p.y + r);
+      } else if (kind === 'suspect') {
+        this.g.lineStyle(2.4, pal.supply, 0.9);
+        this.g.strokeCircle(p.x, p.y, r * 0.85);
+        this.g.lineBetween(p.x, p.y - r * 0.3, p.x, p.y + r * 0.2);
+        this.g.fillStyle(pal.supply, 0.9).fillCircle(p.x, p.y + r * 0.5, 1.6);
+      } else {
+        this.g.lineStyle(2.6, pal.gold, 1).strokeCircle(p.x, p.y, r);
+        this.g.lineStyle(1.4, pal.gold, 0.7).strokeCircle(p.x, p.y, r * 0.55);
+        this.g.fillStyle(pal.gold, 1).fillCircle(p.x, p.y, r * 0.2);
+      }
     }
 
     // 玩家：光暈＋紙墨白圓點（設計板）
@@ -923,6 +1007,7 @@ export class MapScene extends Phaser.Scene {
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
     if (this.bellChipG) this.drawBellChip(this.bellChipX, this.bellChipY, 60, 30);
+    if (this.heatChipG) this.drawHeatChip(this.heatChipX, this.heatChipY, 60, 30);
 
     // 置中體力條在較窄視窗（或持有微光鈴、chip 列多一格時）會撞上右側 chip 列
     // （chip 列左緣隨寬度＋是否持有鈴鐺變動，見 chipRowLeft）。固定寬度斷點（舊：w>=700）
