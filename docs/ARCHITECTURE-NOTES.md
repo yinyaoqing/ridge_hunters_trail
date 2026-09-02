@@ -70,6 +70,31 @@ registry 鍵沒有「格式降級」的概念——寫入方保證型別正確�
 `session` / `i18n` / `audio`，**不做任何記帳**——`SessionState.resolved` 的記帳仍
 完全由 `ResultScene` 負責，因此揭曉畫面被 resize 重啟不會造成重複記錄。
 
+### Phase 5 狀態變更：視野、地形與尋路
+
+`SessionState` 新增兩個純記憶體欄位（不持久化、不進 registry，隨 session 生滅）：
+
+- `seen: Set<string>` — 曾進入視野的格。單向累積，`revealAround()` 在 `newSession`
+  與每次 `move()` 後寫入。`MapScene` 的迷霧層、線索/補給顯示、標記手勢限制，以及
+  `RevealScene` 的未探索區壓暗，全部讀這一個來源。
+- `surveyed: Set<string>` — 已眺望過的格，防止在同一格重複花體力換取零新資訊。
+
+`Level` 新增兩個生成期欄位：
+
+- `elevation: number[][]` — 0..1 高程場。地形由它推導（`terrain.terrainFor`），
+  視野半徑也讀它（`vision.visionRadius`），因此必須隨 Level 一起保存而非生成後丟棄。
+- `trailheadIndex: number` — 開局即揭示的真線索索引。視野收窄後出生角附近通常
+  看不到任何線索，沒有它開局會是一張全空的圖。
+
+**循環匯入的處置：** `TERRAIN_COST`／`isPassable`／`startCorner` 三者實作在
+`src/core/terrain.ts`，`src/core/session.ts` 僅 re-export 以維持既有匯入點。
+原因是 `reach.ts` 與 `generate.ts` 都需要它們，而 `session.ts` 匯入 `generate.ts`——
+若把實作留在 session，會形成 `session → generate → reach → session` 的循環。
+
+**每日挑戰的決定性：** `buildTerrain` 的 rng 消耗次數固定為 160（兩張場 × 兩層
+× (gridSize+1)^2），與地圖大小、取樣次數皆無關。`ensureReachable` 完全不碰 rng。
+因此同一顆日期種子仍必得同一張地圖。
+
 ---
 
 ## 3. 維護規則

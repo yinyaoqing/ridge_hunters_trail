@@ -4,6 +4,7 @@ import { getPalette, type Palette } from '../core/palette';
 import { wagerKey, parseKey } from '../core/marks';
 import { infoCompleteStep, misleadingDecoy } from '../core/deduction';
 import { cheb, type Vec2 } from '../core/geometry';
+import { key } from '../core/clues';
 import { CREATURES } from '../data/creatures';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
@@ -117,6 +118,15 @@ export class RevealScene extends Phaser.Scene {
       }
     }
     g.lineStyle(1, pal.paperDim, 0.25).strokeRect(ox, oy, cell * L.mapSize, cell * L.mapSize);
+
+    // 未探索區壓暗：讓玩家看見自己漏掉了多少山域。
+    // 失敗的每日挑戰同樣要畫——這是玩家自己的探索紀錄，不洩漏答案。
+    for (let y = 0; y < L.mapSize; y++) {
+      for (let x = 0; x < L.mapSize; x++) {
+        if (s.seen.has(key({ x, y }))) continue;
+        g.fillStyle(0x000000, 0.45).fillRect(ox + x * cell, oy + y * cell, cell, cell);
+      }
+    }
 
     // 玩家路徑：連續折線，讓玩家看見自己繞了多遠
     if (s.path.length > 1) {

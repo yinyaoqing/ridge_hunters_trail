@@ -10,6 +10,11 @@ import { cssHex, drawClueToken, drawSupply, BRUSH_RADIUS, FONTS, displayFont } f
 export class HelpScene extends Phaser.Scene {
   private pal!: Palette;
   private from: 'Camp' | 'Map' = 'Map';
+  // 說明列表捲動狀態（比照 CodexScene）：list 是列表容器，listTop 為未捲動時的 y
+  // （同時是捲動上限），minY 是捲到底時的 y（下限，依 rows 總高度與可視窗算出）。
+  private list!: Phaser.GameObjects.Container;
+  private listTop = 0;
+  private minY = 0;
 
   constructor() {
     super('Help');
@@ -33,13 +38,12 @@ export class HelpScene extends Phaser.Scene {
 
     // 面板
     const pw = 580;
-    // 10 列版面預算（Phase 4）：列距維持 44px，末列 y=py0+574，
-    // 開始按鈕上緣＝py0+ph-56-24=py0+600，間距 26px（與 9 列版相同的淨空）。
-    // 面板底緣 py0+ph = 78+680 = 758，仍在規格書 §11.1 的 720×780 embed 視窗內。
-    // 已知限制（不在本階段修）：面板高度是固定值，視窗高度低於 758px 時底部會被裁切。
-    // 這在改動前（714px）就已存在，本次讓門檻上升 44px。Phase 5 若再增加說明列，
-    // 應比照 CodexScene 把說明列表改為可捲動，而不是繼續加高面板。
-    const ph = 680;
+    // 面板高度：Phase 5 起說明列改為可捲動列表（比照 CodexScene 的遮罩＋拖曳手法），
+    // 面板本身不再需要隨列數增高，固定版面預算的舊限制已解除。
+    // 面板底緣 py0+ph = 78+636 = 714，仍在規格書 §11.1 的 720×780 embed 視窗內，
+    // 且比舊版（758）更寬裕。之後若再增加說明列，只需在下方 rows 陣列多加一筆，
+    // 捲動範圍會依 rows.length 自動重新計算，不必再動 ph。
+    const ph = 636;
     const px0 = cx - pw / 2;
     const py0 = 78;
     const panel = this.add.graphics();
@@ -105,13 +109,15 @@ export class HelpScene extends Phaser.Scene {
       }
     };
 
-    // 10 列版面預算（Phase 4）：列距維持 44px，詳見上方 ph 定義處的註解。
+    // 13 列已超出固定面板的版面預算，比照 CodexScene 改為可捲動列表：
+    // 容器 y 起點在 py0+160（標題／簡介之下），列距維持 44px，
+    // 但 y 值改為相對容器的 i*44，不再是絕對的 py0+…。
     const rows: { y: number; key: Parameters<I18n['t']>[0]; icon: (y: number) => void }[] = [
-      { y: py0 + 178, key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
-      { y: py0 + 222, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
-      { y: py0 + 266, key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
+      { y: 0 * 44, key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
+      { y: 1 * 44, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
+      { y: 2 * 44, key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
       {
-        y: py0 + 310, key: 'help.decoy',
+        y: 3 * 44, key: 'help.decoy',
         icon: (y) => {
           drawClueToken(icons, rowX, y, 15, 'footprint', pal);
           icons.lineStyle(2, pal.mark, 0.9);
@@ -120,7 +126,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 354, key: 'help.stamina',
+        y: 4 * 44, key: 'help.stamina',
         icon: (y) => {
           drawSupply(icons, rowX - 14, y, 34, 0, pal);
           drawSupply(icons, rowX + 2, y, 34, 1, pal);
@@ -132,7 +138,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 398, key: 'help.marks',
+        y: 5 * 44, key: 'help.marks',
         icon: (y) => {
           // 排除：紅 ✕
           icons.lineStyle(2.4, pal.mark, 0.9);
@@ -147,7 +153,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 442, key: 'help.qte',
+        y: 6 * 44, key: 'help.qte',
         icon: (y) => {
           icons.lineStyle(2.5, 0x5c6b73, 1).strokeCircle(rowX, y, 14);
           icons.lineStyle(4, pal.gold, 1);
@@ -159,7 +165,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 486, key: 'help.layer',
+        y: 7 * 44, key: 'help.layer',
         icon: (y) => {
           // 三格由淡到濃的金色方塊，對應熱區的熱度分級
           const sq = 9;
@@ -173,7 +179,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 530, key: 'help.reveal',
+        y: 8 * 44, key: 'help.reveal',
         icon: (y) => {
           // 揭曉：生物色實心點＋金色脈動環的靜態版（同 RevealScene 的真實位置圖示）
           icons.fillStyle(pal.glow, 1).fillCircle(rowX, y, 4);
@@ -181,8 +187,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        // 第 10 列：與開始按鈕上緣（py0+600）保有 26px 間距，見上方版面預算註解
-        y: py0 + 574, key: 'help.weather',
+        y: 9 * 44, key: 'help.weather',
         icon: (y) => {
           const order: Weather[] = ['clear', 'mist', 'wind', 'drizzle'];
           const gap = 20;
@@ -193,14 +198,71 @@ export class HelpScene extends Phaser.Scene {
           }
         },
       },
+      {
+        y: 10 * 44, key: 'help.vision',
+        icon: (y) => {
+          // 由亮到暗的三格，對應「近處看得見、遠處是暗的」
+          const sq = 9;
+          let x = rowX - 16;
+          for (const a of [1, 0.45, 0.18]) {
+            icons.fillStyle(pal.paper, a).fillRect(x, y - sq / 2, sq, sq);
+            x += sq + 3;
+          }
+        },
+      },
+      {
+        y: 11 * 44, key: 'help.survey',
+        icon: (y) => {
+          icons.fillStyle(pal.supply, 1).fillCircle(rowX, y, 3);
+          icons.lineStyle(1.6, pal.supply, 0.85).strokeCircle(rowX, y, 8);
+          icons.lineStyle(1.2, pal.supply, 0.45).strokeCircle(rowX, y, 13);
+        },
+      },
+      {
+        y: 12 * 44, key: 'help.route',
+        icon: (y) => {
+          icons.lineStyle(2, pal.gold, 0.85);
+          icons.lineBetween(rowX - 14, y + 6, rowX - 4, y - 4);
+          icons.lineBetween(rowX - 4, y - 4, rowX + 6, y + 2);
+          icons.lineBetween(rowX + 6, y + 2, rowX + 14, y - 6);
+          icons.fillStyle(pal.gold, 1).fillCircle(rowX + 14, y - 6, 3);
+        },
+      },
     ];
+
+    // 列表容器：y 起點 py0+160，與下方遮罩可視區上緣對齊
+    this.listTop = py0 + 160;
+    this.list = this.add.container(0, this.listTop);
+    this.list.add(icons);
     for (const row of rows) {
       row.icon(row.y);
-      this.add.text(textX, row.y, i18n.t(row.key), {
+      this.list.add(this.add.text(textX, row.y, i18n.t(row.key), {
         fontFamily: FONTS.body, fontSize: '13.5px', color: cssHex(pal.paperDim),
         wordWrap: { width: pw - (textX - px0) - 40, useAdvancedWrap: true }, lineSpacing: 4,
-      }).setOrigin(0, 0.5);
+      }).setOrigin(0, 0.5));
     }
+
+    // 可視區：py0+160 到 py0+ph-92，之下留給開始按鈕
+    const viewH = (py0 + ph - 92) - this.listTop;
+    this.minY = Math.min(0, viewH - rows.length * 44) + this.listTop;
+
+    // 遮罩：列表只在可視區內顯示，擋住捲出範圍的列
+    const maskShape = this.make.graphics({}, false);
+    maskShape.fillStyle(0xffffff).fillRect(0, this.listTop, w, viewH);
+    this.list.setMask(maskShape.createGeometryMask());
+
+    // 滾輪與拖曳捲動（比照 CodexScene）
+    this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) =>
+      this.scrollBy(-dy * 0.6));
+    let dragY: number | null = null;
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { dragY = p.y; });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (dragY !== null && p.isDown) {
+        this.scrollBy(p.y - dragY);
+        dragY = p.y;
+      }
+    });
+    this.input.on('pointerup', () => { dragY = null; });
 
     // 開始按鈕
     const label = i18n.t('btn.start').replace(/^[[［]\s*/, '').replace(/\s*[\]］]$/, '');
@@ -222,5 +284,10 @@ export class HelpScene extends Phaser.Scene {
   private close() {
     this.scene.stop();
     this.scene.resume(this.from);
+  }
+
+  // 捲動列表：夾限在 [minY, listTop]（同 CodexScene.scrollBy）
+  private scrollBy(dy: number) {
+    this.list.y = Phaser.Math.Clamp(this.list.y + dy, this.minY, this.listTop);
   }
 }
