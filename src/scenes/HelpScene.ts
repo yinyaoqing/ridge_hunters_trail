@@ -111,13 +111,13 @@ export class HelpScene extends Phaser.Scene {
 
     // 13 列已超出固定面板的版面預算，比照 CodexScene 改為可捲動列表：
     // 容器 y 起點在 py0+160（標題／簡介之下），列距維持 44px，
-    // 但 y 值改為相對容器的 i*44，不再是絕對的 py0+…。
+    // y 值改為 i*44 + 22（半列高偏移），為遮罩上緣保留 7px 緩衝，避免首列圖示被裁剪。
     const rows: { y: number; key: Parameters<I18n['t']>[0]; icon: (y: number) => void }[] = [
-      { y: 0 * 44, key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
-      { y: 1 * 44, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
-      { y: 2 * 44, key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
+      { y: 0 * 44 + 22, key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
+      { y: 1 * 44 + 22, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
+      { y: 2 * 44 + 22, key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
       {
-        y: 3 * 44, key: 'help.decoy',
+        y: 3 * 44 + 22, key: 'help.decoy',
         icon: (y) => {
           drawClueToken(icons, rowX, y, 15, 'footprint', pal);
           icons.lineStyle(2, pal.mark, 0.9);
@@ -126,7 +126,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 4 * 44, key: 'help.stamina',
+        y: 4 * 44 + 22, key: 'help.stamina',
         icon: (y) => {
           drawSupply(icons, rowX - 14, y, 34, 0, pal);
           drawSupply(icons, rowX + 2, y, 34, 1, pal);
@@ -138,7 +138,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 5 * 44, key: 'help.marks',
+        y: 5 * 44 + 22, key: 'help.marks',
         icon: (y) => {
           // 排除：紅 ✕
           icons.lineStyle(2.4, pal.mark, 0.9);
@@ -153,7 +153,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 6 * 44, key: 'help.qte',
+        y: 6 * 44 + 22, key: 'help.qte',
         icon: (y) => {
           icons.lineStyle(2.5, 0x5c6b73, 1).strokeCircle(rowX, y, 14);
           icons.lineStyle(4, pal.gold, 1);
@@ -165,7 +165,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 7 * 44, key: 'help.layer',
+        y: 7 * 44 + 22, key: 'help.layer',
         icon: (y) => {
           // 三格由淡到濃的金色方塊，對應熱區的熱度分級
           const sq = 9;
@@ -179,7 +179,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 8 * 44, key: 'help.reveal',
+        y: 8 * 44 + 22, key: 'help.reveal',
         icon: (y) => {
           // 揭曉：生物色實心點＋金色脈動環的靜態版（同 RevealScene 的真實位置圖示）
           icons.fillStyle(pal.glow, 1).fillCircle(rowX, y, 4);
@@ -187,7 +187,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 9 * 44, key: 'help.weather',
+        y: 9 * 44 + 22, key: 'help.weather',
         icon: (y) => {
           const order: Weather[] = ['clear', 'mist', 'wind', 'drizzle'];
           const gap = 20;
@@ -199,7 +199,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 10 * 44, key: 'help.vision',
+        y: 10 * 44 + 22, key: 'help.vision',
         icon: (y) => {
           // 由亮到暗的三格，對應「近處看得見、遠處是暗的」
           const sq = 9;
@@ -211,7 +211,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 11 * 44, key: 'help.survey',
+        y: 11 * 44 + 22, key: 'help.survey',
         icon: (y) => {
           icons.fillStyle(pal.supply, 1).fillCircle(rowX, y, 3);
           icons.lineStyle(1.6, pal.supply, 0.85).strokeCircle(rowX, y, 8);
@@ -219,7 +219,7 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: 12 * 44, key: 'help.route',
+        y: 12 * 44 + 22, key: 'help.route',
         icon: (y) => {
           icons.lineStyle(2, pal.gold, 0.85);
           icons.lineBetween(rowX - 14, y + 6, rowX - 4, y - 4);
@@ -244,7 +244,7 @@ export class HelpScene extends Phaser.Scene {
 
     // 可視區：py0+160 到 py0+ph-92，之下留給開始按鈕
     const viewH = (py0 + ph - 92) - this.listTop;
-    this.minY = Math.min(0, viewH - rows.length * 44) + this.listTop;
+    this.minY = Math.min(0, viewH - (rows.length * 44 + 22)) + this.listTop;
 
     // 遮罩：列表只在可視區內顯示，擋住捲出範圍的列
     const maskShape = this.make.graphics({}, false);
