@@ -751,21 +751,22 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 5: 把 drawClueOverlay 抽到 paint.ts
+## Task 5: 把 drawClueOverlay 與 drawMark 抽到 paint.ts
 
 **Files:**
 - Modify: `src/scenes/paint.ts`
-- Modify: `src/scenes/MapScene.ts:1446-1470`（私有 `drawClueOverlay` 整段刪除，呼叫端改寫）
+- Modify: `src/scenes/MapScene.ts`（私有 `drawClueOverlay` 整段刪除、`redraw()` 的兩處呼叫端改寫）
 
 **Interfaces:**
-- Consumes: `Clue`（`src/core/types.ts`）、`Palette`（`src/core/palette.ts`）、既有的 `dashedLine`/`dashedCircle`/`dashedArc`
-- Produces: `drawClueOverlay(g, clue, center, cell, pal, windstone): void`（`src/scenes/paint.ts`）
+- Consumes: `Clue`（`src/core/types.ts`）、`MarkKind`（`src/core/marks.ts`）、`Palette`（`src/core/palette.ts`）、既有的 `dashedLine`/`dashedCircle`/`dashedArc`
+- Produces: `drawClueOverlay(g, clue, center, cell, pal, windstone): void`、`drawMark(g, kind, cx, cy, cell, pal): void`（皆在 `src/scenes/paint.ts`）
 
-> **為什麼要抽**：規格要求示範看到的線索圖形與真實地圖**逐像素相同**——那是教學能遷移的前提。
+> **為什麼要抽**：規格要求示範看到的圖形與真實地圖**逐像素相同**——那是教學能遷移的前提。
 > 抄一份到 DemoScene 只能在抄的當下相同，之後任何一邊調整都會靜默分歧。抽成共用函式讓這件事
-> 由建構保證。這是純粹的搬移，不改任何幾何。
+> 由建構保證。三態標記尤其如此：排除、存疑、押注正是示範要教的三件事。
+> **這兩個函式都是純粹的搬移，一個數字都不改。**
 
-- [ ] **Step 1: 在 paint.ts 新增共用函式**
+- [ ] **Step 1: 在 paint.ts 新增 drawClueOverlay**
 
 在 `src/scenes/paint.ts` 的 `drawSupply` 之後加入（並把最上方 import 的 `../core/types` 補上 `Clue`）：
 
@@ -802,11 +803,42 @@ export function drawClueOverlay(
 }
 ```
 
-- [ ] **Step 2: 刪除 MapScene 的私有版本**
+- [ ] **Step 2: 在 paint.ts 新增 drawMark**
+
+在 `drawClueOverlay` 之後加入（並在最上方新增 `import type { MarkKind } from '../core/marks';`）：
+
+```ts
+// 玩家的三態標記：排除＝紅 X、存疑＝黃 ?、押注＝金色雙環（押注全場唯一）。
+// 由 MapScene 與 DemoScene 共用——排除／存疑／押注正是示範要教的三件事，
+// 它們在示範裡長的樣子必須與真實地圖一模一樣，否則玩家學到的記號在真圖上認不得。
+export function drawMark(
+  g: Gfx, kind: MarkKind, cx: number, cy: number, cell: number, pal: Palette,
+): void {
+  const r = cell * 0.32;
+  if (kind === 'exclude') {
+    g.lineStyle(3, pal.mark, 0.9);
+    g.lineBetween(cx - r, cy - r, cx + r, cy + r);
+    g.lineBetween(cx + r, cy - r, cx - r, cy + r);
+  } else if (kind === 'suspect') {
+    g.lineStyle(2.4, pal.supply, 0.9);
+    g.strokeCircle(cx, cy, r * 0.85);
+    g.lineBetween(cx, cy - r * 0.3, cx, cy + r * 0.2);
+    g.fillStyle(pal.supply, 0.9).fillCircle(cx, cy + r * 0.5, 1.6);
+  } else {
+    g.lineStyle(2.6, pal.gold, 1).strokeCircle(cx, cy, r);
+    g.lineStyle(1.4, pal.gold, 0.7).strokeCircle(cx, cy, r * 0.55);
+    g.fillStyle(pal.gold, 1).fillCircle(cx, cy, r * 0.2);
+  }
+}
+```
+
+`r` 原本在 MapScene 的迴圈外算一次，移進函式內每次算一次——同樣的算式、同樣的結果。
+
+- [ ] **Step 3: 刪除 MapScene 的私有版本**
 
 在 `src/scenes/MapScene.ts` 中，刪除整個私有方法 `private drawClueOverlay(c: Clue, px: ...) { ... }`（含其上方的兩行註解，該註解已搬到 paint.ts）。
 
-- [ ] **Step 3: 改寫 MapScene 的呼叫端**
+- [ ] **Step 4: 改寫 MapScene 的線索覆蓋層呼叫端**
 
 把（約在 `redraw()` 中）
 
@@ -824,29 +856,53 @@ export function drawClueOverlay(
 
 並把 `src/scenes/MapScene.ts` 最上方從 `./paint` 的 import 清單加入 `drawClueOverlay`。
 
-若 `dashedArc` 在 MapScene 中已無其他呼叫點，`tsc` 的 `noUnusedLocals`／lint 可能報未使用；此時把它從 MapScene 的 import 清單移除。**先跑型別檢查再決定，不要憑猜測刪 import。**
+- [ ] **Step 5: 改寫 MapScene 的標記呼叫端**
 
-- [ ] **Step 4: 型別檢查與建置**
+把 `redraw()` 中的三態標記迴圈
+
+```ts
+    for (const [m, kind] of s.marks) {
+      const [mx, my] = m.split(',').map(Number);
+      const p = px({ x: mx, y: my });
+      const r = cs * 0.32;
+      if (kind === 'exclude') {
+```
+
+到該 `if / else if / else` 區塊結束為止，整段換成
+
+```ts
+    for (const [m, kind] of s.marks) {
+      const [mx, my] = m.split(',').map(Number);
+      const p = px({ x: mx, y: my });
+      drawMark(this.g, kind, p.x, p.y, cs, pal);
+    }
+```
+
+並把 `drawMark` 加入 `./paint` 的 import 清單。該迴圈上方說明三態語彙的註解保留在原處。
+
+搬移後若 `dashedArc` 等符號在 MapScene 中已無呼叫點，`tsc` 的 `noUnusedLocals` 會報未使用；依錯誤訊息移除。**先跑型別檢查再決定，不要憑猜測刪 import。**
+
+- [ ] **Step 6: 型別檢查與建置**
 
 Run: `powershell -NoProfile -Command "npx tsc --noEmit; exit $LASTEXITCODE"`
 Expected: exit 0
 Run: `powershell -NoProfile -Command "npx vite build; exit $LASTEXITCODE"`
 Expected: exit 0
 
-- [ ] **Step 5: 全套測試**
+- [ ] **Step 7: 全套測試**
 
 Run: `powershell -NoProfile -Command "npx vitest run; exit $LASTEXITCODE"`
 Expected: PASS（本任務為純搬移，測試數不應改變）
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/scenes/paint.ts src/scenes/MapScene.ts
-git commit -m "refactor: lift drawClueOverlay from MapScene into paint
+git commit -m "refactor: lift drawClueOverlay and drawMark from MapScene into paint
 
-The demo scene must draw clue shapes pixel-identically to the real map or the
-lesson does not transfer. Sharing one function makes that true by construction
-instead of by two copies staying in step.
+The demo must draw clue shapes and player marks pixel-identically to the real
+map or the lesson does not transfer. Sharing one function makes that true by
+construction instead of by two copies staying in step.
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```
@@ -877,7 +933,7 @@ import type { I18n } from '../core/i18n';
 import type { SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
 import { DEMO_STEPS } from '../core/demo';
-import { cssHex, BRUSH_RADIUS, FONTS, displayFont } from './paint';
+import { cssHex, FONTS, displayFont } from './paint';
 
 type DemoFrom = 'Camp' | 'Map' | 'Result';
 
@@ -940,8 +996,6 @@ export class DemoScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.input.keyboard?.on('keydown-ESC', () => this.close());
-    // BRUSH_RADIUS 於 Task 8 的導覽按鈕使用；此處先行引入以固定 import 清單
-    void BRUSH_RADIUS;
   }
 
   private i18n(): I18n {
@@ -954,8 +1008,6 @@ export class DemoScene extends Phaser.Scene {
   }
 }
 ```
-
-> `void BRUSH_RADIUS;` 是刻意的暫時行，Task 8 接上導覽按鈕後**必須刪掉**。
 
 - [ ] **Step 2: 註冊場景**
 
@@ -1043,7 +1095,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Modify: `src/scenes/DemoScene.ts`
 
 **Interfaces:**
-- Consumes: `DEMO_SIZE`/`DEMO_CLUES`/`DEMO_PAIR`/`DEMO_TARGET`/`DEMO_STEPS`/`demoUnseen`（`src/core/demo.ts`）、`heatMap`/`maxHeat`（`src/core/deduction.ts`）、`intersect`/`key`（`src/core/clues.ts`）、`MarkMap`（`src/core/marks.ts`）、`drawClueOverlay`/`drawClueToken`（Task 5 與 `paint.ts`）
+- Consumes: `DEMO_SIZE`/`DEMO_CLUES`/`DEMO_PAIR`/`DEMO_TARGET`/`DEMO_STEPS`/`demoUnseen`（`src/core/demo.ts`）、`heatMap`/`maxHeat`（`src/core/deduction.ts`）、`intersect`/`key`（`src/core/clues.ts`）、`MarkMap`（`src/core/marks.ts`）、`drawClueOverlay`/`drawMark`/`drawClueToken`（Task 5 與 `paint.ts`）
 - Produces: `DemoScene` 私有的 `render()`，供 Task 8 的導覽與 Task 9 的動手點呼叫
 
 - [ ] **Step 1: 加入欄位與版面計算**
@@ -1087,7 +1139,7 @@ import type { MarkMap } from '../core/marks';
 import {
   DEMO_SIZE, DEMO_CLUES, DEMO_PAIR, DEMO_TARGET, DEMO_STEPS, demoUnseen, type DemoStep,
 } from '../core/demo';
-import { cssHex, BRUSH_RADIUS, FONTS, displayFont, drawClueToken, drawClueOverlay } from './paint';
+import { cssHex, FONTS, displayFont, drawClueToken, drawClueOverlay, drawMark } from './paint';
 ```
 
 - [ ] **Step 2: 在 create() 中建立網格與文字物件**
@@ -1210,25 +1262,11 @@ import { cssHex, BRUSH_RADIUS, FONTS, displayFont, drawClueToken, drawClueOverla
       }
     }
 
-    // 三態標記，畫法與 MapScene 相同
-    const r = cs * 0.32;
+    // 三態標記：與 MapScene 共用 paint.drawMark，形狀由建構保證一致
     for (const [mk, kind] of this.marksFor(this.step)) {
       const [mx, my] = mk.split(',').map(Number);
       const p = this.px({ x: mx, y: my });
-      if (kind === 'exclude') {
-        g.lineStyle(3, pal.mark, 0.9);
-        g.lineBetween(p.x - r, p.y - r, p.x + r, p.y + r);
-        g.lineBetween(p.x + r, p.y - r, p.x - r, p.y + r);
-      } else if (kind === 'suspect') {
-        g.lineStyle(2.4, pal.supply, 0.9);
-        g.strokeCircle(p.x, p.y, r * 0.85);
-        g.lineBetween(p.x, p.y - r * 0.3, p.x, p.y + r * 0.2);
-        g.fillStyle(pal.supply, 0.9).fillCircle(p.x, p.y + r * 0.5, 1.6);
-      } else {
-        g.lineStyle(2.6, pal.gold, 1).strokeCircle(p.x, p.y, r);
-        g.lineStyle(1.4, pal.gold, 0.7).strokeCircle(p.x, p.y, r * 0.55);
-        g.fillStyle(pal.gold, 1).fillCircle(p.x, p.y, r * 0.2);
-      }
+      drawMark(g, kind, p.x, p.y, cs, pal);
     }
 
     // 迷霧：同 MapScene 的壓暗而非全黑
@@ -1269,23 +1307,19 @@ const CHAPTER_KEY: Record<1 | 2 | 3 | 4, MsgKey> = {
 
 import 補上 `import type { I18n, MsgKey } from '../core/i18n';`（把既有的 `I18n` import 併入同一行）。
 
-- [ ] **Step 4: 移除暫時行**
-
-刪除 Task 6 留下的 `void BRUSH_RADIUS;`（`BRUSH_RADIUS` 會在 Task 8 用到，此時若 `tsc` 報未使用 import，先保留 import 不動，Task 8 會用到它；若 lint 立刻報錯則暫時移出 import，Task 8 再加回）。
-
-- [ ] **Step 5: 型別檢查與建置**
+- [ ] **Step 4: 型別檢查與建置**
 
 Run: `powershell -NoProfile -Command "npx tsc --noEmit; exit $LASTEXITCODE"`
 Expected: exit 0
 Run: `powershell -NoProfile -Command "npx vite build; exit $LASTEXITCODE"`
 Expected: exit 0
 
-- [ ] **Step 6: 全套測試**
+- [ ] **Step 5: 全套測試**
 
 Run: `powershell -NoProfile -Command "npx vitest run; exit $LASTEXITCODE"`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/scenes/DemoScene.ts
@@ -1344,7 +1378,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
       .on('pointerdown', () => this.goto(this.step + 1));
 ```
 
-並把 `stripBrackets` 加入 `./paint` 的 import 清單。
+並把 `stripBrackets` 與 `BRUSH_RADIUS` 加入 `./paint` 的 import 清單（`BRUSH_RADIUS` 於下一步的 `drawNav()` 使用）。
 
 - [ ] **Step 3: 實作導覽方法**
 
@@ -1698,6 +1732,6 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **規格覆蓋**：§2.1 分層 → Task 1/6；§2.2 介面 → Task 1/3/4（`vars` 由函式改為模組載入時算出的物件，同一保證、少一層間接，規格已同步）；§2.3 渲染層 → Task 5/6/7；§3 關卡 → Task 1；§3.2 迷霧 → Task 4；§4 十四步 → Task 3；§4 三個動手點 → Task 4/9；§5 入口 → Task 6/10（每日挑戰失敗分支刻意不接，理由記於 Task 10）；§6 測試 → Task 1/3/4，第 8 項由既有的 `tests/i18n.test.ts` 涵蓋；§7 版面 → Task 7；§8 不做 → 全計畫未觸及 `generate.ts`／`difficulty.ts`／`tut.*`；§9 風險 → Task 11。
 
-**型別一致性**：`DEMO_STEPS`／`DemoStep`／`DemoAction`／`demoUnseen`／`checkCellAction`／`checkMuteAction`／`DEMO_PAIR`／`DEMO_MID`／`DECOY_INDEX`／`DEMO_SCENT_DISTANCE` 在定義處與所有使用處拼寫一致；`drawClueOverlay` 的六參數簽章在 paint.ts、MapScene、DemoScene 三處相同。
+**型別一致性**：`DEMO_STEPS`／`DemoStep`／`DemoAction`／`demoUnseen`／`checkCellAction`／`checkMuteAction`／`DEMO_PAIR`／`DEMO_MID`／`DECOY_INDEX`／`DEMO_SCENT_DISTANCE` 在定義處與所有使用處拼寫一致；`drawClueOverlay` 與 `drawMark` 的六參數簽章，在 paint.ts、MapScene、DemoScene 三處相同。
 
 **未決事項**：無。
