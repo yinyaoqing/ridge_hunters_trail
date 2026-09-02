@@ -100,7 +100,11 @@ export function move(s: SessionState, to: Vec2): void {
   // 同格可能不只一條線索（generate.ts 的 clampToMap 會把出界點夾到同一邊緣格）；
   // 用 findIndex 只記第一條會讓熱區少算、靜音留下漏網線索、揭曉畫面誤判幌子為真線索
   // （見 F1）。改為一次記錄該格「所有」尚未記錄的線索索引，全部掛同一個 step。
-  if (!s.readClues.has(k)) {
+  // C1 回歸：這格必須真的落有線索才算「判讀」——readClues 是 codex 研究筆記數、
+  // MapScene 教學提示（tut.read／tut.cross）共用的「已讀線索」計數，若對空地也
+  // 累加，會在玩家什麼都沒讀到時就灌爆這些下游判斷（見再審報告 C1）。
+  const hasClueHere = s.level.clues.some((c) => key(c.position) === k);
+  if (hasClueHere && !s.readClues.has(k)) {
     s.readClues.add(k);
     s.level.clues.forEach((c, clueIndex) => {
       if (key(c.position) === k) s.readLog.push({ clueIndex, step: s.steps });

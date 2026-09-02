@@ -66,10 +66,14 @@ export class RevealScene extends Phaser.Scene {
     if (wager === null) {
       // 未押注時本來就不揭露任何座標資訊，hideAnswer 與否都可安全保留
       ty = this.line(cx, ty, i18n.t('reveal.noCall'), pal.paperDim, 14);
-    } else if (hideAnswer) {
+    }
+    // C3：daily 失敗且無押注時，「沒押注」與「daily 隱藏答案」是兩件互不排斥的事實——
+    // 前者說明沒有距離可算，後者說明地圖上看不到真實位置為什麼。原本 else if 讓
+    // 兩者互斥，玩家在兩者都成立時反而什麼解釋都看不到，像壞掉一樣。改成各自獨立判斷。
+    if (hideAnswer) {
       // 用一行說明取代距離／假蹤跡行，否則畫面看起來像壞掉（F3）
       ty = this.line(cx, ty, i18n.t('reveal.dailyHidden'), pal.paperDim, 14);
-    } else {
+    } else if (wager !== null) {
       const off = cheb(wager, s.level.targetPos);
       const msg = off === 0 ? i18n.t('reveal.exact') : i18n.t('reveal.offBy', { n: off });
       ty = this.line(cx, ty, msg, off === 0 ? pal.gold : pal.paper, 17);
@@ -80,9 +84,14 @@ export class RevealScene extends Phaser.Scene {
       if (decoy) ty = this.line(cx, ty, i18n.t('reveal.decoy'), pal.mark, 14);
     }
 
-    const infoStep = infoCompleteStep(s.level, s.readLog);
-    if (infoStep !== null && s.steps > infoStep) {
-      ty = this.line(cx, ty, i18n.t('reveal.infoAt', { n: infoStep, m: s.steps }), pal.paperDim, 13);
+    // C2：infoCompleteStep 只看真線索的交集，這一行等於指名「第幾步讀到的是真線索」
+    // ——玩家自己知道每一步讀了什麼，等於把真假線索的判別洩漏給失敗的 daily 玩家
+    // （見再審報告 C2）。跟上面的幌子行一樣，用 hideAnswer 蓋住。
+    if (!hideAnswer) {
+      const infoStep = infoCompleteStep(s.level, s.readLog);
+      if (infoStep !== null && s.steps > infoStep) {
+        ty = this.line(cx, ty, i18n.t('reveal.infoAt', { n: infoStep, m: s.steps }), pal.paperDim, 13);
+      }
     }
 
     // 圖例：牠在這裡／你的押注。hideAnswer 時不畫「牠在這裡」——否則圖例文字本身就洩漏答案

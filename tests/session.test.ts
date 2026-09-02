@@ -243,6 +243,18 @@ describe('move: path and clue read log', () => {
     move(s, { x: 2, y: 0 });
     expect(s.readLog).toHaveLength(2);
   });
+
+  it('leaves readClues and readLog empty when stepping onto cells with no clue', () => {
+    // C1 回歸釘子：線索唯一落在 (2,0)，(0,1)/(1,1)/(1,2) 都是空草地。
+    // readClues 若少了「該格真的有線索」這個條件，會在每一步都被灌水，
+    // 汙染 codex 研究筆記數、教學提示觸發時機（見 ResultScene / MapScene）。
+    const s = makeState();
+    move(s, { x: 0, y: 1 });
+    move(s, { x: 1, y: 1 });
+    move(s, { x: 1, y: 2 });
+    expect(s.readClues.size).toBe(0);
+    expect(s.readLog).toHaveLength(0);
+  });
 });
 
 describe('toggleMute', () => {
