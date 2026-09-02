@@ -229,6 +229,20 @@ describe('checkCellAction: wager', () => {
   });
 });
 
+describe('checkCellAction: cells outside the grid', () => {
+  it('rejects an out-of-grid cell for either action', () => {
+    // 這是回歸測試：CONE 只含格內座標，因此少了邊界守衛時，界外格會因為
+    // 「不在錐形裡」而被判成正確的排除。
+    const outside = [
+      { x: -1, y: -1 }, { x: DEMO_SIZE, y: 0 }, { x: 0, y: DEMO_SIZE }, { x: 99, y: 99 },
+    ];
+    for (const cell of outside) {
+      expect(checkCellAction('exclude', cell)).toBe('demo.hint.exclude');
+      expect(checkCellAction('wager', cell)).toBe('demo.hint.wager');
+    }
+  });
+});
+
 describe('checkMuteAction', () => {
   it('accepts the decoy', () => {
     expect(checkMuteAction(DECOY_INDEX)).toBe(null);

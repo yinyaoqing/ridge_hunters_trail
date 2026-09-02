@@ -178,8 +178,12 @@ export function demoUnseen(step: DemoStep): Set<string> {
 // 排除只接受錐形外的格子：這一步要教的正是「線索的作用是排除」，
 // 點進錐形內就代表這件事還沒學會，此時給提示比給通過更有價值。
 export function checkCellAction(action: 'exclude' | 'wager', cell: Vec2): MsgKey | null {
-  if (action === 'exclude') return CONE.has(key(cell)) ? 'demo.hint.exclude' : null;
-  return key(cell) === key(DEMO_TARGET) ? null : 'demo.hint.wager';
+  // 界外一律當成答錯。CONE 只含格內座標，所以少了這道守衛時，界外的格子
+  // 會因為「不在錐形裡」而被判成正確的排除——一個永遠不該回答「對」的輸入。
+  // 場景層的點擊處理另有自己的邊界檢查；這裡守的是這個匯出函式自身的契約。
+  const inside = cell.x >= 0 && cell.y >= 0 && cell.x < DEMO_SIZE && cell.y < DEMO_SIZE;
+  if (action === 'exclude') return !inside || CONE.has(key(cell)) ? 'demo.hint.exclude' : null;
+  return inside && key(cell) === key(DEMO_TARGET) ? null : 'demo.hint.wager';
 }
 
 export function checkMuteAction(clueIndex: number): MsgKey | null {
