@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { visionRadius, cellsWithin, BASE_VISION } from '../src/core/vision';
+import { TERRAIN_TYPES } from '../src/core/types';
 
 describe('visionRadius', () => {
   it('uses the base radius on flat open ground', () => {
@@ -18,8 +19,22 @@ describe('visionRadius', () => {
     expect(visionRadius('thicket', 0.45)).toBe(BASE_VISION - 1);
   });
 
-  it('never drops below two cells, even in a high thicket', () => {
-    expect(visionRadius('thicket', 0)).toBeGreaterThanOrEqual(2);
+  it('never returns less than two cells for any terrain or elevation', () => {
+    // 視野下限 Math.max(2, r) 目前無法觸發（BASE_VISION=3，唯一懲罰-1），
+    // 但留存作為未來防禦——第6、7階段將加入氣候和生物懲罰，可能突破現有上限。
+    for (const terrain of TERRAIN_TYPES) {
+      for (let elevation = 0; elevation <= 1; elevation += 0.05) {
+        expect(visionRadius(terrain, elevation)).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it('grows gradually with elevation, not as a step function', () => {
+    // 若改為簡單的 "elevation >= 0.5 則 +2" 階級函數，下列三個高度都會回傳 5，測試會失敗。
+    // 驗證公式確實按 (elevation - 0.5) * 8 階梯式縮放，而非平坦 +2。
+    expect(visionRadius('meadow', 0.6)).toBe(3);   // floor(0.1*8) = 0, no bonus
+    expect(visionRadius('meadow', 0.65)).toBe(4);  // floor(0.15*8) = 1, +1 bonus
+    expect(visionRadius('meadow', 0.75)).toBe(5);  // floor(0.25*8) = 2, capped at +2
   });
 });
 

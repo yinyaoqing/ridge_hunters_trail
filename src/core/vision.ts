@@ -13,6 +13,7 @@ export function visionRadius(terrain: TerrainType, elevation: number): number {
   let r = BASE_VISION;
   if (elevation >= 0.5) r += Math.min(2, Math.floor((elevation - 0.5) * 8));
   if (terrain === 'thicket') r -= 1;
+  // 視野下限目前無法觸發（BASE_VISION=3，唯一懲罰-1），但留存作為未來防禦。
   return Math.max(2, r);
 }
 
