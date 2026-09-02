@@ -29,6 +29,20 @@ export function cycleMark(marks: MarkMap, k: string): void {
   marks.set(k, next);
 }
 
+// 只切換押注、不經過三態循環（設計裁定 F3）：押注是計分承諾而非實地筆記，
+// 因此不受「限於看過的格」的規則約束，需要一個能直接對未看過的格下押注的入口。
+// 沒有押注時設為押注（並清掉舊押注，維持全域唯一，同 cycleMark 的規則）；已是押注時清除。
+export function toggleWager(marks: MarkMap, k: string): void {
+  if (marks.get(k) === 'wager') {
+    marks.delete(k);
+    return;
+  }
+  for (const [ck, kind] of marks) {
+    if (kind === 'wager') marks.delete(ck);
+  }
+  marks.set(k, 'wager');
+}
+
 export function wagerKey(marks: MarkMap): string | null {
   for (const [k, kind] of marks) {
     if (kind === 'wager') return k;

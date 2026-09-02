@@ -76,3 +76,41 @@ export function findPath(
 export function pathCost(terrain: TerrainType[][], path: Vec2[]): number {
   return path.reduce((sum, c) => sum + TERRAIN_COST[terrain[c.y][c.x]], 0);
 }
+
+// 從 from 出發，一次 Dijkstra 算出到每個可達格的最省路線成本（成本記在踏入的格，
+// 與 TERRAIN_COST／session.move() 的扣款規則一致）。不可通行格不會出現在結果中。
+// 純計算、不吃 rng——F2 用它在生成期挑起始蹤跡，生成流程的 rng 消耗順序不能被打亂。
+// 生成期還沒有迷霧，所以走全圖，不像 findPath 需要 seen 參數。
+export function routeCostsFrom(terrain: TerrainType[][], from: Vec2): Map<string, number> {
+  const height = terrain.length;
+  const fromRow = terrain[from.y];
+  if (!fromRow || from.x < 0 || from.x >= fromRow.length || !isPassable(fromRow[from.x])) return new Map();
+  const cost = new Map<string, number>([[key(from), 0]]);
+  // 開放集以陣列＋線性取最小值實作，理由同 findPath：地圖規模小，二元堆換不回實作成本。
+  const open: { p: Vec2; c: number }[] = [{ p: from, c: 0 }];
+
+  while (open.length > 0) {
+    let bestIdx = 0;
+    for (let i = 1; i < open.length; i++) if (open[i].c < open[bestIdx].c) bestIdx = i;
+    const { p, c: pc } = open.splice(bestIdx, 1)[0];
+    if (pc > (cost.get(key(p)) ?? Infinity)) continue; // 過期的舊紀錄，已被更省的路線取代
+
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const q = { x: p.x + dx, y: p.y + dy };
+        if (q.y < 0 || q.y >= height) continue;
+        const qRow = terrain[q.y];
+        if (!qRow || q.x < 0 || q.x >= qRow.length) continue;
+        const t = qRow[q.x];
+        if (!isPassable(t)) continue;
+        const tentative = pc + TERRAIN_COST[t];
+        const qk = key(q);
+        if (tentative >= (cost.get(qk) ?? Infinity)) continue;
+        cost.set(qk, tentative);
+        open.push({ p: q, c: tentative });
+      }
+    }
+  }
+  return cost;
+}

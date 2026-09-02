@@ -6,6 +6,7 @@ import { key, intersect } from './clues';
 import { applyQuirk, elevationBiasFor } from './quirks';
 import { buildTerrain, startCorner, elevationFor, BAND_CLIFF } from './terrain';
 import { ensureReachable } from './reach';
+import { routeCostsFrom } from './path';
 import { applyWeather, WEATHER_POOL } from './weather';
 import { CREATURES } from '../data/creatures';
 
@@ -121,14 +122,19 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   const start = startCorner(size, targetPos);
   ensureReachable(terrain, start, [targetPos, ...clues.map((c) => c.position), ...supplies]);
 
-  // 起始蹤跡：離出生角最近的真線索。視野收窄後，出生角附近通常一條線索都看不見，
-  // 開局面對全空的地圖會變成亂走——給玩家一條線可以拉，其餘的靠走與眺望自己找。
+  // 起始蹤跡：出生角走過去體力花費最低的真線索（F2：不能用直線距離——一條隔著挖通
+  // 岩坡稜脊的線索，直線比較近但走過去可能貴得多）。純計算、不消耗 rng，且必須放在
+  // ensureReachable 之後：挖通會改地形，成本表要反映挖通後的地圖。
+  // 用一次 Dijkstra（routeCostsFrom）算出全圖成本，平手時維持既有的決定性規則——取索引最小者。
+  const routeCosts = routeCostsFrom(terrain, start);
   let trailheadIndex = 0;
   let best = Infinity;
   clues.forEach((c, i) => {
     if (c.isDecoy) return;
-    const d = dist(start, c.position);
-    if (d < best) { best = d; trailheadIndex = i; }
+    // 理論上 ensureReachable 已保證每條真線索都在成本表中；不在表中的（不可能發生）略過
+    const cost = routeCosts.get(key(c.position));
+    if (cost === undefined) return;
+    if (cost < best) { best = cost; trailheadIndex = i; }
   });
 
   // ensureReachable 只改 terrain（見 reach.ts 開頭註解），不知道 elevation 網格的存在，

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findPath, pathCost } from '../src/core/path';
+import { findPath, pathCost, routeCostsFrom } from '../src/core/path';
 import { cheb, type Vec2 } from '../src/core/geometry';
 import { key } from '../src/core/clues';
 import type { TerrainType } from '../src/core/types';
@@ -134,6 +134,47 @@ describe('findPath: handles ragged grids with per-row bounds', () => {
     // 起點 (0,0)，目標 (5,1) ——在第一列內但超出第二列的 4 格，應回傳 null
     const p = findPath(t, { x: 0, y: 0 }, { x: 5, y: 1 }, seen);
     expect(p).toBeNull();
+  });
+});
+
+describe('routeCostsFrom', () => {
+  // F2：起始蹤跡挑選要用「走過去要付的體力」而非直線距離，這裡直接測 Dijkstra 本身。
+  // 生成期還沒有迷霧，所以不吃 seen 參數——全圖都算得到成本。
+
+  it('gives the origin a cost of zero', () => {
+    const t = grid(['...', '...', '...']);
+    const costs = routeCostsFrom(t, { x: 1, y: 1 });
+    expect(costs.get(key({ x: 1, y: 1 }))).toBe(0);
+  });
+
+  it('routes around a cliff wall instead of assuming a straight line', () => {
+    const t = grid(['..#..', '..#..', '..#..', '..#..', '.....']);
+    const costs = routeCostsFrom(t, { x: 0, y: 0 });
+    // 直線距離是 4，但牆只在最下一列有缺口，最省路線要繞下去再繞回來
+    expect(costs.get(key({ x: 4, y: 0 }))).toBeGreaterThan(4);
+  });
+
+  it('prefers a cheap detour over an expensive straight line', () => {
+    // 直行穿三格岩坡成本 4×3=12；繞下方草地走（可走對角，八方向）成本僅 4
+    // （(0,0)→(1,1)→(2,1)→(3,1)→(4,0)，每步草地 1）——遠低於直線的 12。
+    const t = grid(['.rrr.', '.....', '.....']);
+    const costs = routeCostsFrom(t, { x: 0, y: 0 });
+    expect(costs.get(key({ x: 4, y: 0 }))).toBe(4);
+    expect(costs.get(key({ x: 4, y: 0 }))).toBeLessThan(12);
+  });
+
+  it('omits impassable cells from the result', () => {
+    const t = grid(['.#.', '.#.', '.#.']);
+    const costs = routeCostsFrom(t, { x: 0, y: 0 });
+    expect(costs.has(key({ x: 1, y: 0 }))).toBe(false);
+    expect(costs.has(key({ x: 1, y: 1 }))).toBe(false);
+    expect(costs.has(key({ x: 1, y: 2 }))).toBe(false);
+  });
+
+  it('does not include unreachable cells cut off by a full wall', () => {
+    const t = grid(['..#..', '..#..', '..#..', '..#..', '..#..']);
+    const costs = routeCostsFrom(t, { x: 0, y: 0 });
+    expect(costs.has(key({ x: 3, y: 0 }))).toBe(false);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  newSession, canMove, move, cycleMarkAt, toggleMute, resolveQte, nextSession, useBell, survey,
+  newSession, canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, resolveQte, nextSession, useBell, survey,
   TERRAIN_COST, isPassable, type SessionState,
 } from '../src/core/session';
 import { mulberry32 } from '../src/core/rng';
@@ -200,6 +200,33 @@ describe('cycleMarkAt', () => {
   });
 });
 
+describe('toggleWagerAt', () => {
+  // F3（設計裁定）：押注不受迷霧限制——玩家可以在還沒看過的格下押注。
+  it('places a wager on an unseen cell', () => {
+    const s = makeState();
+    expect(s.seen.has('4,4')).toBe(false);
+    toggleWagerAt(s, { x: 4, y: 4 });
+    expect(s.marks.get('4,4')).toBe('wager');
+  });
+
+  it('clears the wager when toggled again on the same cell', () => {
+    const s = makeState();
+    toggleWagerAt(s, { x: 4, y: 4 });
+    toggleWagerAt(s, { x: 4, y: 4 });
+    expect(s.marks.has('4,4')).toBe(false);
+  });
+
+  it('keeps the wager unique across seen and unseen cells', () => {
+    const s = makeState();
+    cycleMarkAt(s, { x: 0, y: 0 }); // exclude 一個看過的格
+    toggleWagerAt(s, { x: 4, y: 4 }); // 未看過的格下押注
+    toggleWagerAt(s, { x: 3, y: 3 }); // 另一個未看過的格改押注
+    expect(s.marks.get('0,0')).toBe('exclude'); // 不受影響
+    expect(s.marks.has('4,4')).toBe(false); // 舊押注被清掉
+    expect(s.marks.get('3,3')).toBe('wager');
+  });
+});
+
 describe('move: path and clue read log', () => {
   it('records every visited cell in order, starting from the spawn', () => {
     const s = makeState();
@@ -394,5 +421,15 @@ describe('survey', () => {
   it('is refused outside the explore phase', () => {
     const s = makeState({ stamina: 20, phase: 'qte' });
     expect(survey(s)).toBe(false);
+  });
+
+  it('exhausts when stamina lands at exactly the survey cost (F1 soft-lock boundary)', () => {
+    // 體力恰好等於 SURVEY_COST：眺望花完體力歸零，此後沒有任何移動負擔得起。
+    // survey() 必須和 move() 一樣在此時宣告 phase = 'exhausted'，否則玩家會卡在
+    // 一個永遠回不到 'exhausted' 的 'explore' 狀態（見 F1 修正說明）。
+    const s = makeState({ stamina: SURVEY_COST });
+    expect(survey(s)).toBe(true);
+    expect(s.stamina).toBe(0);
+    expect(s.phase).toBe('exhausted');
   });
 });

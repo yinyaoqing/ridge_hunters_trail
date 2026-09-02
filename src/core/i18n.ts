@@ -30,7 +30,6 @@ export type MsgKey =
   | 'reveal.noCall' | 'reveal.decoy' | 'reveal.infoAt' | 'reveal.dailyHidden'
   | 'btn.continue'
   | 'help.marks' | 'help.layer' | 'help.reveal'
-  | 'terrain.cliff'
   | 'hud.survey' | 'hud.surveyCost' | 'hud.pathCost'
   | 'help.vision' | 'help.survey' | 'help.route'
   | 'score.gain' | 'score.pot' | 'score.lost' | 'btn.bank' | 'btn.push' | 'camp.best' | 'camp.carry';
@@ -39,7 +38,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
     'hud.round': 'Round {n}',
     'hud.stamina': 'Stamina {n}',
-    'hud.hint': 'Move: click/arrow keys · Mark: Shift+click',
+    'hud.hint': 'Move: click/arrow keys · Look: space · Mark: Shift+click',
     'hud.mark': 'Mark',
     'qte.title': 'Close Encounter',
     'qte.instruction': 'Tap or press SPACE when the needle crosses the glowing arc',
@@ -129,7 +128,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.marks': 'Mark a cell again and again to cycle it: ruled out, maybe, my call. Your call sets your record quality.',
     'help.layer': 'Layer shades each cell by how many read clues agree. Mark a clue you already read to mute it.',
     'help.reveal': 'Every hunt ends by revealing where it really was and how close your call landed.',
-    'terrain.cliff': 'Cliff — no way through.',
     'hud.survey': 'Look',
     'hud.surveyCost': '-{n} to look around',
     'hud.pathCost': '{n}',
@@ -140,7 +138,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   'zh-TW': {
     'hud.round': '第 {n} 局',
     'hud.stamina': '體力 {n}',
-    'hud.hint': '移動：點擊/方向鍵 · 標記：Shift+點擊',
+    'hud.hint': '移動：點擊/方向鍵 · 眺望：空白鍵 · 標記：Shift+點擊',
     'hud.mark': '標記',
     'qte.title': '近距離判讀',
     'qte.instruction': '指針掃過發光弧區時點擊或按空白鍵',
@@ -230,7 +228,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.marks': '反覆標記同一格可循環：排除、存疑、押注。押注格決定你的記錄品質。',
     'help.layer': '「圖層」依符合的已判讀線索數為格子上色；標記已判讀的線索可將它靜音。',
     'help.reveal': '每一局結束都會揭曉牠實際在哪，以及你的押注差了幾格。',
-    'terrain.cliff': '崖壁——過不去。',
     'hud.survey': '眺望',
     'hud.surveyCost': '眺望 -{n}',
     'hud.pathCost': '{n}',

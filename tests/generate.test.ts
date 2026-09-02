@@ -10,6 +10,7 @@ import { applyQuirk } from '../src/core/quirks';
 import { applyWeather } from '../src/core/weather';
 import { reachableFrom } from '../src/core/reach';
 import { BAND_CLIFF, BAND_ROCK, BAND_THICKET } from '../src/core/terrain';
+import { routeCostsFrom } from '../src/core/path';
 import type { TerrainType } from '../src/core/types';
 
 describe('generateLevel (property tests over 200 seeds)', () => {
@@ -212,14 +213,25 @@ describe('generateLevel: trailhead', () => {
     }
   });
 
-  it('picks the real clue nearest the spawn corner, so there is a thread to pull', () => {
-    for (let seed = 1; seed <= 20; seed++) {
-      const level = generateLevel(5, mulberry32(seed));
-      const start = startCorner(level.mapSize, level.targetPos);
-      const chosen = level.clues[level.trailheadIndex];
-      for (const c of level.clues) {
-        if (c.isDecoy) continue;
-        expect(dist(start, chosen.position)).toBeLessThanOrEqual(dist(start, c.position));
+  it('picks the real clue with the lowest route cost from spawn, not merely nearest by straight-line distance (F2)', () => {
+    // 直線距離挑選會漏掉「5 格外但隔著挖通的岩坡稜脊」比「8 格外橫跨草地」貴的情況——
+    // 改用 routeCostsFrom 在生成完成（含 ensureReachable 挖出的隘口）後的地形上重算，
+    // 斷言 trailhead 就是所有真線索裡路線成本最低者；平手時取索引最小者。
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const round of [1, 5, 9]) {
+        const level = generateLevel(round, mulberry32(seed));
+        const start = startCorner(level.mapSize, level.targetPos);
+        const costs = routeCostsFrom(level.terrain, start);
+        const real = level.clues
+          .map((c, i) => ({ c, i }))
+          .filter(({ c }) => !c.isDecoy);
+        const minCost = Math.min(...real.map(({ c }) => costs.get(key(c.position)) ?? Infinity));
+        const chosenCost = costs.get(key(level.clues[level.trailheadIndex].position)) ?? Infinity;
+        expect(chosenCost).toBe(minCost);
+        // 平手時取索引最小者：所有成本等於 minCost 的真線索裡，trailheadIndex 必須是最小的那個
+        const tiedIndices = real.filter(({ c }) => (costs.get(key(c.position)) ?? Infinity) === minCost)
+          .map(({ i }) => i);
+        expect(level.trailheadIndex).toBe(Math.min(...tiedIndices));
       }
     }
   });

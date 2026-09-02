@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { canMove, move, cycleMarkAt, toggleMute, useBell, survey, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
+import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
 import { visionRadius, SURVEY_COST, SURVEY_BONUS } from '../core/vision';
 import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
 import { getDifficulty } from '../core/difficulty';
@@ -138,6 +138,10 @@ export class MapScene extends Phaser.Scene {
     this.bellChipText = undefined;
     this.lowTween = undefined;
     this.hoverCell = null;
+    // F9：pressAt 記著上一次 pointerdown 的時間戳。手機收合網址列觸發 restartOnResize
+    // 的 scene.restart() 若沒清掉它，之後的 pointerup 會拿舊時間戳算 held，可能超過 350ms
+    // 門檻，把一次輕點誤判成長按的標記手勢——與這個重置區塊本身要防的其他殘留同一類 bug。
+    this.pressAt = null;
     const w = this.scale.width;
     const h = this.scale.height;
     this.pal = getPalette(s.round);
@@ -215,13 +219,15 @@ export class MapScene extends Phaser.Scene {
   }
 
   // 引導 step0：高亮起始蹤跡（generate 保證它是真線索且開局即可見）
+  // 變數名為 trailhead 而非 nearest：F2 之後「起始蹤跡」是路線成本最低者，不再是直線距離最近者，
+  // 沿用舊名會讓下一個讀者誤把距離挑選加回來。
   private startTutStep0(s: SessionState) {
-    const nearest = s.level.clues[s.level.trailheadIndex];
-    if (s.readClues.has(key(nearest.position))) return; // 防禦：已讀就不再引導
+    const trailhead = s.level.clues[s.level.trailheadIndex];
+    if (s.readClues.has(key(trailhead.position))) return; // 防禦：已讀就不再引導
     const cs = this.cell;
     const p = {
-      x: this.ox + nearest.position.x * cs + cs / 2,
-      y: this.oy + nearest.position.y * cs + cs / 2,
+      x: this.ox + trailhead.position.x * cs + cs / 2,
+      y: this.oy + trailhead.position.y * cs + cs / 2,
     };
     pulseHighlight(this, p.x, p.y, cs * 0.6, this.pal.gold);
     this.showTut('tut.move');
@@ -812,6 +818,9 @@ export class MapScene extends Phaser.Scene {
     floatText(this, c.x, c.y - cs * 0.5,
       this.i18n().t('hud.surveyCost', { n: SURVEY_COST }), cssHex(this.pal.supply));
     this.redraw();
+    // F1：眺望也可能讓體力歸零、觸發力竭（session.survey 現在會宣告 phase = 'exhausted'）。
+    // 沒有這一呼叫，場景永遠不會淡出到 Reveal，玩家會卡在無法動作的畫面上。
+    this.afterMove();
   }
 
   private toGrid(px: number, py: number): Vec2 | null {
@@ -890,8 +899,18 @@ export class MapScene extends Phaser.Scene {
     if (!cellPos) return;
     const wantMark = (p.event as MouseEvent).shiftKey || this.markMode || held >= 350;
     if (wantMark) {
-      // 沒看過的地不能標記：玩家還不知道那裡有什麼，標了也只是猜
-      if (!s.seen.has(key(cellPos))) return;
+      // F3（設計裁定）：排除／存疑仍限於看過的格（它們是實地筆記），但押注不是筆記而是
+      // 計分承諾——玩家可以從線索幾何推斷牠在一片還沒去過的地方，先下注再走過去驗證。
+      // 未看過的格因此改為只能下押注，而不是直接 return 擋掉整個標記手勢。
+      if (!s.seen.has(key(cellPos))) {
+        toggleWagerAt(s, cellPos);
+        // 浮字提示與既有規則一致：下押注時浮字，清除押注（切回無標記）時不浮字
+        if (s.marks.get(key(cellPos)) === 'wager') {
+          this.floatAboveCell(cellPos, this.i18n().t('mark.wager'), this.pal.gold);
+        }
+        this.redraw();
+        return;
+      }
       // 已判讀的線索格：標記手勢改為切換該線索的靜音（在該格上做標記本來就沒有意義，
       // 而「暫時拿掉這條線索看看」是玩家最需要的假說檢驗動作——診斷 B-03）
       // 同格可能不只一條線索（F1）：切換全部索引，不然斜槓／覆蓋層／熱度三者會不同步。

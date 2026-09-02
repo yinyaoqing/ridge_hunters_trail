@@ -1,10 +1,10 @@
 import { cheb, type Vec2 } from './geometry';
-import type { Level } from './types';
+import type { Level, TerrainType } from './types';
 import { getDifficulty } from './difficulty';
 import { generateLevel } from './generate';
 import { key } from './clues';
 import type { Rng } from './rng';
-import { cycleMark, type MarkMap } from './marks';
+import { cycleMark, toggleWager, type MarkMap } from './marks';
 import { TERRAIN_COST, isPassable, startCorner } from './terrain';
 import { visionRadius, cellsWithin, SURVEY_COST, SURVEY_BONUS } from './vision';
 
@@ -12,11 +12,19 @@ import { visionRadius, cellsWithin, SURVEY_COST, SURVEY_BONUS } from './vision';
 // 既有呼叫端（MapScene、測試）沿用 session 的匯入點不變
 export { TERRAIN_COST, isPassable, startCorner };
 
+// 玩家所在格的 terrain/elevation：revealAround 與 survey 都要查這一對值，
+// 抽成共用小函式避免兩處各自重複同一段查詢（F1 順帶整併）。
+function groundUnderPlayer(s: SessionState): { terrain: TerrainType; elevation: number } {
+  return {
+    terrain: s.level.terrain[s.player.y][s.player.x],
+    elevation: s.level.elevation[s.player.y][s.player.x],
+  };
+}
+
 // 把玩家當前視野內的格加進 seen。單向累積：看過的地就不會再變回未知。
 export function revealAround(s: SessionState): void {
-  const t = s.level.terrain[s.player.y][s.player.x];
-  const e = s.level.elevation[s.player.y][s.player.x];
-  for (const k of cellsWithin(s.player, visionRadius(t, e), s.level.mapSize)) s.seen.add(k);
+  const { terrain, elevation } = groundUnderPlayer(s);
+  for (const k of cellsWithin(s.player, visionRadius(terrain, elevation), s.level.mapSize)) s.seen.add(k);
 }
 
 // 駐足眺望：花體力掃過比站著更寬的一圈。同一格只能眺望一次——第二次不會有新資訊，
@@ -28,10 +36,13 @@ export function survey(s: SessionState): boolean {
   if (s.stamina < SURVEY_COST) return false;
   s.stamina -= SURVEY_COST;
   s.surveyed.add(k);
-  const t = s.level.terrain[s.player.y][s.player.x];
-  const e = s.level.elevation[s.player.y][s.player.x];
-  const r = visionRadius(t, e) + SURVEY_BONUS;
+  const { terrain, elevation } = groundUnderPlayer(s);
+  const r = visionRadius(terrain, elevation) + SURVEY_BONUS;
   for (const kk of cellsWithin(s.player, r, s.level.mapSize)) s.seen.add(kk);
+  // F1：眺望花光體力（或花完後已無負擔得起的鄰格移動）卻不宣告力竭，會把玩家鎖進一個
+  // 永遠回不到 'exhausted'、也做不了任何動作的 'explore' 狀態。套用與 move() 結尾
+  // 相同的兩項判斷，讓眺望也能正常觸發力竭收尾。
+  if (s.stamina <= 0 || !hasAffordableMove(s)) s.phase = 'exhausted';
   return true;
 }
 
@@ -150,6 +161,12 @@ export function move(s: SessionState, to: Vec2): void {
 // 三態標記推進：排除 → 存疑 → 押注 → 無（押注唯一性由 marks.cycleMark 保證）
 export function cycleMarkAt(s: SessionState, p: Vec2): void {
   cycleMark(s.marks, key(p));
+}
+
+// 只切換押注（F3 設計裁定）：押注是計分承諾，不像排除／存疑受限於看過的格，
+// 讓玩家能在走過去之前先押注——這正是判讀精準度評分要考驗的推理能力。
+export function toggleWagerAt(s: SessionState, p: Vec2): void {
+  toggleWager(s.marks, key(p));
 }
 
 // 線索靜音：把一條已判讀的線索排除在候選熱區之外，用來檢驗「如果這條是假的呢」

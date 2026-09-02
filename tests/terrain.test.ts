@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { terrainFor, buildTerrain, elevationFor } from '../src/core/terrain';
-import { mulberry32 } from '../src/core/rng';
+import { terrainFor, buildTerrain, elevationFor, startCorner } from '../src/core/terrain';
+import { mulberry32, type Rng } from '../src/core/rng';
 import type { TerrainType } from '../src/core/types';
 
 describe('terrainFor', () => {
@@ -77,6 +77,44 @@ describe('buildTerrain', () => {
     expect(share).toBeLessThan(0.20);     // 但不能多到把地圖切碎
   });
 
+  // F6：上面那條測試只約束 60 顆種子的總體平均比例，會把「單張地圖崖壁多到切碎」
+  // 和「單張地圖一格崖壁都沒有」兩個極端一起平均掉。這裡逐張地圖分別檢查。
+  it('bounds cliff share on every individual map, not just the aggregate (F6)', () => {
+    // 實測（100 顆種子，size 20，elevationBias 0，與上面既有測試同一套參數慣例）：
+    // p90 ≈ 5.5%，單張最糟 14.75%。0.30 訂在目前最糟值之上，但仍遠低於「把地圖切碎」
+    // 的程度，BAND_CLIFF 哪天被調鬆到明顯退化時這裡會紅。
+    for (let seed = 1; seed <= 100; seed++) {
+      const { terrain } = buildTerrain(mulberry32(seed), 20, 0);
+      let cliff = 0;
+      let total = 0;
+      for (const row of terrain) {
+        for (const t of row) {
+          total++;
+          if (t === 'cliff') cliff++;
+        }
+      }
+      expect(cliff / total).toBeLessThan(0.30);
+    }
+  });
+
+  it('consumes exactly 160 rng calls, independent of map size (F6 — daily-determinism guard)', () => {
+    // BASE_GRID/DETAIL_GRID 是寫死的常數：rng 消耗次數只該取決於它們，不該取決於 size。
+    // 這條測試用計數用的假 rng，對兩個不同的 size 各建一次地圖，斷言呼叫次數相同且為 160——
+    // 這是每日挑戰決定性的護欄：BASE_GRID/DETAIL_GRID 哪天被動到，這裡會立刻紅。
+    function countingRng(): { rng: Rng; count: () => number } {
+      let n = 0;
+      const rng: Rng = () => { n++; return 0.5; };
+      return { rng, count: () => n };
+    }
+    const a = countingRng();
+    buildTerrain(a.rng, 15, 0);
+    const b = countingRng();
+    buildTerrain(b.rng, 25, 0);
+    expect(a.count()).toBe(160);
+    expect(b.count()).toBe(160);
+    expect(a.count()).toBe(b.count());
+  });
+
   it('elevationBias shifts the whole field upward, yielding more rock and cliff', () => {
     const count = (t: TerrainType, bias: number): number => {
       const { terrain } = buildTerrain(mulberry32(21), 20, bias);
@@ -108,5 +146,36 @@ describe('elevationFor', () => {
     expect(elevationFor('thicket')).toBeCloseTo(0.50);
     expect(elevationFor('rock')).toBeCloseTo(0.72);
     expect(elevationFor('cliff')).toBeCloseTo(0.91);
+  });
+});
+
+// F8：startCorner 現在同時被 generate.ts（可達性保證的錨點）與 newSession（玩家開局位置）
+// 使用，是兩個保證的共同地基，之前只透過 newSession 間接覆蓋，這裡補上直接測試。
+describe('startCorner', () => {
+  const mapSize = 10; // s = 9
+  const s = mapSize - 1;
+
+  it('picks the bottom-right corner when the target sits at top-left', () => {
+    expect(startCorner(mapSize, { x: 0, y: 0 })).toEqual({ x: s, y: s });
+  });
+
+  it('picks the top-left corner when the target sits at bottom-right', () => {
+    expect(startCorner(mapSize, { x: s, y: s })).toEqual({ x: 0, y: 0 });
+  });
+
+  it('picks the bottom-left corner when the target sits at top-right', () => {
+    expect(startCorner(mapSize, { x: s, y: 0 })).toEqual({ x: 0, y: s });
+  });
+
+  it('picks the top-right corner when the target sits at bottom-left', () => {
+    expect(startCorner(mapSize, { x: 0, y: s })).toEqual({ x: s, y: 0 });
+  });
+
+  it('breaks ties deterministically — same input always yields the same corner', () => {
+    // mapSize 3、target (1,0)：左下 (0,2) 與右下 (2,2) 到 target 的歐氏距離恰好相等
+    // (sqrt(1²+2²) 兩邊算式相同)。輸出必須每次都是同一個角，不能因平手而漂移。
+    const target = { x: 1, y: 0 };
+    const first = startCorner(3, target);
+    for (let i = 0; i < 5; i++) expect(startCorner(3, target)).toEqual(first);
   });
 });
