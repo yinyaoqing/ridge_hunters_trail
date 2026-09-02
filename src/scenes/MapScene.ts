@@ -122,6 +122,22 @@ export class MapScene extends Phaser.Scene {
     this.animating = false;
     this.previewPath = null;
     this.previewTo = null;
+    // 同一個道理套用在下列選用欄位：weatherText/hintText 只在特定版面條件下才建立
+    // （見 buildHud，桌機視窗跨 560px 斷點就會有無 → 建立/建立 → 無的落差）；tutText/tutBg
+    // 只由 hideTut() 在教學結束時清除；bellChipG/bellChipText 只在持有微光鈴時建立；
+    // lowTween 只在體力低於 25% 時啟動。重啟沿用同一個 Scene 實例，這些欄位值會存活，
+    // 但它們指向的 GameObject／Tween 已隨場景 shutdown 被銷毀——殘留的 truthy 參照會讓
+    // 既有的 `if (this.xxx)` 守衛誤判為「已建立」，直接對死物件呼叫 setText／setColor／
+    // stop 而丟出 TypeError（D3／D6）。hoverCell 則沒有崩潰風險，但殘留舊格座標會讓
+    // 重啟後第一次把指標移到同一格命中「與上次相同」的早退，不畫 hover 也不畫預覽（D5）。
+    this.weatherText = undefined;
+    this.hintText = undefined;
+    this.tutText = undefined;
+    this.tutBg = undefined;
+    this.bellChipG = undefined;
+    this.bellChipText = undefined;
+    this.lowTween = undefined;
+    this.hoverCell = null;
     const w = this.scale.width;
     const h = this.scale.height;
     this.pal = getPalette(s.round);
@@ -681,6 +697,10 @@ export class MapScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', (p: Phaser.Input.Pointer) => {
         p.event.stopPropagation();
+        // chip 是獨立互動矩形，永遠不會經過 onPointerUp 的 walking 守衛，需自己這一份——
+        // 比照鈴 chip 的處理。眺望花體力揭示一大片區域，是全遊戲單次資訊增益最大的動作，
+        // 若行走途中能繞過守衛觸發，「一讀到新東西就停」在最富資訊量的動作上就被違反了（D2）
+        if (this.walking) return;
         this.doSurvey();
       });
   }
@@ -825,11 +845,16 @@ export class MapScene extends Phaser.Scene {
   // 看不見上下文、卻仍留在畫面上的預覽（C6）。唯一的例外是全域 pointerdown（見該呼叫點），
   // 那一下可能是確認點擊本身，傳 false 讓預覽狀態撐到 onPointerUp 判斷完再清。
   private clearHover(alsoClearPreview = true) {
+    // 清預覽要排在 hoverCell===null 的早退之前：pointerdown 已把 hoverCell 設為 null
+    // （見該處呼叫點註解，故意傳 false 保留預覽），若清預覽的判斷寫在早退之後，
+    // onPointerMove 在拖曳期間（此時 hoverCell 早已是 null）呼叫 clearHover() 就會整個
+    // 變成空操作、連清預覽都不會發生——拖曳放開後金線與花費標籤會一直卡在畫面上，直到
+    // 下一次指標移動才消失（D4，C6 的拖曳症狀只關閉了一半）。
+    if (alsoClearPreview) this.clearPreview();
     if (this.hoverCell === null) return;
     this.hoverCell = null;
     this.hoverG.clear();
     this.hoverCostText?.setVisible(false);
-    if (alsoClearPreview) this.clearPreview();
   }
 
   private drawHover(c: Vec2, s: SessionState) {
@@ -992,6 +1017,15 @@ export class MapScene extends Phaser.Scene {
       const eventsBefore = s.microEvents;
       const next = path[i++];
       if (!canMove(s, next)) { this.walking = false; return; }
+      // animating 是單步防重入旗標，補間跑滿 100ms 才會清；但 move() 是同步的，玩家位置
+      // 在補間播完之前就已更新。這個窗口內把滑鼠移到別處已探索格，hover 會用「已更新的
+      // 玩家位置」同步重算出一條合法路線；此時點下去會通過相鄰性檢查、觸發新的 walkPath，
+      // 而 doMove 開頭的 `if (this.animating || !canMove) return;` 提前返回不會呼叫
+      // onStepDone。不在這裡擋住，walking 就會永久卡在 true，直到偶然的 scene.restart()
+      // 才會解——這正是第一輪修正把 delayedCall(130) 換成完成回呼時，意外丟掉的自癒特性
+      // （D1，第一輪修正引入的迴歸）。故意不改成在 doMove 的提前返回路徑呼叫 onStepDone：
+      // 那會讓「這一步沒發生」與「這一步做完了」共用同一個回呼，語意較差。
+      if (this.animating) { this.walking = false; return; }
       this.doMove(next, () => {
         const now = this.session();
         const learnedSomething = now.readClues.size > readBefore
