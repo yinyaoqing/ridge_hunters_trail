@@ -36,6 +36,9 @@ export class HelpScene extends Phaser.Scene {
     // 10 列版面預算（Phase 4）：列距維持 44px，末列 y=py0+574，
     // 開始按鈕上緣＝py0+ph-56-24=py0+600，間距 26px（與 9 列版相同的淨空）。
     // 面板底緣 py0+ph = 78+680 = 758，仍在規格書 §11.1 的 720×780 embed 視窗內。
+    // 已知限制（不在本階段修）：面板高度是固定值，視窗高度低於 758px 時底部會被裁切。
+    // 這在改動前（714px）就已存在，本次讓門檻上升 44px。Phase 5 若再增加說明列，
+    // 應比照 CodexScene 把說明列表改為可捲動，而不是繼續加高面板。
     const ph = 680;
     const px0 = cx - pw / 2;
     const py0 = 78;
