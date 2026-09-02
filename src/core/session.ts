@@ -6,10 +6,34 @@ import { key } from './clues';
 import type { Rng } from './rng';
 import { cycleMark, type MarkMap } from './marks';
 import { TERRAIN_COST, isPassable, startCorner } from './terrain';
+import { visionRadius, cellsWithin, SURVEY_COST, SURVEY_BONUS } from './vision';
 
 // 實作已移至 terrain.ts 以打斷 session → generate → reach → session 的循環匯入；
 // 既有呼叫端（MapScene、測試）沿用 session 的匯入點不變
 export { TERRAIN_COST, isPassable, startCorner };
+
+// 把玩家當前視野內的格加進 seen。單向累積：看過的地就不會再變回未知。
+export function revealAround(s: SessionState): void {
+  const t = s.level.terrain[s.player.y][s.player.x];
+  const e = s.level.elevation[s.player.y][s.player.x];
+  for (const k of cellsWithin(s.player, visionRadius(t, e), s.level.mapSize)) s.seen.add(k);
+}
+
+// 駐足眺望：花體力掃過比站著更寬的一圈。同一格只能眺望一次——第二次不會有新資訊，
+// 讓它白扣體力只是懲罰誤觸。體力不足或非探索階段時不執行、不扣款。
+export function survey(s: SessionState): boolean {
+  if (s.phase !== 'explore') return false;
+  const k = key(s.player);
+  if (s.surveyed.has(k)) return false;
+  if (s.stamina < SURVEY_COST) return false;
+  s.stamina -= SURVEY_COST;
+  s.surveyed.add(k);
+  const t = s.level.terrain[s.player.y][s.player.x];
+  const e = s.level.elevation[s.player.y][s.player.x];
+  const r = visionRadius(t, e) + SURVEY_BONUS;
+  for (const kk of cellsWithin(s.player, r, s.level.mapSize)) s.seen.add(kk);
+  return true;
+}
 
 export type Phase = 'explore' | 'qte' | 'caught' | 'escaped' | 'exhausted';
 export type SessionMode = 'run' | 'daily';
@@ -30,6 +54,8 @@ export interface SessionState {
   path: Vec2[];           // 走過的每一格（含起點），揭曉畫面回放用
   readLog: ClueRead[];    // 線索判讀順序與步數（同一條線索只記一次）
   mutedClues: Set<number>; // 被玩家靜音、不計入候選熱區的線索索引
+  seen: Set<string>;      // 曾進入視野的格（單向累積，看過就不會忘）
+  surveyed: Set<string>;  // 已在此格眺望過，避免重複花體力卻沒有新資訊
   phase: Phase;
   steps: number;          // 本局累計移動步數（分享卡用）
   mode: SessionMode;      // 主線 run / 每日挑戰 daily
@@ -41,7 +67,7 @@ export interface SessionState {
 export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): SessionState {
   const level = generateLevel(round, rng);
   const player = startCorner(level.mapSize, level.targetPos);
-  return {
+  const s: SessionState = {
     round,
     level,
     player,
@@ -51,6 +77,8 @@ export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): 
     path: [player],
     readLog: [],
     mutedClues: new Set(),
+    seen: new Set(),
+    surveyed: new Set(),
     phase: 'explore',
     steps: 0,
     mode,
@@ -58,6 +86,10 @@ export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): 
     bellUsed: false,
     microEvents: 0,
   };
+  revealAround(s);
+  // 起始蹤跡永遠可見（見 generate.ts 的 trailheadIndex 註解）
+  s.seen.add(key(level.clues[level.trailheadIndex].position));
+  return s;
 }
 
 function hasAffordableMove(s: SessionState): boolean {
@@ -85,6 +117,7 @@ export function move(s: SessionState, to: Vec2): void {
   s.stamina -= TERRAIN_COST[s.level.terrain[to.y][to.x]];
   s.player = to;
   s.path.push(to);
+  revealAround(s); // 走到新位置立即揭示視野，供本次移動後的所有判斷共用
 
   const k = key(to);
   const supplyIdx = s.level.supplies.findIndex((p) => key(p) === k);

@@ -39,6 +39,7 @@ function makeState(opts: Opts = {}): SessionState {
     round: 1, level, player, stamina: 10,
     readClues: new Set(),
     marks: new Map(), path: [player], readLog: [], mutedClues: new Set(),
+    seen: new Set(), surveyed: new Set(),
     phase: 'explore',
     steps: 0, mode: opts.mode ?? 'run', resolved: false, bellUsed: false,
     microEvents: opts.microEvents ?? 0,

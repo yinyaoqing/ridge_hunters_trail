@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
-  newSession, canMove, move, cycleMarkAt, toggleMute, resolveQte, nextSession, useBell,
+  newSession, canMove, move, cycleMarkAt, toggleMute, resolveQte, nextSession, useBell, survey,
   TERRAIN_COST, isPassable, type SessionState,
 } from '../src/core/session';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key } from '../src/core/clues';
+import { SURVEY_COST } from '../src/core/vision';
 import type { Level, TerrainType } from '../src/core/types';
 
 // 手工關卡：5x5 全草地，目標 (4,4)，補給 (1,0)，scent 線索 (2,0)
@@ -26,6 +27,7 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
     readClues: new Set(),
     marks: new Map(), path: [{ x: 0, y: 0 }], readLog: [], mutedClues: new Set(),
+    seen: new Set(), surveyed: new Set(),
     phase: 'explore',
     steps: 0, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
     ...overrides,
@@ -322,5 +324,75 @@ describe('canMove: cliffs', () => {
     expect(s.player).toEqual({ x: 1, y: 1 });
     // 還退得回 (0,0)，所以不算力竭——力竭永遠來自體力歸零，不是被崖壁圍死
     expect(s.phase).toBe('explore');
+  });
+});
+
+describe('vision', () => {
+  it('seeds seen with the spawn vision and the trailhead cell', () => {
+    const s = newSession(1, mulberry32(11));
+    expect(s.seen.has(key(s.player))).toBe(true);
+    expect(s.seen.has(key(s.level.clues[s.level.trailheadIndex].position))).toBe(true);
+  });
+
+  it('does not start with the whole map revealed', () => {
+    const s = newSession(9, mulberry32(11)); // 25x25 = 625 格
+    expect(s.seen.size).toBeLessThan(s.level.mapSize * s.level.mapSize);
+  });
+
+  it('reveals new ground as the player moves', () => {
+    const s = makeState();
+    const before = s.seen.size;
+    move(s, { x: 1, y: 1 });
+    expect(s.seen.size).toBeGreaterThan(before);
+  });
+
+  it('never forgets ground already seen', () => {
+    const s = makeState();
+    move(s, { x: 1, y: 1 });
+    const far = [...s.seen];
+    move(s, { x: 0, y: 0 });
+    for (const k of far) expect(s.seen.has(k)).toBe(true);
+  });
+});
+
+describe('survey', () => {
+  it('spends stamina and reveals a wider ring than standing vision', () => {
+    const s = makeState({ stamina: 20 });
+    const before = s.seen.size;
+    expect(survey(s)).toBe(true);
+    expect(s.stamina).toBe(20 - SURVEY_COST);
+    expect(s.seen.size).toBeGreaterThan(before);
+  });
+
+  it('refuses a second look from the same cell — no stamina drain for nothing', () => {
+    const s = makeState({ stamina: 20 });
+    survey(s);
+    const after = s.stamina;
+    expect(survey(s)).toBe(false);
+    expect(s.stamina).toBe(after);
+  });
+
+  it('allows another look after moving somewhere new', () => {
+    const s = makeState({ stamina: 20 });
+    survey(s);
+    move(s, { x: 1, y: 1 });
+    expect(survey(s)).toBe(true);
+  });
+
+  it('refuses when stamina would not cover it', () => {
+    const s = makeState({ stamina: SURVEY_COST - 1 });
+    expect(survey(s)).toBe(false);
+    expect(s.stamina).toBe(SURVEY_COST - 1);
+  });
+
+  it('does not count as a step — steps measure walking', () => {
+    const s = makeState({ stamina: 20 });
+    survey(s);
+    expect(s.steps).toBe(0);
+  });
+
+  it('is refused outside the explore phase', () => {
+    const s = makeState({ stamina: 20, phase: 'qte' });
+    expect(survey(s)).toBe(false);
   });
 });
