@@ -317,8 +317,10 @@ export class MapScene extends Phaser.Scene {
     }
     ctx.filter = 'none';
 
-    // 崖壁：色塊之外再描一道細亮邊。純色差在暗色調配色下不夠可讀，
-    // 而「哪裡過不去」是玩家每一步都要判斷的事，不能靠猜。
+    this.paintTerrainTexture(ctx, s);
+
+    // 崖壁：色塊之外再描一道細亮邊。紋理填色後繪製，確保選配地形紋理無法遮蓋此邊。
+    // 純色差在暗色調配色下不夠可讀，而「哪裡過不去」是玩家每一步都要判斷的事，不能靠猜。
     ctx.strokeStyle = cssRgba(this.pal.paper, 0.22);
     ctx.lineWidth = 1;
     for (let y = 0; y < L.mapSize; y++) {
@@ -327,8 +329,6 @@ export class MapScene extends Phaser.Scene {
         ctx.strokeRect(x * cs + 1.5, y * cs + 1.5, cs - 3, cs - 3);
       }
     }
-
-    this.paintTerrainTexture(ctx, s);
 
     ctx.strokeStyle = cssRgba(this.pal.paper, 0.06);
     ctx.lineWidth = 1;
