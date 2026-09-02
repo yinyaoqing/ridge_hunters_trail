@@ -89,24 +89,27 @@ export class DemoScene extends Phaser.Scene {
       fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
     }).setOrigin(0, 0.5).setLetterSpacing(1);
 
-    // 網格尺寸同時受面板寬與可用高度限制：旁白最多三行（約 60px）、
-    // 導覽列 56px、上方標題區 88px，其餘全歸網格。
+    // 版面由面板底部往上錨定，只有網格會伸縮。下方固定預算合計 197px：
+    // 導覽列 55（中心在 ph-34、高 42）＋提示兩行 44＋旁白三行 66＋三段間距 32。
+    // 網格因此最多只能吃掉 ph-88-197 的高度；上方 88 是標題與章節列。
+    // 舊版把旁白與提示綁在網格底緣、且預算漏算了兩者之間的間距，
+    // 預設視窗下導覽列會直接壓在旁白文字上。
     const gridTop = py0 + 88;
-    const availH = ph - 88 - 60 - 56;
+    const availH = ph - 88 - 197;
     this.cell = Math.max(16, Math.floor(Math.min((pw - 56) / DEMO_SIZE, availH / DEMO_SIZE)));
     this.gx = cx - (this.cell * DEMO_SIZE) / 2;
     this.gy = gridTop;
 
     this.gridG = this.add.graphics();
 
-    const narrY = this.gy + this.cell * DEMO_SIZE + 30;
+    const narrY = py0 + ph - 177;
     this.narrationText = this.add.text(cx, narrY, '', {
       fontFamily: FONTS.body, fontSize: '13.5px', color: cssHex(pal.paper),
       wordWrap: { width: pw - 56, useAdvancedWrap: true }, align: 'center', lineSpacing: 5,
     }).setOrigin(0.5, 0);
 
     // 提示行：只有動手點做錯時才有內容，平時為空字串，不佔視覺重量
-    this.hintText = this.add.text(cx, narrY + 62, '', {
+    this.hintText = this.add.text(cx, py0 + ph - 107, '', {
       fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.mark),
       wordWrap: { width: pw - 56, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
     }).setOrigin(0.5, 0);
