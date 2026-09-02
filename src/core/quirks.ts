@@ -42,6 +42,10 @@ export function applyQuirk(p: DifficultyParams, creatureId: string): DifficultyP
 // 8 隻無局數門檻生物之一，等於約 1.4% 的首局直接受影響。owner 裁定下修至
 // 0.08：既保留「稜脊獸腳下更多岩坡」的個性，也把崖壁佔比拉回可玩範圍——
 // 見 terrain.test.ts 的 ridgecrest 專屬崖壁佔比測試（F-ridgecrest）。
+// 下修後實測：崖壁佔比均值 7.56%、最糟 28%，理想路線超預算率 2.33%，加計補給
+// 後仍無法完成率 0.67%。尾部未完全消除——種子 79 可復現（理想 129 點 vs 預算 60 點）。
+// 接受此尾部：ridgecrest round-1 的 0.67% 對應全部首獵約 0.08%，遠低於 owner
+// 先前 2.3% 臨界；且上述值均為首輪遊戲測試前估值。
 export function elevationBiasFor(creatureId: string): number {
   return creatureId === 'ridgecrest' ? 0.08 : 0;
 }
