@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { canMove, move, cycleMarkAt, toggleMute, useBell, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
+import { canMove, move, cycleMarkAt, toggleMute, useBell, survey, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
+import { visionRadius, SURVEY_COST, SURVEY_BONUS } from '../core/vision';
 import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
@@ -77,6 +78,12 @@ export class MapScene extends Phaser.Scene {
   private heatChipX = 0;
   private heatChipY = 0;
 
+  private surveyChipG?: Phaser.GameObjects.Graphics;
+  private surveyChipText?: Phaser.GameObjects.Text;
+  private surveyChipX = 0;
+  private surveyChipY = 0;
+  private spaceKey?: Phaser.Input.Keyboard.Key;
+
   constructor() {
     super('Map');
   }
@@ -125,6 +132,7 @@ export class MapScene extends Phaser.Scene {
     }).setOrigin(1, 1).setVisible(false);
 
     this.cursors = this.input.keyboard?.createCursorKeys();
+    this.spaceKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.pressAt = { t: p.time, x: p.x, y: p.y };
       this.clearHover(); // 按下後（可能拖曳/移動）暫時隱藏 hover，避免殘影
@@ -258,6 +266,10 @@ export class MapScene extends Phaser.Scene {
     if (!this.cursors) return;
     const s = this.session();
     if (s.phase !== 'explore') return;
+    if (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      this.doSurvey();
+      return;
+    }
     const c = this.cursors;
     const jd = Phaser.Input.Keyboard.JustDown;
     // 任一方向鍵按下的那一幀才動作（維持既有「一次按鍵走一格」手感）
@@ -507,7 +519,8 @@ export class MapScene extends Phaser.Scene {
     const hasBell = this.tools.has('glowbell');
     const xBell = xSound - 8 - 60;                        // 鈴 chip 左緣（僅持有微光鈴時顯示）
     const xHeat = (hasBell ? xBell : xSound) - 8 - 60; // 熱區圖層 chip 左緣
-    this.chipRowLeft = xHeat; // 供 updateHud 計算體力條寬度時保持間距
+    const xSurvey = xHeat - 8 - 60;      // 眺望 chip 左緣
+    this.chipRowLeft = xSurvey;          // 供 updateHud 計算體力條寬度時保持間距
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
     if (!compact) {
@@ -618,6 +631,22 @@ export class MapScene extends Phaser.Scene {
         this.drawHeatChip(xHeat, chipY, 60, chipH);
         this.redraw();
       });
+
+    // 眺望 chip：可用＝供給色描邊，已在此格眺望過或體力不足＝暗色描邊（僅視覺停用，
+    // 點擊仍走同一路徑，由 survey() 內部 no-op）——沿用鈴 chip 的同款處理
+    this.surveyChipX = xSurvey;
+    this.surveyChipY = chipY;
+    this.surveyChipG = this.add.graphics();
+    this.surveyChipText = this.add.text(xSurvey + 30, chipY + chipH / 2, '', {
+      fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.supply),
+    }).setOrigin(0.5).setLetterSpacing(1);
+    this.drawSurveyChip(xSurvey, chipY, 60, chipH);
+    this.add.rectangle(xSurvey + 30, chipY + chipH / 2, 60, 44, 0, 0) // 44px 命中區
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (p: Phaser.Input.Pointer) => {
+        p.event.stopPropagation();
+        this.doSurvey();
+      });
   }
 
   // 鈴 chip：可用＝標記色描邊＋亮字；不可用（已用本局/無幌子線索）＝暗描邊＋暗字（僅視覺停用，
@@ -679,6 +708,54 @@ export class MapScene extends Phaser.Scene {
       g.lineStyle(1.2, pal.gold, 0.7).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
       this.heatChipText!.setColor(cssHex(pal.gold)).setText(label);
     }
+  }
+
+  // 眺望 chip：可用＝供給色描邊＋亮字，不可用＝暗描邊＋暗字
+  private drawSurveyChip(x: number, y: number, w: number, h: number) {
+    const pal = this.pal;
+    const g = this.surveyChipG!;
+    g.clear();
+    const usable = this.surveyUsable();
+    g.lineStyle(1.2, usable ? pal.supply : pal.paperDim, usable ? 0.75 : 0.4)
+      .strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
+    this.surveyChipText!
+      .setColor(cssHex(usable ? pal.supply : pal.paperDim))
+      .setText(this.i18n().t('hud.survey'));
+  }
+
+  private surveyUsable(): boolean {
+    const s = this.session();
+    return s.phase === 'explore'
+      && !s.surveyed.has(key(s.player))
+      && s.stamina >= SURVEY_COST;
+  }
+
+  // 眺望：花體力掃視一圈。成功時以擴張圓環演出掃視範圍＋浮字標示花費。
+  private doSurvey() {
+    const s = this.session();
+    if (!survey(s)) return;
+    this.audio.play('reveal');
+    const cs = this.cell;
+    const c = {
+      x: this.ox + s.player.x * cs + cs / 2,
+      y: this.oy + s.player.y * cs + cs / 2,
+    };
+    if (motionOK()) {
+      const g = this.add.graphics();
+      g.lineStyle(2, this.pal.supply, 0.8)
+        .strokeCircle(0, 0, cs * (visionRadius(
+          s.level.terrain[s.player.y][s.player.x],
+          s.level.elevation[s.player.y][s.player.x],
+        ) + SURVEY_BONUS));
+      const holder = this.add.container(c.x, c.y, [g]).setScale(0.2).setAlpha(0.9);
+      this.tweens.add({
+        targets: holder, scale: 1, alpha: 0, duration: 520, ease: 'Cubic.easeOut',
+        onComplete: () => holder.destroy(),
+      });
+    }
+    floatText(this, c.x, c.y - cs * 0.5,
+      this.i18n().t('hud.surveyCost', { n: SURVEY_COST }), cssHex(this.pal.supply));
+    this.redraw();
   }
 
   private toGrid(px: number, py: number): Vec2 | null {
@@ -1065,6 +1142,7 @@ export class MapScene extends Phaser.Scene {
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
     if (this.bellChipG) this.drawBellChip(this.bellChipX, this.bellChipY, 60, 30);
     if (this.heatChipG) this.drawHeatChip(this.heatChipX, this.heatChipY, 60, 30);
+    if (this.surveyChipG) this.drawSurveyChip(this.surveyChipX, this.surveyChipY, 60, 30);
 
     // 置中體力條在較窄視窗（或持有微光鈴、chip 列多一格時）會撞上右側 chip 列
     // （chip 列左緣隨寬度＋是否持有鈴鐺變動，見 chipRowLeft）。固定寬度斷點（舊：w>=700）
