@@ -827,7 +827,7 @@ export class MapScene extends Phaser.Scene {
     if (!this.sys.game.device.os.desktop) return;
     const s = this.session();
     if (s.phase !== 'explore' || p.isDown) {
-      this.clearHover();
+      this.clearHover(false);
       return;
     }
     const cellPos = this.toGrid(p.x, p.y);
@@ -840,10 +840,10 @@ export class MapScene extends Phaser.Scene {
     this.drawHover(cellPos, s);
   }
 
-  // alsoClearPreview 預設 true：指標離開棋盤範圍或 phase 不再是 explore 時，金色路線與
-  // 花費標籤（previewG/previewCostText）本來就該跟著 hover 外框一起消失，否則會留下一條
-  // 看不見上下文、卻仍留在畫面上的預覽（C6）。唯一的例外是全域 pointerdown（見該呼叫點），
-  // 那一下可能是確認點擊本身，傳 false 讓預覽狀態撐到 onPointerUp 判斷完再清。
+  // alsoClearPreview 預設 true：指標離開棋盤範圍時，金色路線與花費標籤（previewG/
+  // previewCostText）本來就該跟著 hover 外框一起消失，否則會留下一條看不見上下文、卻仍留在
+  // 畫面上的預覽（C6）。預覽在按下時保留（onPointerMove 傳 false），讓確認點擊能讀到它；
+  // 當手勢轉為拖曳時則明確清除（onPointerUp 的 moved > 12 分支），避免拖放後殘留金線。
   private clearHover(alsoClearPreview = true) {
     // 清預覽要排在 hoverCell===null 的早退之前：pointerdown 已把 hoverCell 設為 null
     // （見該處呼叫點註解，故意傳 false 保留預覽），若清預覽的判斷寫在早退之後，
@@ -882,7 +882,10 @@ export class MapScene extends Phaser.Scene {
     const held = p.time - this.pressAt.t;
     const moved = Math.hypot(p.x - this.pressAt.x, p.y - this.pressAt.y);
     this.pressAt = null;
-    if (moved > 12) return; // 拖曳不動作
+    if (moved > 12) {
+      this.clearPreview();
+      return;
+    } // 拖曳不動作
     const cellPos = this.toGrid(p.x, p.y);
     if (!cellPos) return;
     const wantMark = (p.event as MouseEvent).shiftKey || this.markMode || held >= 350;
