@@ -8,6 +8,7 @@ import { heatMap, maxHeat } from '../core/deduction';
 import type { MarkMap } from '../core/marks';
 import {
   DEMO_SIZE, DEMO_CLUES, DEMO_PAIR, DEMO_TARGET, DEMO_STEPS, demoUnseen, type DemoStep,
+  checkCellAction, checkMuteAction,
 } from '../core/demo';
 import {
   cssHex, FONTS, displayFont, drawClueToken, drawClueOverlay, drawMark, stripBrackets, BRUSH_RADIUS,
@@ -108,6 +109,13 @@ export class DemoScene extends Phaser.Scene {
     this.gy = gridTop;
 
     this.gridG = this.add.graphics();
+
+    // 單一互動矩形覆蓋整個網格，由座標換算格子——比建立 81 個互動物件簡單，
+    // 也與 MapScene 的做法一致。
+    const gw = this.cell * DEMO_SIZE;
+    this.add.rectangle(this.gx + gw / 2, this.gy + gw / 2, gw, gw, 0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (p: Phaser.Input.Pointer) => this.onGridClick(p));
 
     const narrY = py0 + ph - 177;
     this.narrationText = this.add.text(cx, narrY, '', {
@@ -301,6 +309,46 @@ export class DemoScene extends Phaser.Scene {
       this.nextG.lineStyle(1.5, pal.gold, 0.15).strokeRoundedRect(nb.x, nb.y, nb.w, nb.h, BRUSH_RADIUS);
       this.nextTxt.setColor(cssHex(pal.gold)).setAlpha(0.3);
     }
+  }
+
+  // 網格點擊。只有在該步有動手點時才有作用——其餘步驟點格子不該有任何效果，
+  // 免得玩家以為自己弄壞了什麼。
+  private onGridClick(p: Phaser.Input.Pointer) {
+    const step = DEMO_STEPS[this.step];
+    if (!step.action || this.done.has(this.step)) return;
+
+    const cs = this.cell;
+    const cell = {
+      x: Math.floor((p.x - this.gx) / cs),
+      y: Math.floor((p.y - this.gy) / cs),
+    };
+    if (cell.x < 0 || cell.y < 0 || cell.x >= DEMO_SIZE || cell.y >= DEMO_SIZE) return;
+
+    if (step.action === 'mute') {
+      // 靜音要點的是線索記號，不是格子。先找出被點到的是哪一條已判讀的線索；
+      // 點在空地上不給提示——那不是「答錯」，只是還沒點到東西。
+      const hit = step.clues.find((i) => {
+        const q = DEMO_CLUES[i].position;
+        return q.x === cell.x && q.y === cell.y;
+      });
+      if (hit === undefined) return;
+      this.resolve(checkMuteAction(hit));
+      return;
+    }
+
+    this.resolve(checkCellAction(step.action, cell), cell);
+  }
+
+  // 動手點的共同收尾：答對就記下並自動前進到下一步（下一步的資料本身就是
+  // 這個動作的結果，因此不需要任何中間狀態或計時器）；答錯就顯示提示，畫面不動。
+  private resolve(hint: MsgKey | null, cell?: Vec2) {
+    if (hint !== null) {
+      this.hintText.setText(this.i18n().t(hint));
+      return;
+    }
+    if (DEMO_STEPS[this.step].action === 'exclude' && cell) this.excluded = cell;
+    this.done.add(this.step);
+    this.goto(this.step + 1);
   }
 
   private close() {
