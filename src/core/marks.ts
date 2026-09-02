@@ -13,7 +13,7 @@ export function nextMark(current: MarkKind | undefined): MarkKind | null {
   return CYCLE[(idx + 1) % CYCLE.length];
 }
 
-// 就地推進一格的標記狀態（沿用 session.toggleMark 的 mutate 慣例，不回傳新 Map）
+// 就地推進一格的標記狀態（沿用 session.cycleMarkAt 的 mutate 慣例，不回傳新 Map）
 export function cycleMark(marks: MarkMap, k: string): void {
   const next = nextMark(marks.get(k));
   if (next === null) {

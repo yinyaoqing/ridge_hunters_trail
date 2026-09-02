@@ -27,7 +27,7 @@ export type MsgKey =
   | 'hud.layer' | 'hud.muted'
   | 'mark.exclude' | 'mark.suspect' | 'mark.wager'
   | 'reveal.title' | 'reveal.wasHere' | 'reveal.yourCall' | 'reveal.exact' | 'reveal.offBy'
-  | 'reveal.noCall' | 'reveal.decoy' | 'reveal.infoAt'
+  | 'reveal.noCall' | 'reveal.decoy' | 'reveal.infoAt' | 'reveal.dailyHidden'
   | 'btn.continue'
   | 'help.marks' | 'help.layer' | 'help.reveal'
   | 'score.gain' | 'score.pot' | 'score.lost' | 'btn.bank' | 'btn.push' | 'camp.best' | 'camp.carry';
@@ -121,6 +121,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'reveal.noCall': 'You made no call this hunt — mark a cell gold next time.',
     'reveal.decoy': 'This false trail led you astray.',
     'reveal.infoAt': 'You had the sharpest reading available by step {n}, and walked to step {m}.',
+    'reveal.dailyHidden': "Today's trail keeps its secret — everyone is hunting the same map.",
     'btn.continue': '[ Continue ]',
     'help.marks': 'Mark a cell again and again to cycle it: ruled out, maybe, my call. Your call sets your record quality.',
     'help.layer': 'Layer shades each cell by how many read clues agree. Mark a clue you already read to mute it.',
@@ -214,6 +215,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'reveal.noCall': '這一局你沒有下押注——下次記得把一格標成金色。',
     'reveal.decoy': '這條假蹤跡把你帶偏了。',
     'reveal.infoAt': '你在第 {n} 步就取得了本局最精確的資訊，最後走到第 {m} 步。',
+    'reveal.dailyHidden': '今日行蹤不揭曉——全球同題，答案得自己找。',
     'btn.continue': '［繼續］',
     'help.marks': '反覆標記同一格可循環：排除、存疑、押注。押注格決定你的記錄品質。',
     'help.layer': '「圖層」依符合的已判讀線索數為格子上色；標記已判讀的線索可將它靜音。',

@@ -59,7 +59,7 @@ export class MapScene extends Phaser.Scene {
   private bellChipText?: Phaser.GameObjects.Text;
   private bellChipX = 0;
   private bellChipY = 0;
-  private chipRowLeft = 0; // chip 列最左緣（鈴／靜音 chip 左緣）：體力條需與其保持 ≥8px 間距
+  private chipRowLeft = 0; // chip 列最左緣（熱區圖層 chip 左緣，見 buildHud 的 xHeat）：體力條需與其保持 ≥8px 間距
   private skipFirstRunHelp = false;
   private audio!: AudioBus;
   private tools!: ToolStore;
@@ -727,18 +727,47 @@ export class MapScene extends Phaser.Scene {
     if (wantMark) {
       // 已判讀的線索格：標記手勢改為切換該線索的靜音（在該格上做標記本來就沒有意義，
       // 而「暫時拿掉這條線索看看」是玩家最需要的假說檢驗動作——診斷 B-03）
+      // 同格可能不只一條線索（F1）：切換全部索引，不然斜槓／覆蓋層／熱度三者會不同步。
+      // 若這些索引目前靜音狀態不一致，一律以「還有任一條未靜音就全部靜音，否則全部取消」為準。
       const ck = key(cellPos);
-      const clueIndex = s.level.clues.findIndex((c) => key(c.position) === ck);
-      if (clueIndex >= 0 && s.readClues.has(ck)) {
-        toggleMute(s, clueIndex);
+      const clueIndices = s.level.clues
+        .map((c, i) => (key(c.position) === ck ? i : -1))
+        .filter((i) => i >= 0);
+      if (clueIndices.length > 0 && s.readClues.has(ck)) {
+        const anyUnmuted = clueIndices.some((i) => !s.mutedClues.has(i));
+        for (const i of clueIndices) {
+          const currentlyMuted = s.mutedClues.has(i);
+          if (anyUnmuted && !currentlyMuted) toggleMute(s, i);
+          else if (!anyUnmuted && currentlyMuted) toggleMute(s, i);
+        }
         this.audio.play('click');
+        // 靜音變為「開」時浮字回饋；取消靜音（anyUnmuted 為 false 分支）不浮字（F4）
+        if (anyUnmuted) this.floatAboveCell(cellPos, this.i18n().t('hud.muted'), this.pal.paperDim);
       } else {
         cycleMarkAt(s, cellPos);
+        this.floatMarkLabel(cellPos, s);
       }
       this.redraw();
       return;
     }
     this.doMove(cellPos);
+  }
+
+  // 格子正上方浮字（比照 doMove 中補給／扣體力浮字的位置手法：格中心往上半格）
+  private floatAboveCell(p: Vec2, text: string, color: number) {
+    const cs = this.cell;
+    const x = this.ox + p.x * cs + cs / 2;
+    const y = this.oy + p.y * cs + cs / 2 - cs * 0.5;
+    floatText(this, x, y, text, cssHex(color));
+  }
+
+  // 三態標記循環後的浮字回饋（F4）：告訴玩家剛剛循環到哪一態，繞回「無標記」時不浮字
+  private floatMarkLabel(p: Vec2, s: SessionState) {
+    const kind = s.marks.get(key(p));
+    if (!kind) return;
+    const label = kind === 'exclude' ? 'mark.exclude' : kind === 'suspect' ? 'mark.suspect' : 'mark.wager';
+    const color = kind === 'exclude' ? this.pal.mark : kind === 'suspect' ? this.pal.supply : this.pal.gold;
+    this.floatAboveCell(p, this.i18n().t(label), color);
   }
 
   private doMove(to: Vec2) {
@@ -1019,6 +1048,11 @@ export class MapScene extends Phaser.Scene {
     const centered = this.scale.width / 2 + 105 <= this.chipRowLeft - 8;
     const barLeft = !centered;
     const bx = barLeft ? 50 : w / 2 - 105;
+    // F6：Math.max(90, ...) 這個下限本身會壓過 Math.min 的夾限——當 chipRowLeft - 8 - bx < 90，
+    // 也就是 chipRowLeft < 148（bx=50 時），體力條寬度仍被撐到 90，右緣就超出 chipRowLeft - 8，
+    // 8px 間距保證在此失效。持有微光鈴的 compact（w<560）版面下 chipRowLeft = w - 288
+    // （見 buildHud 的 xHeat 推導），代入 chipRowLeft < 148 得 w < 436，不是 w < 368。
+    // 行動裝置尚非出貨目標，此處只記正確門檻，不改變數值。
     const bw = barLeft ? Math.max(90, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
     const bh = barLeft ? 10 : 12;
     const by = barLeft ? 46 : 27;

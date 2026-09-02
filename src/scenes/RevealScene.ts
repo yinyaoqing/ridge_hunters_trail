@@ -38,7 +38,17 @@ export class RevealScene extends Phaser.Scene {
       fontFamily: displayFont(i18n.locale()), fontSize: '30px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(2);
 
+    // 每日挑戰失敗時不揭真實位置（F3，專案負責人裁定）：daily 的重試是同一顆種子，
+    // 揭曉真相等於把答案直接遞給重玩——品質改用 Chebyshev 距離後，重玩必得金級，
+    // 汙染 catchScore／quality-any 委託／分享卡。caught 時仍照常揭曉（不影響已結算的這一局）。
+    const hideAnswer = s.mode === 'daily' && s.phase !== 'caught';
+
     // 小地圖：夾在標題與文字區之間，正方形，最大 300px
+    // F6：Math.max(4, ...) 這個下限會讓 span 超出 mapMax 的版面預算——矮視窗＋大地圖時
+    // （例如 h=390 時 mapMax=50，若 size=25 則 floor(50/25)=2 被下限 4 蓋過，span=4*25=100，
+    // 是預算的兩倍）。span 沒有回頭夾回 mapMax，下面 ty/legendY 的版面預算全部建立在
+    // 「span ≤ mapMax」這個不成立的假設上，這正是既有 legendY（見下方 Math.min(ty+14, h-108)）
+    // 重疊風險的真正成因，不是 legendY 那行本身算錯。此處只記門檻與機制，不改動數值。
     const mapTop = 92;
     const mapMax = Math.min(300, w - 48, h - 340);
     const size = s.level.mapSize;
@@ -46,7 +56,7 @@ export class RevealScene extends Phaser.Scene {
     const span = cell * size;
     const ox = Math.floor(cx - span / 2);
     const oy = mapTop;
-    this.drawMinimap(s, ox, oy, cell);
+    this.drawMinimap(s, ox, oy, cell, hideAnswer);
 
     // 文字區：距離、假蹤跡、資訊完備步數，三行由上而下堆疊（缺項自動不佔位）
     const wk = wagerKey(s.marks);
@@ -54,24 +64,30 @@ export class RevealScene extends Phaser.Scene {
     let ty = oy + span + 30;
 
     if (wager === null) {
+      // 未押注時本來就不揭露任何座標資訊，hideAnswer 與否都可安全保留
       ty = this.line(cx, ty, i18n.t('reveal.noCall'), pal.paperDim, 14);
+    } else if (hideAnswer) {
+      // 用一行說明取代距離／假蹤跡行，否則畫面看起來像壞掉（F3）
+      ty = this.line(cx, ty, i18n.t('reveal.dailyHidden'), pal.paperDim, 14);
     } else {
       const off = cheb(wager, s.level.targetPos);
       const msg = off === 0 ? i18n.t('reveal.exact') : i18n.t('reveal.offBy', { n: off });
       ty = this.line(cx, ty, msg, off === 0 ? pal.gold : pal.paper, 17);
     }
 
-    const decoy = misleadingDecoy(s.level, s.readLog, wager);
-    if (decoy) ty = this.line(cx, ty, i18n.t('reveal.decoy'), pal.mark, 14);
+    if (!hideAnswer) {
+      const decoy = misleadingDecoy(s.level, s.readLog, wager);
+      if (decoy) ty = this.line(cx, ty, i18n.t('reveal.decoy'), pal.mark, 14);
+    }
 
     const infoStep = infoCompleteStep(s.level, s.readLog);
     if (infoStep !== null && s.steps > infoStep) {
       ty = this.line(cx, ty, i18n.t('reveal.infoAt', { n: infoStep, m: s.steps }), pal.paperDim, 13);
     }
 
-    // 圖例：牠在這裡／你的押注
+    // 圖例：牠在這裡／你的押注。hideAnswer 時不畫「牠在這裡」——否則圖例文字本身就洩漏答案
     const legendY = Math.min(ty + 14, h - 108);
-    this.legend(cx - 78, legendY, i18n.t('reveal.wasHere'), pal.gold, true);
+    if (!hideAnswer) this.legend(cx - 78, legendY, i18n.t('reveal.wasHere'), pal.gold, true);
     if (wager) this.legend(cx + 62, legendY, i18n.t('reveal.yourCall'), pal.paper, false);
 
     this.button(cx, h - 52, 250, 50, stripBrackets(i18n.t('btn.continue')),
@@ -79,7 +95,8 @@ export class RevealScene extends Phaser.Scene {
   }
 
   // 小地圖：地形底色 → 玩家路徑 → 已判讀線索（幌子在此才揭穿）→ 押注格 → 真實位置
-  private drawMinimap(s: SessionState, ox: number, oy: number, cell: number) {
+  // hideAnswer 時（F3）真假線索一律畫成金色、且不畫真實位置，避免顏色差異或色點洩漏答案
+  private drawMinimap(s: SessionState, ox: number, oy: number, cell: number, hideAnswer: boolean) {
     const pal = this.pal;
     const L = s.level;
     const g = this.add.graphics();
@@ -103,10 +120,12 @@ export class RevealScene extends Phaser.Scene {
     }
 
     // 已判讀的線索：真線索金點、幌子紅點——真假在此刻才第一次公開（診斷 B-03 的學習迴圈）
+    // hideAnswer 時一律畫成金色（即真線索的畫法），不得用 pal.mark 洩漏哪條是幌子（F3）
     L.clues.forEach((c, i) => {
       if (!s.readLog.some((e) => e.clueIndex === i)) return;
       const p = px(c.position);
-      g.fillStyle(c.isDecoy ? pal.mark : pal.gold, 0.9).fillCircle(p.x, p.y, Math.max(2, cell * 0.26));
+      const color = hideAnswer ? pal.gold : (c.isDecoy ? pal.mark : pal.gold);
+      g.fillStyle(color, 0.9).fillCircle(p.x, p.y, Math.max(2, cell * 0.26));
     });
 
     // 玩家押注格：紙墨白空心方框
@@ -116,6 +135,8 @@ export class RevealScene extends Phaser.Scene {
       g.lineStyle(2, pal.paper, 0.95)
         .strokeRect(ox + wp.x * cell, oy + wp.y * cell, cell, cell);
     }
+
+    if (hideAnswer) return; // 真實位置本身就是答案，daily 未捕獲時整段不畫（F3）
 
     // 真實位置：生物色實心點＋金色脈動環
     const creature = CREATURES.find((c) => c.id === L.creatureId)!;
