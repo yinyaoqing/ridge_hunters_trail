@@ -555,12 +555,19 @@ export class MapScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setLetterSpacing(2);
     this.hudG = this.add.graphics();
 
-    // 操作提示（兩行右對齊）：熟練玩家（累積 3 勝以上）自動退場，不再佔用版面
+    // 操作提示（三行右對齊，hud.hint 加入眺望動詞後從兩行變三行）：熟練玩家
+    // （累積 3 勝以上）自動退場，不再佔用版面。
+    // G4：Phaser 的 GetTextSize 用 lineHeight = measureText(fontSize) + strokeThickness，
+    // 三行高度＝3×lineHeight + 2×lineSpacing。原本 y=15、lineSpacing=4 是為兩行訂的；
+    // 三行下，這個位置的文字底部落在 HUD_HEIGHT(56) 之外，逼近 oy 的下限（≥60），
+    // 有機會刮到地圖格線的右上角。改成 y=8（對齊同一列的 roundText／stamLabel）、
+    // lineSpacing 收到 2，字級不動以維持可讀性——三行底部退回 HUD_HEIGHT 帶內，
+    // 不必動 oy 或 HUD_HEIGHT 本身。
     const wins = (this.registry.get('runState') as RunState).wins();
     if (!compact && wins < 3) {
-      this.hintText = this.add.text(w - 136, 15, '', {
+      this.hintText = this.add.text(w - 136, 8, '', {
         fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(pal.paperDim),
-        align: 'right', lineSpacing: 4,
+        align: 'right', lineSpacing: 2,
       }).setOrigin(1, 0);
     }
 

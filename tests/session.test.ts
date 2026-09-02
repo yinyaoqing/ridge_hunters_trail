@@ -432,4 +432,21 @@ describe('survey', () => {
     expect(s.stamina).toBe(0);
     expect(s.phase).toBe('exhausted');
   });
+
+  it('exhausts on soft-lock when the post-survey remainder is positive but affords no neighbour (G3)', () => {
+    // F1 的力竭收尾判斷是 `stamina <= 0 || !hasAffordableMove(s)` 兩個子句。上一條
+    // 測試只驗證了 stamina 恰好歸零那一半；這裡補上另一半：眺望花完後體力還剩
+    // 正數，但比周圍任何鄰格的地形成本都便宜——這正是刪掉 !hasAffordableMove(s)
+    // 那截會漏掉的軟鎖情境。玩家站在 (0,0)（地圖角落，只有 3 個界內鄰格），
+    // 把這三格全部改成密叢（成本 2）；體力 5 減去 SURVEY_COST(4) 剩 1，1 < 2，
+    // 三個鄰格都負擔不起。
+    const s = makeState({ stamina: SURVEY_COST + 1, player: { x: 0, y: 0 } });
+    const terrain = s.level.terrain;
+    terrain[0][1] = 'thicket';
+    terrain[1][0] = 'thicket';
+    terrain[1][1] = 'thicket';
+    expect(survey(s)).toBe(true);
+    expect(s.stamina).toBe(1);
+    expect(s.phase).toBe('exhausted');
+  });
 });

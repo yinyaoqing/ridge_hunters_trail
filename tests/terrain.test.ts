@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { terrainFor, buildTerrain, elevationFor, startCorner } from '../src/core/terrain';
 import { mulberry32, type Rng } from '../src/core/rng';
+import { elevationBiasFor } from '../src/core/quirks';
 import type { TerrainType } from '../src/core/types';
 
 describe('terrainFor', () => {
@@ -97,6 +98,33 @@ describe('buildTerrain', () => {
     }
   });
 
+  // ridgecrest 專屬：F6 的 0.30 上界是針對 bias 0（觀測最糟 14.75%）訂的，headroom
+  // 是觀測值的兩倍多，對 ridgecrest 的 elevationBias（原本 0.15，owner 裁定下修至
+  // 0.08，見 quirks.ts）太鬆——這正是 G1 這次要補的洞：0.15 在 round-1、無霧的
+  // 300 顆種子上量到均值 15.9%、單張最糟 44.4%，本測試改用同一套 seed 1..100、
+  // size 20 慣例，逐張地圖檢查下修後的 0.08 是否真的把崖壁佔比拉回可玩範圍。
+  it("bounds ridgecrest's cliff share on every individual map at the lowered bias (G1)", () => {
+    // 實測（seed 1..100，size 20，bias = elevationBiasFor('ridgecrest') = 0.08）：
+    // 均值 7.37%，p90 ≈ 15.5%，單張最糟 27.25%（seed 92）。0.30 訂在最糟值之上，
+    // 但只留約 2.75 個百分點的 headroom——刻意比上面 F6 的 0.30 更緊，因為這條
+    // 測試的職責就是抓 ridgecrest 的 bias 被調回過高（例如打回 0.15，同一套種子
+    // 量到單張最糟 44.75%）或 BAND_CLIFF 被調鬆（例如退回 0.74，同一套種子量到
+    // 11/100 張超過 0.30）時，這裡要立刻紅。
+    const bias = elevationBiasFor('ridgecrest');
+    for (let seed = 1; seed <= 100; seed++) {
+      const { terrain } = buildTerrain(mulberry32(seed), 20, bias);
+      let cliff = 0;
+      let total = 0;
+      for (const row of terrain) {
+        for (const t of row) {
+          total++;
+          if (t === 'cliff') cliff++;
+        }
+      }
+      expect(cliff / total).toBeLessThan(0.30);
+    }
+  });
+
   it('consumes exactly 160 rng calls, independent of map size (F6 — daily-determinism guard)', () => {
     // BASE_GRID/DETAIL_GRID 是寫死的常數：rng 消耗次數只該取決於它們，不該取決於 size。
     // 這條測試用計數用的假 rng，對兩個不同的 size 各建一次地圖，斷言呼叫次數相同且為 160——
@@ -174,8 +202,14 @@ describe('startCorner', () => {
   it('breaks ties deterministically — same input always yields the same corner', () => {
     // mapSize 3、target (1,0)：左下 (0,2) 與右下 (2,2) 到 target 的歐氏距離恰好相等
     // (sqrt(1²+2²) 兩邊算式相同)。輸出必須每次都是同一個角，不能因平手而漂移。
+    // G2：原本只互相比對五次呼叫的結果，任何純函式都會通過，根本沒釘住平手時
+    // 選的是哪一角——把 reduce 的 > 改成 >=（平手時改選後者）會讓 (0,2) 變成
+    // (2,2)，出生角整個換邊，但這條測試仍然全綠。改成直接斷言 (0,2)：reduce
+    // 從 (0,0) 開始比對 (2,0)（距離相同，> 為 false，維持 (0,0)）、再比對 (0,2)
+    // （距離變大，> 為 true，換成 (0,2)）、最後比對 (2,2)（距離又打平，> 為
+    // false，維持 (0,2)）——實際跑過 src/core/terrain.ts 目前的實作確認過。
     const target = { x: 1, y: 0 };
-    const first = startCorner(3, target);
-    for (let i = 0; i < 5; i++) expect(startCorner(3, target)).toEqual(first);
+    expect(startCorner(3, target)).toEqual({ x: 0, y: 2 });
+    for (let i = 0; i < 5; i++) expect(startCorner(3, target)).toEqual({ x: 0, y: 2 });
   });
 });
