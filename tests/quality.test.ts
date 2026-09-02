@@ -1,19 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { qualityFromQte, maxQuality, QUALITY_RANK } from '../src/core/quality';
-import type { QteState } from '../src/core/qte';
+import { qualityFromAccuracy, maxQuality, QUALITY_RANK } from '../src/core/quality';
 
-const q = (attempt: number, hits: number, offsets: number[]): QteState =>
-  ({ attempt, hits, arcStart: 0, pointer: 0, done: true, success: true, lastHit: true, offsets });
+const target = { x: 10, y: 10 };
 
-describe('qualityFromQte', () => {
-  it('any miss yields bronze', () => {
-    expect(qualityFromQte(q(3, 2, [0.1, 0.1]))).toBe('bronze');
+describe('qualityFromAccuracy', () => {
+  it('an exact call yields gold', () => {
+    expect(qualityFromAccuracy({ x: 10, y: 10 }, target)).toBe('gold');
   });
-  it('all hits with loose precision yields silver', () => {
-    expect(qualityFromQte(q(2, 2, [0.9, 0.4]))).toBe('silver'); // 平均 0.65 > 0.5
+  it('within two cells yields silver', () => {
+    expect(qualityFromAccuracy({ x: 12, y: 10 }, target)).toBe('silver');
+    expect(qualityFromAccuracy({ x: 11, y: 12 }, target)).toBe('silver'); // 對角距離 2
   });
-  it('all hits with tight precision yields gold', () => {
-    expect(qualityFromQte(q(2, 2, [0.3, 0.5]))).toBe('gold'); // 平均 0.4 ≤ 0.5
+  it('beyond two cells yields bronze', () => {
+    expect(qualityFromAccuracy({ x: 13, y: 10 }, target)).toBe('bronze');
+  });
+  it('no wager yields bronze', () => {
+    expect(qualityFromAccuracy(null, target)).toBe('bronze');
   });
 });
 

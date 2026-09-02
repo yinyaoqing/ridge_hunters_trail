@@ -4,8 +4,8 @@ import { getPalette, type Palette } from '../core/palette';
 import {
   notesForRun, MILESTONE_NAME, MILESTONE_DETAIL, MILESTONE_QUIRK, type CodexStore,
 } from '../core/codex';
-import { qualityFromQte, type Quality } from '../core/quality';
-import type { QteState } from '../core/qte';
+import { qualityFromAccuracy, type Quality } from '../core/quality';
+import { wagerKey, parseKey } from '../core/marks';
 import { catchScore, MULTIPLIERS, type ScoreStore } from '../core/score';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
@@ -60,8 +60,10 @@ export class ResultScene extends Phaser.Scene {
     const caught = outcome === 'caught';
     this.pal = getPalette(s.round);
 
-    const qte = this.registry.get('qteOutcome') as QteState | undefined;
-    const quality: Quality | null = caught && qte ? qualityFromQte(qte) : null;
+    // 品質改由本局判讀精準度決定（Phase 4／診斷 C-03）：QTE 仍決定成敗，但不再決定品質
+    const wk = wagerKey(s.marks);
+    const wager = wk === null ? null : parseKey(wk);
+    const quality: Quality | null = caught ? qualityFromAccuracy(wager, s.level.targetPos) : null;
     const notes = caught ? 0 : notesForRun(s.readClues.size);
     // 單一取樣：daily 的 dateKey 由 Camp 進入時取樣一次存進 registry，
     // 記帳與分享卡都讀同一值，避免跨 UTC 午夜時分歧（沒有存到值時退回現場取樣）。
