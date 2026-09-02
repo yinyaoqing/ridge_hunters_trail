@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { canMove, move, toggleMark, useBell, TERRAIN_COST, type SessionState } from '../core/session';
+import { canMove, move, cycleMarkAt, useBell, TERRAIN_COST, type SessionState } from '../core/session';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { TERRAIN_TYPES } from '../core/types';
@@ -682,7 +682,7 @@ export class MapScene extends Phaser.Scene {
     if (!cellPos) return;
     const wantMark = (p.event as MouseEvent).shiftKey || this.markMode || held >= 350;
     if (wantMark) {
-      toggleMark(s, cellPos);
+      cycleMarkAt(s, cellPos);
       this.redraw();
       return;
     }
@@ -885,7 +885,7 @@ export class MapScene extends Phaser.Scene {
       if (s.readClues.has(key(c.position))) this.drawReadCheck(p.x, p.y, r);
     }
 
-    for (const m of s.marks) {
+    for (const [m] of s.marks) {
       const [mx, my] = m.split(',').map(Number);
       const p = px({ x: mx, y: my });
       const r = cs * 0.32;

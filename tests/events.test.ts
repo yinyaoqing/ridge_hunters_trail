@@ -32,9 +32,12 @@ function makeState(opts: Opts = {}): SessionState {
     clues: opts.clues ?? [], terrain, supplies: opts.supplies ?? [],
     creatureId: 'mistfawn', weather: 'clear', iris: false,
   };
+  const player = opts.player ?? { x: 0, y: 0 };
   return {
-    round: 1, level, player: opts.player ?? { x: 0, y: 0 }, stamina: 10,
-    readClues: new Set(), marks: new Set(), phase: 'explore',
+    round: 1, level, player, stamina: 10,
+    readClues: new Set(),
+    marks: new Map(), path: [player], readLog: [], mutedClues: new Set(),
+    phase: 'explore',
     steps: 0, mode: opts.mode ?? 'run', resolved: false, bellUsed: false,
     microEvents: opts.microEvents ?? 0,
   };

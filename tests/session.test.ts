@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  newSession, canMove, move, toggleMark, resolveQte, nextSession, useBell,
+  newSession, canMove, move, cycleMarkAt, toggleMute, resolveQte, nextSession, useBell,
   TERRAIN_COST, type SessionState,
 } from '../src/core/session';
 import { mulberry32 } from '../src/core/rng';
@@ -22,7 +22,9 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
   };
   return {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
-    readClues: new Set(), marks: new Set(), phase: 'explore',
+    readClues: new Set(),
+    marks: new Map(), path: [{ x: 0, y: 0 }], readLog: [], mutedClues: new Set(),
+    phase: 'explore',
     steps: 0, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
     ...overrides,
   };
@@ -106,16 +108,6 @@ describe('move', () => {
   });
 });
 
-describe('toggleMark', () => {
-  it('toggles marks on and off', () => {
-    const s = makeState();
-    toggleMark(s, { x: 2, y: 2 });
-    expect(s.marks.has('2,2')).toBe(true);
-    toggleMark(s, { x: 2, y: 2 });
-    expect(s.marks.has('2,2')).toBe(false);
-  });
-});
-
 describe('resolveQte / nextSession', () => {
   it('success -> caught -> next round', () => {
     const s = makeState({ phase: 'qte' });
@@ -180,12 +172,70 @@ describe('useBell', () => {
     const pos = useBell(s, mulberry32(1));
     expect(pos).not.toBeNull();
     expect(s.bellUsed).toBe(true);
-    expect(s.marks.has(key(pos!))).toBe(true);
+    expect(s.marks.get(key(pos!))).toBe('exclude');
     expect(useBell(s, mulberry32(2))).toBeNull(); // 一局一次
   });
   it('returns null when no decoys exist', () => {
     const s = newSession(1, mulberry32(3)); // tier1 無 decoy
     expect(useBell(s, mulberry32(1))).toBeNull();
     expect(s.bellUsed).toBe(false);
+  });
+});
+
+describe('cycleMarkAt', () => {
+  it('advances a cell through the three mark states', () => {
+    const s = makeState();
+    cycleMarkAt(s, { x: 2, y: 2 });
+    expect(s.marks.get('2,2')).toBe('exclude');
+    cycleMarkAt(s, { x: 2, y: 2 });
+    expect(s.marks.get('2,2')).toBe('suspect');
+    cycleMarkAt(s, { x: 2, y: 2 });
+    expect(s.marks.get('2,2')).toBe('wager');
+    cycleMarkAt(s, { x: 2, y: 2 });
+    expect(s.marks.has('2,2')).toBe(false);
+  });
+});
+
+describe('move: path and clue read log', () => {
+  it('records every visited cell in order, starting from the spawn', () => {
+    const s = makeState();
+    move(s, { x: 0, y: 1 });
+    move(s, { x: 1, y: 1 });
+    expect(s.path).toEqual([{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }]);
+  });
+
+  it('logs the clue index and the step it was read at', () => {
+    const s = makeState({ player: { x: 1, y: 0 } }); // 線索在 (2,0)
+    move(s, { x: 2, y: 0 });
+    expect(s.readLog).toEqual([{ clueIndex: 0, step: 1 }]);
+    expect(s.readClues.has('2,0')).toBe(true);
+  });
+
+  it('does not log the same clue twice', () => {
+    const s = makeState({ player: { x: 1, y: 0 } });
+    move(s, { x: 2, y: 0 });
+    move(s, { x: 1, y: 0 });
+    move(s, { x: 2, y: 0 });
+    expect(s.readLog).toHaveLength(1);
+  });
+});
+
+describe('toggleMute', () => {
+  it('toggles a clue index in and out of the muted set', () => {
+    const s = makeState();
+    toggleMute(s, 0);
+    expect(s.mutedClues.has(0)).toBe(true);
+    toggleMute(s, 0);
+    expect(s.mutedClues.has(0)).toBe(false);
+  });
+});
+
+describe('newSession', () => {
+  it('seeds the path with the spawn cell and empty deduction state', () => {
+    const s = newSession(1, mulberry32(11));
+    expect(s.path).toEqual([s.player]);
+    expect(s.marks.size).toBe(0);
+    expect(s.readLog).toHaveLength(0);
+    expect(s.mutedClues.size).toBe(0);
   });
 });

@@ -4,6 +4,7 @@ import { getDifficulty } from './difficulty';
 import { generateLevel } from './generate';
 import { key } from './clues';
 import type { Rng } from './rng';
+import { cycleMark, type MarkMap } from './marks';
 
 export type Phase = 'explore' | 'qte' | 'caught' | 'escaped' | 'exhausted';
 export type SessionMode = 'run' | 'daily';
@@ -12,13 +13,22 @@ export const TERRAIN_COST: Record<TerrainType, number> = {
   meadow: 1, mist: 1, thicket: 2, rock: 2,
 };
 
+// 線索判讀記錄：哪一條線索、在第幾步被踩到。供揭曉畫面回推「資訊在第幾步就已完備」
+export interface ClueRead {
+  clueIndex: number;
+  step: number;
+}
+
 export interface SessionState {
   round: number;
   level: Level;
   player: Vec2;
   stamina: number;
   readClues: Set<string>; // 已判讀（踩過）的線索位置鍵
-  marks: Set<string>;     // 玩家自行標記的格
+  marks: MarkMap;         // 玩家標記：排除／存疑／押注（押注全域唯一）
+  path: Vec2[];           // 走過的每一格（含起點），揭曉畫面回放用
+  readLog: ClueRead[];    // 線索判讀順序與步數（同一條線索只記一次）
+  mutedClues: Set<number>; // 被玩家靜音、不計入候選熱區的線索索引
   phase: Phase;
   steps: number;          // 本局累計移動步數（分享卡用）
   mode: SessionMode;      // 主線 run / 每日挑戰 daily
@@ -35,13 +45,17 @@ function startPos(level: Level): Vec2 {
 
 export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): SessionState {
   const level = generateLevel(round, rng);
+  const player = startPos(level);
   return {
     round,
     level,
-    player: startPos(level),
+    player,
     stamina: getDifficulty(round).staminaBudget,
     readClues: new Set(),
-    marks: new Set(),
+    marks: new Map(),
+    path: [player],
+    readLog: [],
+    mutedClues: new Set(),
     phase: 'explore',
     steps: 0,
     mode,
@@ -75,6 +89,7 @@ export function move(s: SessionState, to: Vec2): void {
   s.steps++;
   s.stamina -= TERRAIN_COST[s.level.terrain[to.y][to.x]];
   s.player = to;
+  s.path.push(to);
 
   const k = key(to);
   const supplyIdx = s.level.supplies.findIndex((p) => key(p) === k);
@@ -82,7 +97,11 @@ export function move(s: SessionState, to: Vec2): void {
     s.level.supplies.splice(supplyIdx, 1);
     s.stamina += getDifficulty(s.round).supplyRestore;
   }
-  if (s.level.clues.some((c) => key(c.position) === k)) s.readClues.add(k);
+  const clueIndex = s.level.clues.findIndex((c) => key(c.position) === k);
+  if (clueIndex >= 0 && !s.readClues.has(k)) {
+    s.readClues.add(k);
+    s.readLog.push({ clueIndex, step: s.steps });
+  }
 
   // 逼近目標的判定先於力竭判定：最後一步逼近仍可觸發 QTE
   if (cheb(to, s.level.targetPos) <= 1) {
@@ -92,10 +111,15 @@ export function move(s: SessionState, to: Vec2): void {
   if (s.stamina <= 0 || !hasAffordableMove(s)) s.phase = 'exhausted';
 }
 
-export function toggleMark(s: SessionState, p: Vec2): void {
-  const k = key(p);
-  if (s.marks.has(k)) s.marks.delete(k);
-  else s.marks.add(k);
+// 三態標記推進：排除 → 存疑 → 押注 → 無（押注唯一性由 marks.cycleMark 保證）
+export function cycleMarkAt(s: SessionState, p: Vec2): void {
+  cycleMark(s.marks, key(p));
+}
+
+// 線索靜音：把一條已判讀的線索排除在候選熱區之外，用來檢驗「如果這條是假的呢」
+export function toggleMute(s: SessionState, clueIndex: number): void {
+  if (s.mutedClues.has(clueIndex)) s.mutedClues.delete(clueIndex);
+  else s.mutedClues.add(clueIndex);
 }
 
 export function resolveQte(s: SessionState, success: boolean): void {
@@ -109,7 +133,7 @@ export function useBell(s: SessionState, rng: Rng): Vec2 | null {
   const decoys = s.level.clues.filter((c) => c.isDecoy);
   if (decoys.length === 0) return null;
   const pick = decoys[Math.floor(rng() * decoys.length)];
-  s.marks.add(key(pick.position));
+  s.marks.set(key(pick.position), 'exclude');
   s.bellUsed = true;
   return pick.position;
 }
