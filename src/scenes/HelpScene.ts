@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import type { SessionState } from '../core/session';
-import type { TerrainType } from '../core/types';
 import type { Weather } from '../core/weather';
 import { getPalette, type Palette } from '../core/palette';
 import type { I18n } from '../core/i18n';
@@ -34,7 +33,10 @@ export class HelpScene extends Phaser.Scene {
 
     // 面板
     const pw = 580;
-    const ph = 636;
+    // 10 列版面預算（Phase 4）：列距維持 44px，末列 y=py0+574，
+    // 開始按鈕上緣＝py0+ph-56-24=py0+600，間距 26px（與 9 列版相同的淨空）。
+    // 面板底緣 py0+ph = 78+680 = 758，仍在規格書 §11.1 的 720×780 embed 視窗內。
+    const ph = 680;
     const px0 = cx - pw / 2;
     const py0 = 78;
     const panel = this.add.graphics();
@@ -100,8 +102,7 @@ export class HelpScene extends Phaser.Scene {
       }
     };
 
-    // 9 列版面預算：列距 48→44px 騰出第 9 列（help.weather）空間，面板高度 ph 維持 636 不變。
-    // 第 9 列 y=py0+530，開始按鈕上緣＝py0+ph-56-24=py0+556，間距 26px（≥18px 需求）。
+    // 10 列版面預算（Phase 4）：列距維持 44px，詳見上方 ph 定義處的註解。
     const rows: { y: number; key: Parameters<I18n['t']>[0]; icon: (y: number) => void }[] = [
       { y: py0 + 178, key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
       { y: py0 + 222, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
@@ -123,11 +124,18 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 398, key: 'help.mark',
+        y: py0 + 398, key: 'help.marks',
         icon: (y) => {
-          icons.lineStyle(3, pal.mark, 0.9);
-          icons.lineBetween(rowX - 9, y - 9, rowX + 9, y + 9);
-          icons.lineBetween(rowX + 9, y - 9, rowX - 9, y + 9);
+          // 排除：紅 ✕
+          icons.lineStyle(2.4, pal.mark, 0.9);
+          icons.lineBetween(rowX - 20, y - 7, rowX - 8, y + 7);
+          icons.lineBetween(rowX - 8, y - 7, rowX - 20, y + 7);
+          // 存疑：黃圈＋點
+          icons.lineStyle(2, pal.supply, 0.9).strokeCircle(rowX, y - 1, 6);
+          icons.fillStyle(pal.supply, 0.9).fillCircle(rowX, y + 8, 1.6);
+          // 押注：金色雙環
+          icons.lineStyle(2.2, pal.gold, 1).strokeCircle(rowX + 18, y, 8);
+          icons.fillStyle(pal.gold, 1).fillCircle(rowX + 18, y, 2.4);
         },
       },
       {
@@ -143,22 +151,30 @@ export class HelpScene extends Phaser.Scene {
         },
       },
       {
-        y: py0 + 486, key: 'help.terrain',
+        y: py0 + 486, key: 'help.layer',
         icon: (y) => {
-          const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
-          const sq = 6;
-          const gap = 2;
-          const totalW = order.length * sq + (order.length - 1) * gap;
-          let x = rowX - totalW / 2;
-          for (const t of order) {
-            icons.fillStyle(pal.terrain[t], 1).fillRect(x, y - sq / 2, sq, sq);
+          // 三格由淡到濃的金色方塊，對應熱區的熱度分級
+          const sq = 9;
+          const gap = 3;
+          let x = rowX - (sq * 3 + gap * 2) / 2;
+          for (const a of [0.12, 0.24, 0.38]) {
+            icons.fillStyle(pal.gold, a).fillRect(x, y - sq / 2, sq, sq);
             x += sq + gap;
           }
+          icons.lineStyle(1, pal.gold, 0.5).strokeRect(rowX - 16.5, y - sq / 2, sq * 3 + gap * 2, sq);
         },
       },
       {
-        // 第 9 列：與開始按鈕上緣（py0+556）保有 26px 間距，見上方版面預算註解
-        y: py0 + 530, key: 'help.weather',
+        y: py0 + 530, key: 'help.reveal',
+        icon: (y) => {
+          // 揭曉：生物色實心點＋金色脈動環的靜態版（同 RevealScene 的真實位置圖示）
+          icons.fillStyle(pal.glow, 1).fillCircle(rowX, y, 4);
+          icons.lineStyle(2, pal.gold, 1).strokeCircle(rowX, y, 10);
+        },
+      },
+      {
+        // 第 10 列：與開始按鈕上緣（py0+600）保有 26px 間距，見上方版面預算註解
+        y: py0 + 574, key: 'help.weather',
         icon: (y) => {
           const order: Weather[] = ['clear', 'mist', 'wind', 'drizzle'];
           const gap = 20;

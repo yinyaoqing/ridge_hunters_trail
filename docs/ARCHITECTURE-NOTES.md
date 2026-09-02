@@ -48,7 +48,7 @@ registry 鍵沒有「格式降級」的概念——寫入方保證型別正確�
 | `storage` | `main.ts`（`safeStorage()`：`window.localStorage` 或 `undefined`） | `MapScene`（教學／說明旗標的直接讀寫，未包成 store） | 從不清空；`undefined` 時代表整個頁面降級為純記憶體模式，各 store 建構時已各自處理。 |
 | `codex` | `main.ts`（`createCodex(storage)`） | `ResultScene`、`CodexScene`、`CampScene` | 從不清空；store 本身是 `rht.codex.v2` 的薄包裝，registry 只存這個包裝物件的參照。 |
 | `i18n` | `main.ts`（`createI18n(...)`） | `ResultScene`、`QteScene`、`MapScene`、`HelpScene`、`CodexScene`、`CampScene`（幾乎每個場景都讀） | 從不清空；`setLocale()` 改變的是物件內部狀態＋`rht.locale.v1`，registry 鍵本身恆指向同一物件，不需重設。 |
-| `session` | `main.ts`（初始 `newSession(1, rng)`）／`ResultScene`（成功續追、daily 重試、run 重試時覆寫成下一局）／`CampScene`（點擊「上山追蹤」「今日行蹤」時覆寫） | `MapScene`、`QteScene`、`HelpScene`、`CodexScene`（僅讀已記錄的圖鑑進度用不到 session 內容，但介面一致）、`BootScene`（僅 dev 模式 `#scene=Result` 直達除錯路徑，直接改寫 `s.phase`） | 從不 `remove`，永遠是「覆寫成下一局的新 `SessionState`」；`SessionState.resolved` 旗標防止 `ResultScene` 因 resize 重啟而重複記帳，而非靠清空這個鍵。 |
+| `session` | `main.ts`（初始 `newSession(1, rng)`）／`ResultScene`（成功續追、daily 重試、run 重試時覆寫成下一局）／`CampScene`（點擊「上山追蹤」「今日行蹤」時覆寫） | `MapScene`、`QteScene`、`HelpScene`、`RevealScene`、`CodexScene`（僅讀已記錄的圖鑑進度用不到 session 內容，但介面一致）、`BootScene`（僅 dev 模式 `#scene=Result` 直達除錯路徑，直接改寫 `s.phase`） | 從不 `remove`，永遠是「覆寫成下一局的新 `SessionState`」；`SessionState.resolved` 旗標防止 `ResultScene` 因 resize 重啟而重複記帳，而非靠清空這個鍵。 |
 | `runState` | `main.ts`（`createRunState(storage)`） | `ResultScene`（`addWin()`／`setRound()`）、`MapScene`（HUD 顯示 `wins()`） | 從不清空；store 是 `rht.run.v1` 的薄包裝。 |
 | `runRound` | `main.ts`（初始 `runState.round()`）／`ResultScene`（主線捕獲成功時 `s.round + 1`，與 `runState.setRound()` 同步寫入） | `ResultScene`（「下一場狩獵」按鈕的目標局數）、`CampScene`（「上山追蹤．第 n 局」按鈕文字與進場局數） | 從不清空；是 `runState.round()` 在 registry 層的快取，兩者理論上應保持一致（`ResultScene` 記帳時同時寫兩處）。 |
 | `streak` | `main.ts`（`createStreak(storage)`） | `ResultScene`（daily 模式記錄連勝、顯示連勝數／分享卡）、`CampScene`（連勝 chip、判斷今日是否已玩） | 從不清空；store 是 `rht.daily.v1` 的薄包裝。 |
@@ -57,11 +57,18 @@ registry 鍵沒有「格式降級」的概念——寫入方保證型別正確�
 | `audio` | `main.ts`（`createAudio(storage, ctxFactory)`） | `ResultScene`、`QteScene`、`MapScene`、`CampScene`（每個場景各自持有 `this.audio` 快取，皆來自此鍵） | 從不清空；`toggle()`／`unlock()` 改變物件內部狀態＋ `rht.audio.v1`，registry 鍵本身恆指向同一物件。 |
 | `lastUnlocks` | `ResultScene`（結算時算出「本次新解鎖的道具」清單並暫存） | `ResultScene`（同一次 `create()` 稍後渲染解鎖卡；resize 重啟時重讀，不重算） | `MapScene.create()`／`CampScene.create()` 開頭清空為 `[]`——代表「離開 Result 進入下一個場景」，避免卡片殘留到下一次進場。 |
 | `lastComms` | `ResultScene`（結算時算出「本次新完成的委託」索引清單並暫存） | `ResultScene`（同上，渲染委託完成行；`describeCommission` 取回描述文字） | 同 `lastUnlocks`：`MapScene.create()`／`CampScene.create()` 開頭清空為 `[]`。 |
-| `qteOutcome` | `QteScene`（判讀結束時寫入 `QteState`，含命中精準度） | `ResultScene`（換算品質 `qualityFromQte(qte)`） | 從不主動清空／`remove`；下一次進入 `QteScene` 時會被覆寫。若某局跳過 QTE（如失敗/逃跑），`ResultScene` 讀到的是上一局殘留值，但 `qte` 只在 `caught` 分支才會被使用，故不影響正確性。 |
+| `qteOutcome` | `QteScene`（判讀結束時寫入 `QteState`，含命中精準度） | （Phase 4 起無讀者）——品質改由判讀精準度計算，`ResultScene` 不再讀取本鍵。`QteScene` 仍寫入，供 Phase 7 移除 QTE 時一併清理。 | 從不主動清空／`remove`；下一次進入 `QteScene` 時會被覆寫。若某局跳過 QTE（如失敗/逃跑），`ResultScene` 讀到的是上一局殘留值，但 `qte` 只在 `caught` 分支才會被使用，故不影響正確性。 |
 | `dailyKey` | `CampScene`（點擊「今日行蹤」時，取樣當下日期一次存入，供本局與結算共用同一 dateKey） | `ResultScene`（`s.mode === 'daily'` 時讀取，取代現場重新取樣，避免跨 UTC 午夜分歧） | `CampScene.create()` 開頭 `registry.remove('dailyKey')`——代表「回到營地＝本次 daily（若有）已結算完畢」，防止下一局改走主線時誤讀到舊值。 |
 | `score`（Task 8 新增） | `main.ts`（preBoot：`registry.set('score', createScoreStore(storage))`，比照 `codex`/`tools`/`streak` 的 store 掛載方式） | `ResultScene`（caught 時記帳＋顯示；雙卡「安全歇腳／乘勝續追」的 `bank()`/`push()` 呼叫）、`CampScene`（右上角顯示 `bestRun` 與進行中的 `banked`/`pot`） | 從不清空；`rht.score.v1` 的薄包裝，比照現有 store 慣例。 |
 | `lastGain`（Task 8 新增） | `ResultScene`（`!s.resolved` 記帳區塊內，僅 `caught && s.mode === 'run'` 時，暫存 `score.addCatch(catchScore(...))` 的實得分數，供結算畫面顯示「+N 分」） | `ResultScene`（`if (!s.resolved)` 區塊之外的渲染段讀取，含 resize 重啟時的重讀） | `CampScene.create()`／`MapScene.create()` 開頭各自 `registry.remove('lastGain')`——離開 Result 即清空，避免殘留到下一次進場。 |
 | `lastLoss`（Task 8 新增） | `ResultScene`（同一 `!s.resolved` 區塊內，`!caught && s.mode === 'run'` 時，於 `score.loseRun()` 歸零 pot **之前**先讀出 `score.state().pot` 暫存，供結算畫面顯示「散進霧裡了……」文案帶數字） | `ResultScene`（同 `lastGain`：`if (!s.resolved)` 區塊之外讀取顯示） | 同 `lastGain`：`CampScene.create()`／`MapScene.create()` 開頭各自 `registry.remove('lastLoss')`。 |
+
+### Phase 4 流程變更：揭曉插入結算之前
+
+`Qte → Result` 與 `Map(exhausted) → Result` 兩條路徑，自 Phase 4 起一律先經
+`RevealScene`（scene key `'Reveal'`）。`RevealScene` 為純呈現場景：只讀 registry 的
+`session` / `i18n` / `audio`，**不做任何記帳**——`SessionState.resolved` 的記帳仍
+完全由 `ResultScene` 負責，因此揭曉畫面被 resize 重啟不會造成重複記錄。
 
 ---
 

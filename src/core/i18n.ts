@@ -11,7 +11,7 @@ export type MsgKey =
   | 'btn.camp' | 'btn.copy'
   | 'help.title' | 'help.goal'
   | 'help.footprint' | 'help.disturbance' | 'help.scent'
-  | 'help.decoy' | 'help.stamina' | 'help.mark' | 'help.qte' | 'help.terrain' | 'help.weather'
+  | 'help.decoy' | 'help.stamina' | 'help.qte' | 'help.weather'
   | 'weather.clear' | 'weather.mist' | 'weather.wind' | 'weather.drizzle'
   | 'camp.continue' | 'camp.daily' | 'camp.dailyDone' | 'camp.streak'
   | 'quality.bronze' | 'quality.silver' | 'quality.gold'
@@ -63,9 +63,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.scent': 'Scent — the creature sits at this distance, along the ring.',
     'help.decoy': 'Some trails lie. From round 4, decoy clues appear — cross-check before you commit.',
     'help.stamina': 'Every step costs stamina — meadow and mist 1, thicket and rock 2. Mistleaf and dewfruit restore it.',
-    'help.mark': 'Shift+click marks a cell for your notes. Step onto a clue to read it.',
     'help.qte': 'Up close, tap or press SPACE when the needle sweeps the glowing arc.',
-    'help.terrain': 'Terrain costs stamina: meadow/mist 1 · thicket/rock 2.',
     'help.weather': 'Weather shifts how clues read: mist blurs, wind scatters scent, drizzle sharpens tracks.',
     'weather.clear': 'Clear',
     'weather.mist': 'Misty',
@@ -158,9 +156,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.scent': '氣味——生物位於這個距離的環帶上。',
     'help.decoy': '有些蹤跡會說謊。第 4 局起會出現干擾線索，下判斷前先交叉比對。',
     'help.stamina': '每一步都消耗體力：草地／霧地 1，密叢／岩坡 2。霧葉與露珠果可以回復。',
-    'help.mark': 'Shift+點擊可在格子上做標記筆記；踩上線索即可判讀。',
     'help.qte': '逼近目標後，趁指針掃過發光弧區時點擊或按空白鍵。',
-    'help.terrain': '地形消耗體力：草地／霧地 1 ・密叢／岩坡 2。',
     'help.weather': '天氣影響判讀：霧日朦朧、風日氣味散逸、細雨足跡清晰。',
     'weather.clear': '晴',
     'weather.mist': '霧日',
