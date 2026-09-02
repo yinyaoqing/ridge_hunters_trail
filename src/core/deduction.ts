@@ -1,4 +1,5 @@
-import { candidates } from './clues';
+import { candidates, intersect, key } from './clues';
+import type { Vec2 } from './geometry';
 import type { Clue, Level } from './types';
 import type { ClueRead } from './session';
 
@@ -33,4 +34,39 @@ export function maxHeat(heat: Map<string, number>): number {
   let max = 0;
   for (const n of heat.values()) if (n > max) max = n;
   return max;
+}
+
+// 資訊完備步數：依判讀順序重播真線索，交集大小第一次達到「最終交集大小」的那一步。
+// 從這一步之後，玩家再走的路都沒有帶來更精確的資訊——揭曉畫面用它指出過度行走。
+// 幌子不計入：它們不是關於目標的資訊。玩家未讀到任何真線索時回傳 null。
+export function infoCompleteStep(level: Level, readLog: ClueRead[]): number | null {
+  const real: { clue: Clue; step: number }[] = [];
+  for (const entry of readLog) {
+    const clue = level.clues[entry.clueIndex];
+    if (clue && !clue.isDecoy) real.push({ clue, step: entry.step });
+  }
+  if (real.length === 0) return null;
+
+  const finalSize = intersect(real.map((r) => r.clue), level.mapSize).size;
+  const acc: Clue[] = [];
+  for (const r of real) {
+    acc.push(r.clue);
+    if (intersect(acc, level.mapSize).size === finalSize) return r.step;
+  }
+  // 理論上不可達（最後一輪必定等於 finalSize），保底回傳最後一次判讀的步數
+  return real[real.length - 1].step;
+}
+
+// 誤導你的那條假蹤跡：玩家已判讀的幌子中，候選集合涵蓋押注格的第一條。
+// 沒有押注、或押注不落在任何已讀幌子的範圍內時回傳 null（揭曉畫面就不顯示這一行）。
+export function misleadingDecoy(
+  level: Level, readLog: ClueRead[], wager: Vec2 | null,
+): Clue | null {
+  if (!wager) return null;
+  const wk = key(wager);
+  for (const entry of readLog) {
+    const clue = level.clues[entry.clueIndex];
+    if (clue && clue.isDecoy && candidates(clue, level.mapSize).has(wk)) return clue;
+  }
+  return null;
 }

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { unmutedReadClues, heatMap, maxHeat } from '../src/core/deduction';
+import {
+  unmutedReadClues, heatMap, maxHeat, infoCompleteStep, misleadingDecoy,
+} from '../src/core/deduction';
 import type { Clue, Level, TerrainType } from '../src/core/types';
 
 const disturbance = (x: number, y: number, radius: number, isDecoy = false): Clue =>
@@ -59,5 +61,61 @@ describe('maxHeat', () => {
   });
   it('returns 0 for an empty map', () => {
     expect(maxHeat(new Map())).toBe(0);
+  });
+});
+
+describe('infoCompleteStep', () => {
+  it('returns the step after which no further real clue narrowed the answer', () => {
+    // 三條真線索：前兩條把交集收斂到最終大小，第三條完全包住前兩者、不再收斂
+    const level = makeLevel([
+      disturbance(5, 5, 2),
+      disturbance(7, 5, 2),
+      disturbance(6, 5, 9), // 半徑極大，涵蓋前兩者的交集，不提供新資訊
+    ]);
+    const step = infoCompleteStep(level, [
+      { clueIndex: 0, step: 4 },
+      { clueIndex: 1, step: 11 },
+      { clueIndex: 2, step: 26 },
+    ]);
+    expect(step).toBe(11);
+  });
+
+  it('ignores decoys — they are not information about the target', () => {
+    const level = makeLevel([disturbance(5, 5, 2), disturbance(0, 0, 1, true)]);
+    expect(infoCompleteStep(level, [
+      { clueIndex: 0, step: 3 },
+      { clueIndex: 1, step: 8 },
+    ])).toBe(3);
+  });
+
+  it('returns null when no real clue was ever read', () => {
+    const level = makeLevel([disturbance(0, 0, 1, true)]);
+    expect(infoCompleteStep(level, [{ clueIndex: 0, step: 2 }])).toBe(null);
+    expect(infoCompleteStep(level, [])).toBe(null);
+  });
+});
+
+describe('misleadingDecoy', () => {
+  const level = makeLevel([
+    disturbance(5, 5, 2),
+    disturbance(1, 1, 2, true), // 幌子，涵蓋 (1,2)
+  ]);
+  const readLog = [{ clueIndex: 0, step: 3 }, { clueIndex: 1, step: 7 }];
+
+  it('names the read decoy whose candidate set contains the wager cell', () => {
+    const found = misleadingDecoy(level, readLog, { x: 1, y: 2 });
+    expect(found?.position).toEqual({ x: 1, y: 1 });
+  });
+
+  it('returns null when the wager sits outside every read decoy', () => {
+    expect(misleadingDecoy(level, readLog, { x: 6, y: 5 })).toBe(null);
+  });
+
+  it('returns null when the player placed no wager', () => {
+    expect(misleadingDecoy(level, readLog, null)).toBe(null);
+  });
+
+  it('ignores decoys the player never read', () => {
+    expect(misleadingDecoy(level, [{ clueIndex: 0, step: 3 }], { x: 1, y: 2 })).toBe(null);
   });
 });
