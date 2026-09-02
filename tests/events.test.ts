@@ -32,7 +32,7 @@ function makeState(opts: Opts = {}): SessionState {
   const level: Level = {
     round: 1, mapSize: size, targetPos: opts.targetPos ?? { x: size - 1, y: size - 1 },
     clues: opts.clues ?? [], terrain, elevation, supplies: opts.supplies ?? [],
-    creatureId: 'mistfawn', weather: 'clear', iris: false,
+    creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
   };
   const player = opts.player ?? { x: 0, y: 0 };
   return {

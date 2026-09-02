@@ -44,6 +44,7 @@ export interface Level {
   elevation: number[][];    // elevation[y][x]，0..1；地形由它推導，視野加成也讀它
   supplies: Vec2[];         // 補給道具（規格書「霧葉/露珠果」的統一實作）
   creatureId: string;
+  trailheadIndex: number; // 開局即揭示的真線索索引——玩家永遠有一條線可以拉
   weather: Weather;
   iris: boolean; // 異彩變種——純視覺＋計分，不影響難度
 }

@@ -14,7 +14,7 @@ function makeLevel(clues: Clue[], mapSize = 12): Level {
     Array.from({ length: mapSize }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
   return {
     round: 1, mapSize, targetPos: { x: 6, y: 5 }, clues, terrain, elevation,
-    supplies: [], creatureId: 'mistfawn', weather: 'clear', iris: false,
+    supplies: [], creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
   };
 }
 

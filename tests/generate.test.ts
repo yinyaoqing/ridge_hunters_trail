@@ -4,6 +4,7 @@ import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key, intersect } from '../src/core/clues';
 import { dist, angleDiff, angleDeg } from '../src/core/geometry';
+import { startCorner } from '../src/core/terrain';
 import { CREATURES } from '../src/data/creatures';
 import { applyQuirk } from '../src/core/quirks';
 import { applyWeather } from '../src/core/weather';
@@ -194,6 +195,31 @@ describe('generateLevel: physical reachability', () => {
             expect(band(level.terrain[y][x])).toBe(bandFromElevation(level.elevation[y][x]));
           }
         }
+      }
+    }
+  });
+});
+
+describe('generateLevel: trailhead', () => {
+  it('always names a real clue as the trailhead', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const round of [1, 5, 9]) {
+        const level = generateLevel(round, mulberry32(seed));
+        const clue = level.clues[level.trailheadIndex];
+        expect(clue).toBeDefined();
+        expect(clue.isDecoy).toBe(false);
+      }
+    }
+  });
+
+  it('picks the real clue nearest the spawn corner, so there is a thread to pull', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const level = generateLevel(5, mulberry32(seed));
+      const start = startCorner(level.mapSize, level.targetPos);
+      const chosen = level.clues[level.trailheadIndex];
+      for (const c of level.clues) {
+        if (c.isDecoy) continue;
+        expect(dist(start, chosen.position)).toBeLessThanOrEqual(dist(start, c.position));
       }
     }
   });

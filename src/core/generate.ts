@@ -121,6 +121,16 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   const start = startCorner(size, targetPos);
   ensureReachable(terrain, start, [targetPos, ...clues.map((c) => c.position), ...supplies]);
 
+  // 起始蹤跡：離出生角最近的真線索。視野收窄後，出生角附近通常一條線索都看不見，
+  // 開局面對全空的地圖會變成亂走——給玩家一條線可以拉，其餘的靠走與眺望自己找。
+  let trailheadIndex = 0;
+  let best = Infinity;
+  clues.forEach((c, i) => {
+    if (c.isDecoy) return;
+    const d = dist(start, c.position);
+    if (d < best) { best = d; trailheadIndex = i; }
+  });
+
   // ensureReachable 只改 terrain（見 reach.ts 開頭註解），不知道 elevation 網格的存在，
   // 所以它挖的隘口（起點降級、崖壁降級）會留下「terrain 是 rock 但 elevation 還停在
   // 崖壁那一帶」的落差。這裡補回去：凡是 rock 卻還帶著崖壁高程的格子，代表是剛被
@@ -136,7 +146,7 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
 
   return {
     round, mapSize: size, targetPos, clues, terrain, elevation, supplies,
-    creatureId: creature.id, weather, iris,
+    creatureId: creature.id, trailheadIndex, weather, iris,
   };
 }
 
