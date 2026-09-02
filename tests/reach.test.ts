@@ -29,6 +29,13 @@ describe('reachableFrom', () => {
   it('returns an empty set when the origin itself is impassable', () => {
     expect(reachableFrom(grid(['#.', '..']), { x: 0, y: 0 }).size).toBe(0);
   });
+
+  it('bounds x per row rather than reusing the row count on a non-square grid', () => {
+    // 2 列 × 4 欄：若 x 邊界誤用 terrain.length（=2，列數），會把 x 也夾在 <2，
+    // 漏掉整張圖右半邊。正確答案是全部 8 格互通。
+    const t = grid(['....', '....']);
+    expect(reachableFrom(t, { x: 0, y: 0 }).size).toBe(8);
+  });
 });
 
 describe('ensureReachable', () => {
@@ -41,9 +48,12 @@ describe('ensureReachable', () => {
   });
 
   it('downgrades cliffs to rock rather than to meadow — the pass is still costly', () => {
-    const t = grid(['.#.']);
+    // 方形網格（避免 F1 那個非方形 bug 讓這條測試「假綠燈」：值對了，
+    // 但走訪根本沒發生，postcondition 從沒被驗過）
+    const t = grid(['.#.', '.#.', '.#.']);
     ensureReachable(t, { x: 0, y: 0 }, [{ x: 2, y: 0 }]);
     expect(t[0][1]).toBe('rock');
+    expect(reachableFrom(t, { x: 0, y: 0 }).has(key({ x: 2, y: 0 }))).toBe(true);
   });
 
   it('leaves an already-connected map untouched', () => {

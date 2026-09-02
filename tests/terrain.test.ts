@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { terrainFor, buildTerrain } from '../src/core/terrain';
+import { terrainFor, buildTerrain, elevationFor } from '../src/core/terrain';
 import { mulberry32 } from '../src/core/rng';
 import type { TerrainType } from '../src/core/types';
 
@@ -89,5 +89,24 @@ describe('buildTerrain', () => {
   it('the same seed with a bias still differs from the unbiased field', () => {
     expect(buildTerrain(mulberry32(2), 15, 0.15).terrain)
       .not.toEqual(buildTerrain(mulberry32(2), 15, 0).terrain);
+  });
+});
+
+describe('elevationFor', () => {
+  it('round-trips through terrainFor back to the same terrain type', () => {
+    // meadow/mist 兩者都落在同一個高程帶，只靠濕度分岔——分別用乾、濕兩種濕度驗證
+    expect(terrainFor(elevationFor('meadow'), 0.2)).toBe('meadow');
+    expect(terrainFor(elevationFor('mist'), 0.8)).toBe('mist');
+    expect(terrainFor(elevationFor('thicket'), 0.5)).toBe('thicket');
+    expect(terrainFor(elevationFor('rock'), 0.5)).toBe('rock');
+    expect(terrainFor(elevationFor('cliff'), 0.5)).toBe('cliff');
+  });
+
+  it('returns the documented band midpoints', () => {
+    expect(elevationFor('meadow')).toBeCloseTo(0.19);
+    expect(elevationFor('mist')).toBeCloseTo(0.19);
+    expect(elevationFor('thicket')).toBeCloseTo(0.50);
+    expect(elevationFor('rock')).toBeCloseTo(0.72);
+    expect(elevationFor('cliff')).toBeCloseTo(0.91);
   });
 });

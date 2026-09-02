@@ -65,6 +65,22 @@ export const TERRAIN_COST: Record<TerrainType, number> = {
 
 export const isPassable = (t: TerrainType): boolean => Number.isFinite(TERRAIN_COST[t]);
 
+// terrainFor 的反向代表值：generate.ts／reach.ts 有幾處會「改地形但不重算高程」
+// （目標強制地形、崖壁線索降級、reach.ts 挖隘口），若不同步更新對應的高程格，
+// 之後的視野加成（讀 elevation 判斷是否站在高地）就會被騙——挖出來的隘口明明
+// 只是 rock，卻因為留著舊的崖壁高程而被當成峰頂算加成。取值為各分帶的中點，
+// 回填 terrainFor 仍會得到同一個地形型別，見 terrain.test.ts 的往返測試。
+export function elevationFor(terrain: TerrainType): number {
+  switch (terrain) {
+    case 'cliff': return 0.91;
+    case 'rock': return 0.72;
+    case 'thicket': return 0.50;
+    case 'meadow':
+    case 'mist':
+      return 0.19;
+  }
+}
+
 // 出生角：離目標最遠的那個角落。Task 4 的可達性保證（generate.ts）與 session 的
 // 開局位置共用同一份定義——兩邊各算一次遲早會不一致。
 export function startCorner(mapSize: number, target: Vec2): Vec2 {

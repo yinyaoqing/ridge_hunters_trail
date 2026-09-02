@@ -6,7 +6,6 @@ import type { TerrainType } from './types';
 // 從 from 出發、以八方向走訪所有可通行格。起點本身不可通行時回傳空集合
 // （呼叫端應先確保起點可通行——ensureReachable 會處理）。
 export function reachableFrom(terrain: TerrainType[][], from: Vec2): Set<string> {
-  const size = terrain.length;
   const seen = new Set<string>();
   if (!isPassable(terrain[from.y][from.x])) return seen;
   const queue: Vec2[] = [from];
@@ -17,7 +16,10 @@ export function reachableFrom(terrain: TerrainType[][], from: Vec2): Set<string>
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue;
         const q = { x: p.x + dx, y: p.y + dy };
-        if (q.x < 0 || q.y < 0 || q.x >= size || q.y >= size) continue;
+        // y 邊界看列數、x 邊界看「該列自己的」長度——不可共用同一個 size，
+        // 否則非方形網格會把 x 也夾在列數以內，漏掉整張圖的一部分（F1）
+        if (q.y < 0 || q.y >= terrain.length) continue;
+        if (q.x < 0 || q.x >= terrain[q.y].length) continue;
         const k = key(q);
         if (seen.has(k) || !isPassable(terrain[q.y][q.x])) continue;
         seen.add(k);
@@ -31,6 +33,10 @@ export function reachableFrom(terrain: TerrainType[][], from: Vec2): Set<string>
 // 物理可達性保證：反向錨定保證線索在「幾何上」有解，這裡保證它們在「物理上」走得到。
 // 對每一個從起點走不到的必要格，沿它與起點的直線把崖壁降級為岩坡，然後重新走訪。
 // 降級為 rock（成本 4）而非 meadow：挖出來的隘口仍然昂貴，繞不繞路依舊是個決定。
+// 注意：這裡只改 terrain，不動 elevation——ensureReachable 的簽章刻意維持
+// (terrain, from, required)，不額外吃 elevation 網格（reach.test.ts 既有測試
+// 依賴這個簽章）。呼叫端（generate.ts）在這之後會對整張圖做一次高程回補，
+// 統一處理這裡與 generate.ts 自己那兩處改地形卻沒有同步改高程的落差。
 export function ensureReachable(
   terrain: TerrainType[][], from: Vec2, required: Vec2[],
 ): void {

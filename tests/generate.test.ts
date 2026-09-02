@@ -8,6 +8,8 @@ import { CREATURES } from '../src/data/creatures';
 import { applyQuirk } from '../src/core/quirks';
 import { applyWeather } from '../src/core/weather';
 import { reachableFrom } from '../src/core/reach';
+import { BAND_CLIFF, BAND_ROCK, BAND_THICKET } from '../src/core/terrain';
+import type { TerrainType } from '../src/core/types';
 
 describe('generateLevel (property tests over 200 seeds)', () => {
   const cases = Array.from({ length: 200 }, (_, i) => ({
@@ -171,5 +173,28 @@ describe('generateLevel: physical reachability', () => {
 
   it('stays deterministic for a given seed', () => {
     expect(generateLevel(5, mulberry32(33))).toEqual(generateLevel(5, mulberry32(33)));
+  });
+
+  it('every cell\'s terrain stays consistent with its elevation, even after target/clue/corridor edits', () => {
+    // 地形永遠該是「由高程推導出來的」——三個會改地形的地方（目標強制地形、
+    // 崖壁線索降級、reach.ts 挖隘口）如果沒有同步改高程，這裡就會抓到落差。
+    // meadow 和 mist 同屬「低地」高程帶，只靠濕度分岔，所以比對時要把兩者當同一帶。
+    const band = (t: TerrainType): string => (t === 'meadow' || t === 'mist' ? 'lowland' : t);
+    const bandFromElevation = (e: number): string => {
+      if (e >= BAND_CLIFF) return 'cliff';
+      if (e >= BAND_ROCK) return 'rock';
+      if (e >= BAND_THICKET) return 'thicket';
+      return 'lowland';
+    };
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const round of [1, 5, 9]) {
+        const level = generateLevel(round, mulberry32(seed));
+        for (let y = 0; y < level.mapSize; y++) {
+          for (let x = 0; x < level.mapSize; x++) {
+            expect(band(level.terrain[y][x])).toBe(bandFromElevation(level.elevation[y][x]));
+          }
+        }
+      }
+    }
   });
 });

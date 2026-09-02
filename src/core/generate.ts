@@ -4,7 +4,7 @@ import type { Clue, ClueType, Level } from './types';
 import { getDifficulty, type DifficultyParams } from './difficulty';
 import { key, intersect } from './clues';
 import { applyQuirk, elevationBiasFor } from './quirks';
-import { buildTerrain, startCorner } from './terrain';
+import { buildTerrain, startCorner, elevationFor, BAND_CLIFF } from './terrain';
 import { ensureReachable } from './reach';
 import { applyWeather, WEATHER_POOL } from './weather';
 import { CREATURES } from '../data/creatures';
@@ -91,8 +91,11 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   }
 
   const { terrain, elevation } = buildTerrain(rng, size, elevationBiasFor(creatureId));
-  // 目標所在格強制為該生物的偏好地形——這也順帶保證目標永遠不落在崖壁上
+  // 目標所在格強制為該生物的偏好地形——這也順帶保證目標永遠不落在崖壁上。
+  // 同步改高程，否則 elevation 還留著雜訊原本算出來的值，跟強制後的地形對不上
+  // （見 terrain.ts 的 elevationFor）。
   terrain[targetPos.y][targetPos.x] = creature.terrain;
+  elevation[targetPos.y][targetPos.x] = elevationFor(creature.terrain);
 
   const taken = new Set([key(targetPos), ...clues.map((c) => key(c.position))]);
   const supplies: Vec2[] = [];
@@ -106,15 +109,30 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   }
 
   // 線索必須踩得到才能判讀；落在崖壁上的線索格先降級為岩坡（代價高但走得到）
+  // ——同樣要同步高程，理由同上。
   for (const c of clues) {
     if (terrain[c.position.y][c.position.x] === 'cliff') {
       terrain[c.position.y][c.position.x] = 'rock';
+      elevation[c.position.y][c.position.x] = elevationFor('rock');
     }
   }
 
   // 物理可達性保證（見 reach.ts）：目標、所有線索、所有補給都必須從出生角走得到
   const start = startCorner(size, targetPos);
   ensureReachable(terrain, start, [targetPos, ...clues.map((c) => c.position), ...supplies]);
+
+  // ensureReachable 只改 terrain（見 reach.ts 開頭註解），不知道 elevation 網格的存在，
+  // 所以它挖的隘口（起點降級、崖壁降級）會留下「terrain 是 rock 但 elevation 還停在
+  // 崖壁那一帶」的落差。這裡補回去：凡是 rock 卻還帶著崖壁高程的格子，代表是剛被
+  // ensureReachable 降級的，把高程也改成 rock 的代表值。原生的 rock 格高程本來就
+  // 低於崖壁門檻，不會被這條規則誤觸。
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (terrain[y][x] === 'rock' && elevation[y][x] >= BAND_CLIFF) {
+        elevation[y][x] = elevationFor('rock');
+      }
+    }
+  }
 
   return {
     round, mapSize: size, targetPos, clues, terrain, elevation, supplies,
