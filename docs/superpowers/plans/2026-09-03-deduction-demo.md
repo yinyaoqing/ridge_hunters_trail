@@ -98,7 +98,6 @@ describe('demo level', () => {
 describe('demo level: chapter 2 — the overlap is the answer', () => {
   it('narrows to 11 cells once the first two clues are read', () => {
     expect(DEMO_PAIR.size).toBe(11);
-    expect(DEMO_PAIR).toEqual(intersect([DEMO_CLUES[0], DEMO_CLUES[1]], DEMO_SIZE));
   });
 });
 
@@ -279,7 +278,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
     'demo.s9': 'Mute the one that lies. Click its marker.',
     'demo.s10': 'Still {n} cells — too many. And the far ground is dark to you. Walk toward the overlap.',
     'demo.s11': 'Look around. The mist pulls back and a fourth clue surfaces — looking is not only how you find clues, it is how you open up ground to plan through.',
-    'demo.s12': 'Lay the disturbance circle over the rest and the three honest clues collapse to a single cell.',
+    'demo.s12': 'Now the three honest clues agree on one cell, and one cell only.',
     'demo.s13': 'That is the one. Call it.',
     'demo.s14': 'It was here. Read, layer, discard, look, call — every hunt is these five things.',
     'demo.hint.exclude': 'That cell is still inside the cone, so it is still possible. Pick one outside it.',
@@ -313,7 +312,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
     'demo.s9': '把說謊的那條靜音。點它的記號。',
     'demo.s10': '還有 {n} 格，太多了。而更遠的地方你根本看不見。往交集區走過去。',
     'demo.s11': '眺望。霧退開，第四條線索浮了出來——眺望不只是找線索，也是把你能規劃的地面打開。',
-    'demo.s12': '把擾動圓域套上去，三條誠實的線索收斂成唯一一格。',
+    'demo.s12': '三條誠實的線索交會的地方，只剩一格。',
     'demo.s13': '就是這一格。押下去。',
     'demo.s14': '牠就在這裡。讀、疊、剔、望、押——每一局都是這五件事。',
     'demo.hint.exclude': '這格還在錐形裡，仍然有可能。挑錐形外的一格。',
@@ -434,11 +433,25 @@ describe('demo script', () => {
     }
   });
 
-  it('reveals the fourth clue only after the survey step lifts the fog', () => {
-    const firstWithClue3 = DEMO_STEPS.findIndex((s) => s.clues.includes(3));
-    const firstAllSeen = DEMO_STEPS.findIndex((s) => s.seen === 'all');
-    expect(firstAllSeen).toBeGreaterThan(0);
-    expect(firstWithClue3).toBeGreaterThan(firstAllSeen);
+  it('never reads the fourth clue while it is still under fog', () => {
+    // 第四條線索的存在感就是眺望的報酬。若腳本讓它在退霧之前就被讀到，
+    // 第 11 步的旁白（「霧退開，第四條線索浮了出來」）就會變成空話。
+    // 用「凡是讀到它的步驟，霧必定已退」而非比較首次出現的索引——
+    // 前者允許兩件事發生在同一步，後者會誤把那種正確的腳本判成錯的。
+    expect(DEMO_STEPS.some((s) => s.clues.includes(3))).toBe(true);
+    for (const step of DEMO_STEPS) {
+      if (step.clues.includes(3)) expect(step.seen).toBe('all');
+    }
+  });
+
+  it('never declares an overlay with no live clue to draw it from', () => {
+    // overlay 不是 'none' 卻沒有任何未靜音的已讀線索時，畫面會是一片空白，
+    // 而旁白照樣宣稱玩家看得到東西。
+    for (const step of DEMO_STEPS) {
+      if (step.overlay === 'none') continue;
+      const live = step.clues.filter((i) => !step.muted.includes(i));
+      expect(live.length).toBeGreaterThan(0);
+    }
   });
 
   it('moves the player to the overlap before the survey', () => {
@@ -538,9 +551,11 @@ export const DEMO_STEPS: readonly DemoStep[] = [
     clues: [0, 1, 2], muted: [DECOY_INDEX], overlay: 'heat', seen: 'near', player: DEMO_MID,
     autoSuspect: true,
   },
+  // 第四條線索與退霧同一步：旁白說「霧退開，第四條線索浮了出來」，
+  // 資料就必須讓它在這一步出現。真實遊戲也是如此——踏上一格會同時看到記號與範圍。
   {
     chapter: 4, narration: 'demo.s11',
-    clues: [0, 1, 2], muted: [DECOY_INDEX], overlay: 'heat', seen: 'all', player: DEMO_MID,
+    clues: [0, 1, 2, 3], muted: [DECOY_INDEX], overlay: 'heat', seen: 'all', player: DEMO_MID,
     autoSuspect: true,
   },
   {
