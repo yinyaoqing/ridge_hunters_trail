@@ -107,8 +107,11 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
     }
   }
 
+  // 暫時的均一高程（Task 4 改用 buildTerrain 之後即被取代）
+  const elevation: number[][] = terrain.map((row) => row.map(() => 0.2));
+
   return {
-    round, mapSize: size, targetPos, clues, terrain, supplies, creatureId: creature.id, weather, iris,
+    round, mapSize: size, targetPos, clues, terrain, elevation, supplies, creatureId: creature.id, weather, iris,
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getPalette, CLUE_GOLD } from '../src/core/palette';
+import { TERRAIN_TYPES } from '../src/core/types';
 
 describe('getPalette follows the three-cycle art direction', () => {
   it('rounds 1-3 use the mist-green cycle', () => {
@@ -20,11 +21,12 @@ describe('getPalette follows the three-cycle art direction', () => {
     }
   });
 
-  it('every cycle defines all four terrain colors, mutually distinct', () => {
-    for (const r of [1, 4, 8]) {
+  it('every cycle defines all five terrain colors, mutually distinct', () => {
+    for (const r of [1, 5, 9]) {
       const t = getPalette(r).terrain;
-      const values = [t.meadow, t.mist, t.thicket, t.rock];
-      expect(new Set(values).size).toBe(4);
+      const values = TERRAIN_TYPES.map((type) => t[type]);
+      expect(values).toHaveLength(5);
+      expect(new Set(values).size).toBe(5); // 互不相同：崖壁必須與岩坡分得開
     }
   });
 

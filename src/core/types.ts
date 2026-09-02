@@ -1,10 +1,10 @@
 import type { Vec2 } from './geometry';
 import type { Weather } from './weather';
 
-export type TerrainType = 'meadow' | 'mist' | 'thicket' | 'rock';
+export type TerrainType = 'meadow' | 'mist' | 'thicket' | 'rock' | 'cliff';
 
 // 地形型別的執行期清單（載入地形紋理、逐型別繪製時需要可列舉的來源）
-export const TERRAIN_TYPES: readonly TerrainType[] = ['meadow', 'mist', 'thicket', 'rock'];
+export const TERRAIN_TYPES: readonly TerrainType[] = ['meadow', 'mist', 'thicket', 'rock', 'cliff'];
 
 // 支援語系：英文（預設）與繁體中文
 export type Locale = 'en' | 'zh-TW';
@@ -41,6 +41,7 @@ export interface Level {
   targetPos: Vec2;
   clues: Clue[];
   terrain: TerrainType[][]; // terrain[y][x]
+  elevation: number[][];    // elevation[y][x]，0..1；地形由它推導，視野加成也讀它
   supplies: Vec2[];         // 補給道具（規格書「霧葉/露珠果」的統一實作）
   creatureId: string;
   weather: Weather;

@@ -10,7 +10,9 @@ export type Phase = 'explore' | 'qte' | 'caught' | 'escaped' | 'exhausted';
 export type SessionMode = 'run' | 'daily';
 
 export const TERRAIN_COST: Record<TerrainType, number> = {
-  meadow: 1, mist: 1, thicket: 2, rock: 2,
+  // 崖壁設為 Infinity：canMove/hasAffordableMove 都用「體力 >= 成本」判斷可否移動，
+  // 有限體力永遠小於 Infinity，因此崖壁天生不可通行，不需要另開一條「地形是否可走」的判斷路徑
+  meadow: 1, mist: 1, thicket: 2, rock: 2, cliff: Infinity,
 };
 
 // 線索判讀記錄：哪一條線索、在第幾步被踩到。供揭曉畫面回推「資訊在第幾步就已完備」

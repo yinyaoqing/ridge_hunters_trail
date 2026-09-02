@@ -10,8 +10,10 @@ const disturbance = (x: number, y: number, radius: number, isDecoy = false): Clu
 function makeLevel(clues: Clue[], mapSize = 12): Level {
   const terrain: TerrainType[][] = Array.from({ length: mapSize }, () =>
     Array.from({ length: mapSize }, () => 'meadow' as TerrainType));
+  const elevation: number[][] = Array.from({ length: mapSize }, () =>
+    Array.from({ length: mapSize }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
   return {
-    round: 1, mapSize, targetPos: { x: 6, y: 5 }, clues, terrain,
+    round: 1, mapSize, targetPos: { x: 6, y: 5 }, clues, terrain, elevation,
     supplies: [], creatureId: 'mistfawn', weather: 'clear', iris: false,
   };
 }

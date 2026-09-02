@@ -27,9 +27,11 @@ function makeState(opts: Opts = {}): SessionState {
   const size = opts.mapSize ?? 15;
   const terrain: TerrainType[][] = Array.from({ length: size }, () =>
     Array.from({ length: size }, () => 'meadow' as TerrainType));
+  const elevation: number[][] = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
   const level: Level = {
     round: 1, mapSize: size, targetPos: opts.targetPos ?? { x: size - 1, y: size - 1 },
-    clues: opts.clues ?? [], terrain, supplies: opts.supplies ?? [],
+    clues: opts.clues ?? [], terrain, elevation, supplies: opts.supplies ?? [],
     creatureId: 'mistfawn', weather: 'clear', iris: false,
   };
   const player = opts.player ?? { x: 0, y: 0 };

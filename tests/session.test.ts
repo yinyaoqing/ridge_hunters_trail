@@ -12,13 +12,15 @@ import type { Level, TerrainType } from '../src/core/types';
 function makeState(overrides: Partial<SessionState> = {}): SessionState {
   const terrain: TerrainType[][] = Array.from({ length: 5 }, () =>
     Array.from({ length: 5 }, () => 'meadow' as TerrainType));
+  const elevation: number[][] = Array.from({ length: 5 }, () =>
+    Array.from({ length: 5 }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
   const level: Level = {
     round: 1, mapSize: 5, targetPos: { x: 4, y: 4 },
     clues: [{
       type: 'scent', position: { x: 2, y: 0 }, isDecoy: false,
       data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
     }],
-    terrain, supplies: [{ x: 1, y: 0 }], creatureId: 'mistfawn', weather: 'clear', iris: false,
+    terrain, elevation, supplies: [{ x: 1, y: 0 }], creatureId: 'mistfawn', weather: 'clear', iris: false,
   };
   return {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
