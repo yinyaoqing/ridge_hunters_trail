@@ -24,6 +24,12 @@ export type MsgKey =
   | 'result.toolUnlocked' | 'hud.bell'
   | 'comm.title' | 'comm.record' | 'comm.stamina' | 'comm.quality' | 'comm.done' | 'comm.reward'
   | 'tut.move' | 'tut.read' | 'tut.cross' | 'tut.qte'
+  | 'hud.layer' | 'hud.muted'
+  | 'mark.exclude' | 'mark.suspect' | 'mark.wager'
+  | 'reveal.title' | 'reveal.wasHere' | 'reveal.yourCall' | 'reveal.exact' | 'reveal.offBy'
+  | 'reveal.noCall' | 'reveal.decoy' | 'reveal.infoAt'
+  | 'btn.continue'
+  | 'help.marks' | 'help.layer' | 'help.reveal'
   | 'score.gain' | 'score.pot' | 'score.lost' | 'btn.bank' | 'btn.push' | 'camp.best' | 'camp.carry';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
@@ -56,7 +62,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.disturbance': 'Disturbance — the creature is somewhere inside this circle.',
     'help.scent': 'Scent — the creature sits at this distance, along the ring.',
     'help.decoy': 'Some trails lie. From round 4, decoy clues appear — cross-check before you commit.',
-    'help.stamina': 'Every step costs stamina; thickets and rock cost more. Mistleaf and dewfruit restore it.',
+    'help.stamina': 'Every step costs stamina — meadow and mist 1, thicket and rock 2. Mistleaf and dewfruit restore it.',
     'help.mark': 'Shift+click marks a cell for your notes. Step onto a clue to read it.',
     'help.qte': 'Up close, tap or press SPACE when the needle sweeps the glowing arc.',
     'help.terrain': 'Terrain costs stamina: meadow/mist 1 · thicket/rock 2.',
@@ -104,6 +110,23 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.push': '[ Push On x{m} ]',
     'camp.best': 'Best run {n}',
     'camp.carry': 'Banked {b} · Unbanked {p}',
+    'hud.layer': 'Layer',
+    'hud.muted': 'Muted',
+    'mark.exclude': 'Ruled out',
+    'mark.suspect': 'Maybe',
+    'mark.wager': 'My call',
+    'reveal.title': 'The Reveal',
+    'reveal.wasHere': 'It was here',
+    'reveal.yourCall': 'Your call',
+    'reveal.exact': 'You called it exactly.',
+    'reveal.offBy': 'You were {n} cells off.',
+    'reveal.noCall': 'You made no call this hunt — mark a cell gold next time.',
+    'reveal.decoy': 'This false trail led you astray.',
+    'reveal.infoAt': 'You had the sharpest reading available by step {n}, and walked to step {m}.',
+    'btn.continue': '[ Continue ]',
+    'help.marks': 'Mark a cell again and again to cycle it: ruled out, maybe, my call. Your call sets your record quality.',
+    'help.layer': 'Layer shades each cell by how many read clues agree. Mark a clue you already read to mute it.',
+    'help.reveal': 'Every hunt ends by revealing where it really was and how close your call landed.',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -134,7 +157,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.disturbance': '擾動——生物就在這個圓域範圍之中。',
     'help.scent': '氣味——生物位於這個距離的環帶上。',
     'help.decoy': '有些蹤跡會說謊。第 4 局起會出現干擾線索，下判斷前先交叉比對。',
-    'help.stamina': '每一步都消耗體力；密叢與岩坡消耗更多。霧葉與露珠果可以回復體力。',
+    'help.stamina': '每一步都消耗體力：草地／霧地 1，密叢／岩坡 2。霧葉與露珠果可以回復。',
     'help.mark': 'Shift+點擊可在格子上做標記筆記；踩上線索即可判讀。',
     'help.qte': '逼近目標後，趁指針掃過發光弧區時點擊或按空白鍵。',
     'help.terrain': '地形消耗體力：草地／霧地 1 ・密叢／岩坡 2。',
@@ -182,6 +205,23 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.push': '［乘勝續追 ×{m}］',
     'camp.best': '最佳連追 {n}',
     'camp.carry': '入袋 {b}｜待入袋 {p}',
+    'hud.layer': '圖層',
+    'hud.muted': '已靜音',
+    'mark.exclude': '排除',
+    'mark.suspect': '存疑',
+    'mark.wager': '押注',
+    'reveal.title': '揭曉',
+    'reveal.wasHere': '牠在這裡',
+    'reveal.yourCall': '你的押注',
+    'reveal.exact': '你押得正中。',
+    'reveal.offBy': '你差了 {n} 格。',
+    'reveal.noCall': '這一局你沒有下押注——下次記得把一格標成金色。',
+    'reveal.decoy': '這條假蹤跡把你帶偏了。',
+    'reveal.infoAt': '你在第 {n} 步就取得了本局最精確的資訊，最後走到第 {m} 步。',
+    'btn.continue': '［繼續］',
+    'help.marks': '反覆標記同一格可循環：排除、存疑、押注。押注格決定你的記錄品質。',
+    'help.layer': '「圖層」依符合的已判讀線索數為格子上色；標記已判讀的線索可將它靜音。',
+    'help.reveal': '每一局結束都會揭曉牠實際在哪，以及你的押注差了幾格。',
   },
 };
 
