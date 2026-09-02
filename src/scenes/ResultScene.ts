@@ -287,27 +287,31 @@ export class ResultScene extends Phaser.Scene {
       // Daily retry lives in the daily branch above; this is run mode only
       const yPrimary = Math.min(552 + toolOffset, h - 96);
       const ySecondary = Math.min(614 + toolOffset, h - 34);
-      // 示範入口：剛失敗、最想知道「我到底該怎麼想」的那一刻。
-      // 做成文字連結而非第三顆按鈕——本畫面的垂直預算已被夾限到 h-34，
-      // 沒有再加一列的空間（見 F7 的重疊教訓）。座標綁在主鈕之上 40px，
-      // 因此不論夾限把主鈕推到哪裡，兩者的相對關係都成立。
-      const demoLinkY = yPrimary - 40;
-      this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
-        fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
-        wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
-      }).setOrigin(0.5);
-      this.add.rectangle(cx, demoLinkY, 420, 44, 0, 0)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => {
-          this.scene.launch('Demo', { from: 'Result' });
-          this.scene.pause();
-        });
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
         this.registry.set('session', newSession(s.round, rng));
         fadeToScene(this, 'Map');
       });
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
+      // 示範入口：剛失敗、最想知道「我到底該怎麼想」的那一刻。
+      // 放在次鈕「之下」而非主鈕之上——主鈕上方被觀察筆記區佔滿（進度條與研究度
+      // 文字一路排到主鈕頂緣），塞在那裡會直接蓋住它。做成文字連結而非第三顆按鈕，
+      // 是因為本畫面的按鈕列已被夾限到 h-34，沒有再加一列的預算（見 F7 的重疊教訓）。
+      // 矮視窗下算出來的位置若會碰到次鈕，寧可整個不畫：少一個入口，
+      // 好過一個疊在按鈕上的入口——營地工具列與說明頁仍然進得去。
+      const demoLinkY = Math.min(ySecondary + 44, h - 14);
+      if (demoLinkY >= ySecondary + 34) {
+        this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
+          fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
+          wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+        }).setOrigin(0.5);
+        this.add.rectangle(cx, demoLinkY, 420, 32, 0, 0)
+          .setInteractive({ useHandCursor: true })
+          .on('pointerdown', () => {
+            this.scene.launch('Demo', { from: 'Result' });
+            this.scene.pause();
+          });
+      }
     }
   }
 
