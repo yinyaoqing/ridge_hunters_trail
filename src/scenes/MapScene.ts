@@ -8,6 +8,7 @@ import { TERRAIN_TYPES } from '../core/types';
 import { key, intersect } from '../core/clues';
 import { cheb, type Vec2 } from '../core/geometry';
 import { rollMicroEvent, type MicroEvent } from '../core/events';
+import { findPath, pathCost } from '../core/path';
 import type { Clue, TerrainType } from '../core/types';
 import type { Weather } from '../core/weather';
 import type { I18n, MsgKey } from '../core/i18n';
@@ -35,6 +36,13 @@ export class MapScene extends Phaser.Scene {
   private hoverCostText?: Phaser.GameObjects.Text; // 重用單一 Text，hover 時移動＋顯示，不逐格重建
   private hoverCell: Vec2 | null = null;
   private animating = false;
+  // 路線預覽與自動行走狀態（Task 13）：previewPath/previewTo 記錄「上一次預覽的是哪條路、到哪格」，
+  // 供 onPointerUp 判斷「同一格再點一次」；previewCostText 於首次預覽時延遲建立
+  private previewPath: Vec2[] | null = null;
+  private previewTo: Vec2 | null = null;
+  private previewG!: Phaser.GameObjects.Graphics;
+  private previewCostText?: Phaser.GameObjects.Text;
+  private walking = false; // 自動行走中——與 animating（單步防重入）各司其職，見 doMove 註解
   private lowTween?: Phaser.Tweens.Tween;
   private hudG!: Phaser.GameObjects.Graphics;
   private roundText!: Phaser.GameObjects.Text;
@@ -125,6 +133,7 @@ export class MapScene extends Phaser.Scene {
     this.heatG = this.add.graphics(); // 熱區在最底層，不遮蔽線索覆蓋層與標記
     this.g = this.add.graphics();
     this.fogG = this.add.graphics(); // 迷霧蓋在線索與標記之上、玩家層之下
+    this.previewG = this.add.graphics(); // 路線預覽：畫在迷霧之上（迷霧上仍可讀），玩家之下（不擋玩家標記）
     this.pg = this.add.graphics();
     this.hoverG = this.add.graphics(); // 建於 pg 之後，確保 hover 外框畫在玩家層之上
     this.hoverCostText = this.add.text(0, 0, '', {
@@ -270,6 +279,7 @@ export class MapScene extends Phaser.Scene {
       this.doSurvey();
       return;
     }
+    if (this.walking) return; // 自動行走中封鎖方向鍵，避免插隊
     const c = this.cursors;
     const jd = Phaser.Input.Keyboard.JustDown;
     // 任一方向鍵按下的那一幀才動作（維持既有「一次按鍵走一格」手感）
@@ -280,6 +290,7 @@ export class MapScene extends Phaser.Scene {
     const dx = (c.right.isDown ? 1 : 0) - (c.left.isDown ? 1 : 0);
     const dy = (c.down.isDown ? 1 : 0) - (c.up.isDown ? 1 : 0);
     if (dx === 0 && dy === 0) return; // 左右或上下同時按住互相抵消
+    this.clearPreview(); // 鍵盤移動會改變玩家位置，任何殘留的預覽路線都已失準
     this.doMove({ x: s.player.x + dx, y: s.player.y + dy });
   }
 
@@ -801,9 +812,13 @@ export class MapScene extends Phaser.Scene {
     const t = s.level.terrain[c.y][c.x];
     this.hoverCostText?.setText(isPassable(t) ? String(TERRAIN_COST[t]) : '✕')
       .setPosition(x + cs - 3, y + cs - 3).setVisible(true);
+    // 遠處：hover 直接預覽整條路線，桌機玩家不必先點一次
+    if (cheb(s.player, c) > 1) this.showPreview(c);
+    else this.previewG.clear();
   }
 
   private onPointerUp(p: Phaser.Input.Pointer) {
+    if (this.walking) return; // 自動行走中封鎖其他輸入，避免插隊
     const s = this.session();
     if (s.phase !== 'explore' || !this.pressAt) return;
     const held = p.time - this.pressAt.t;
@@ -841,7 +856,21 @@ export class MapScene extends Phaser.Scene {
       this.redraw();
       return;
     }
-    this.doMove(cellPos);
+    // 相鄰格維持單擊直走——近距離微調不該多一次確認
+    if (cheb(s.player, cellPos) === 1) {
+      this.clearPreview();
+      this.doMove(cellPos);
+      return;
+    }
+    // 遠處：第一次點擊預覽路線與花費，同一格再點一次才走。
+    // 觸控裝置沒有 hover，這個兩段式是它唯一能看到花費的機會。
+    if (this.previewTo && key(this.previewTo) === key(cellPos) && this.previewPath) {
+      const path = this.previewPath;
+      this.clearPreview();
+      this.walkPath(path);
+      return;
+    }
+    this.showPreview(cellPos);
   }
 
   // 格子正上方浮字（比照 doMove 中補給／扣體力浮字的位置手法：格中心往上半格）
@@ -859,6 +888,76 @@ export class MapScene extends Phaser.Scene {
     const label = kind === 'exclude' ? 'mark.exclude' : kind === 'suspect' ? 'mark.suspect' : 'mark.wager';
     const color = kind === 'exclude' ? this.pal.mark : kind === 'suspect' ? this.pal.supply : this.pal.gold;
     this.floatAboveCell(p, this.i18n().t(label), color);
+  }
+
+  // 路線預覽：畫出行經格的金色連線與終點花費數字。
+  // 目的地與整條路線都必須落在看過的地上——這條規則由 findPath 內部把關
+  // （未看過的格視同不可通行），此處不重複判斷，避免兩套邏輯日後各自漂移。
+  private showPreview(to: Vec2) {
+    const s = this.session();
+    const path = findPath(s.level.terrain, s.player, to, s.seen);
+    if (!path || path.length === 0) { this.clearPreview(); return; }
+    const cost = pathCost(s.level.terrain, path);
+    this.previewPath = path;
+    this.previewTo = to;
+
+    const cs = this.cell;
+    const pc = (v: Vec2) => ({ x: this.ox + v.x * cs + cs / 2, y: this.oy + v.y * cs + cs / 2 });
+    this.previewG.clear();
+    // 走不完的路線改用警示色，讓玩家一眼看出這條路會半途力竭
+    const affordable = cost <= s.stamina;
+    const color = affordable ? this.pal.gold : this.pal.mark;
+    this.previewG.lineStyle(Math.max(2, cs * 0.12), color, 0.75);
+    let prev = pc(s.player);
+    for (const step of path) {
+      const cur = pc(step);
+      this.previewG.lineBetween(prev.x, prev.y, cur.x, cur.y);
+      prev = cur;
+    }
+    const end = pc(path[path.length - 1]);
+    this.previewG.fillStyle(color, 0.9).fillCircle(end.x, end.y, cs * 0.18);
+    this.previewCostText ??= this.add.text(0, 0, '', {
+      fontFamily: FONTS.body, fontSize: '13px', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(60);
+    this.previewCostText
+      .setText(this.i18n().t('hud.pathCost', { n: cost }))
+      .setColor(cssHex(color))
+      .setPosition(end.x, end.y - cs * 0.7)
+      .setVisible(true);
+  }
+
+  private clearPreview() {
+    this.previewPath = null;
+    this.previewTo = null;
+    this.previewG.clear();
+    this.previewCostText?.setVisible(false);
+  }
+
+  // 沿預覽路線自動行走。每一步都走既有的 doMove，因此線索判讀、補給、微事件、
+  // QTE 觸發與力竭判定全部照常發生——這裡只是替玩家連續按下同一個動作。
+  // 停止條件是本任務的核心：一讀到新東西就交還控制權，讓自動化省掉的是搬運而非判斷。
+  private walkPath(path: Vec2[]) {
+    if (this.walking) return;
+    this.walking = true;
+    let i = 0;
+    const stepOnce = () => {
+      const s = this.session();
+      if (i >= path.length || s.phase !== 'explore') { this.walking = false; return; }
+      const readBefore = s.readClues.size;
+      const eventsBefore = s.microEvents;
+      const next = path[i++];
+      if (!canMove(s, next)) { this.walking = false; return; }
+      this.doMove(next);
+      // doMove 的移動補間為 100ms，等它跑完再決定要不要續走
+      this.time.delayedCall(130, () => {
+        const now = this.session();
+        const learnedSomething = now.readClues.size > readBefore
+          || now.microEvents > eventsBefore;
+        if (now.phase !== 'explore' || learnedSomething) { this.walking = false; return; }
+        stepOnce();
+      });
+    };
+    stepOnce();
   }
 
   private doMove(to: Vec2) {
