@@ -32,7 +32,13 @@ export type MsgKey =
   | 'help.marks' | 'help.layer' | 'help.reveal'
   | 'hud.survey' | 'hud.surveyCost' | 'hud.pathCost'
   | 'help.vision' | 'help.survey' | 'help.route'
-  | 'score.gain' | 'score.pot' | 'score.lost' | 'btn.bank' | 'btn.push' | 'camp.best' | 'camp.carry';
+  | 'score.gain' | 'score.pot' | 'score.lost' | 'btn.bank' | 'btn.push' | 'camp.best' | 'camp.carry'
+  | 'demo.title' | 'demo.progress' | 'demo.fromResult'
+  | 'demo.ch1' | 'demo.ch2' | 'demo.ch3' | 'demo.ch4'
+  | 'demo.s1' | 'demo.s2' | 'demo.s3' | 'demo.s4' | 'demo.s5' | 'demo.s6' | 'demo.s7'
+  | 'demo.s8' | 'demo.s9' | 'demo.s10' | 'demo.s11' | 'demo.s12' | 'demo.s13' | 'demo.s14'
+  | 'demo.hint.exclude' | 'demo.hint.mute' | 'demo.hint.wager'
+  | 'btn.demo' | 'btn.next' | 'btn.prev';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -134,6 +140,33 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.vision': 'You only see the ground near you. High ground sees further; thickets close in.',
     'help.survey': 'Look costs stamina and sweeps the ground around you, uncovering clues you have not walked past.',
     'help.route': 'Click a distant cell to preview the route and its cost, then click again to walk it. Walking stops the moment you read something new.',
+    'demo.title': 'Deduction Walkthrough',
+    'demo.progress': '{n} / {total}',
+    'demo.fromResult': 'Not sure how to read the clues? Walk through a hunt step by step.',
+    'demo.ch1': 'One clue only rules places out',
+    'demo.ch2': 'The overlap is the answer',
+    'demo.ch3': 'The odd one out is lying',
+    'demo.ch4': 'Look around, then call it',
+    'demo.s1': '{n} cells. It hides in one of them. A clue never names the cell — it only rules others out.',
+    'demo.s2': 'Read the footprint: it heads northeast. It is somewhere inside this cone — {n} cells.',
+    'demo.s3': 'So the {n} cells outside the cone are impossible. Pick one and rule it out.',
+    'demo.s4': 'A second clue: scent. It sits on the ring, {n} cells out from here.',
+    'demo.s5': 'Layer them. The more clues a cell agrees with, the brighter it burns — and only {n} cells agree with both. This is what the Layer button does.',
+    'demo.s6': 'A third clue, another footprint. But this one points northwest.',
+    'demo.s7': 'Now no cell on the map satisfies all three. They cannot all be true, so one of them is lying.',
+    'demo.s8': 'Count the agreements: {n} cells match two clues, none match three. Two corroborate each other; the leftover agrees with nobody.',
+    'demo.s9': 'Mute the one that lies. Click its marker.',
+    'demo.s10': 'Still {n} cells — too many. And the far ground is dark to you. Walk toward the overlap.',
+    'demo.s11': 'Look around. The mist pulls back and a fourth clue surfaces — looking is not only how you find clues, it is how you open up ground to plan through.',
+    'demo.s12': 'Lay the disturbance circle over the rest and the three honest clues collapse to a single cell.',
+    'demo.s13': 'That is the one. Call it.',
+    'demo.s14': 'It was here. Read, layer, discard, look, call — every hunt is these five things.',
+    'demo.hint.exclude': 'That cell is still inside the cone, so it is still possible. Pick one outside it.',
+    'demo.hint.mute': 'That clue corroborates another one. Look again — which clue agrees with nobody?',
+    'demo.hint.wager': 'That cell does not satisfy all three clues. Only one cell does.',
+    'btn.demo': '[ Walkthrough ]',
+    'btn.next': '[ Next ]',
+    'btn.prev': '[ Back ]',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -234,6 +267,33 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.vision': '你只看得見身邊的地面。高處望得遠，密叢裡看不遠。',
     'help.survey': '「眺望」消耗體力，掃過身邊一圈地面，找出你還沒走過的線索。',
     'help.route': '點遠處的格子會先預覽路線與總花費，再點一次才會走。一讀到新東西就會立刻停下。',
+    'demo.title': '推理示範',
+    'demo.progress': '{n} / {total}',
+    'demo.fromResult': '不確定線索該怎麼讀？跟著走一遍完整的推理。',
+    'demo.ch1': '一條線索只會排除',
+    'demo.ch2': '交集才是答案',
+    'demo.ch3': '落單的那條在說謊',
+    'demo.ch4': '眺望，然後押注',
+    'demo.s1': '{n} 格，牠躲在其中一格。線索從來不會直接指出是哪一格——它只負責把不可能的地方劃掉。',
+    'demo.s2': '判讀足跡：牠往東北去了。牠在這片錐形裡的某一格——{n} 格。',
+    'demo.s3': '所以錐形外的 {n} 格全都不可能。挑一格，把它標成排除。',
+    'demo.s4': '第二條線索是氣味。牠就在離這裡 {n} 格遠的環帶上。',
+    'demo.s5': '疊起來看。符合越多線索的格子越亮，而兩條都符合的只剩 {n} 格——這就是「圖層」鈕在做的事。',
+    'demo.s6': '第三條線索，又是足跡。但這一枚朝西北。',
+    'demo.s7': '現在整張圖沒有任何一格同時滿足三條。它們不可能都是真的，所以其中一條在說謊。',
+    'demo.s8': '數符合數：{n} 格符合兩條，沒有一格符合三條。兩條互相印證，剩下那條和誰都對不上。',
+    'demo.s9': '把說謊的那條靜音。點它的記號。',
+    'demo.s10': '還有 {n} 格，太多了。而更遠的地方你根本看不見。往交集區走過去。',
+    'demo.s11': '眺望。霧退開，第四條線索浮了出來——眺望不只是找線索，也是把你能規劃的地面打開。',
+    'demo.s12': '把擾動圓域套上去，三條誠實的線索收斂成唯一一格。',
+    'demo.s13': '就是這一格。押下去。',
+    'demo.s14': '牠就在這裡。讀、疊、剔、望、押——每一局都是這五件事。',
+    'demo.hint.exclude': '這格還在錐形裡，仍然有可能。挑錐形外的一格。',
+    'demo.hint.mute': '這條和另一條互相吻合。再看一次——哪一條和誰都對不上？',
+    'demo.hint.wager': '這格沒有滿足全部三條線索。只有一格滿足。',
+    'btn.demo': '［看示範］',
+    'btn.next': '［下一步］',
+    'btn.prev': '［上一步］',
   },
 };
 
