@@ -25,6 +25,7 @@ import {
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, addGlowIfWebGL, PARTICLE_CAPS,
 } from './fx';
+import { flowY, type FlowBlock } from '../core/layout';
 
 const GLOW_KEY = 'result-glow';
 
@@ -133,31 +134,24 @@ export class ResultScene extends Phaser.Scene {
     const cx = this.scale.width / 2;
     const h = this.scale.height;
     const showTools = (this.registry.get('lastUnlocks') as ToolId[] | undefined) ?? [];
-    // h<700 視窗已很擁擠（見既有的 Math.min(…, h-96) 夾限），解鎖卡收窄為僅標題行，
-    // 卡片間距與後續按鈕位移量一併縮小，降低與按鈕重疊的機率
+    // h<700 視窗已很擁擠，解鎖卡收窄為僅標題行——卡片間距縮小，降低與按鈕重疊的機率；
+    // 版面本身已改由下方 flowY 排定，這裡只留下「畫不畫副標」與「區塊多高」兩個決定
     const compactCards = h < 700;
     const cardStep = compactCards ? 22 : 40;
-    // run 且失手時，未入袋的 score.lost 軟著陸訊息併入同一疊層（視為多一張卡），
-    // 讓下方筆記掉落區與失敗按鈕列（沿用 toolOffset 夾限）自動一併往下挪，不必另外改按鈕程式碼
+    // run 且失手時，未入袋的 score.lost 軟著陸訊息併入同一疊層（視為多一個 flowY 區塊）
     const lastLoss = (this.registry.get('lastLoss') as number | undefined) ?? 0;
     const showLoss = !caught && s.mode === 'run' && lastLoss > 0;
-    const lossStep = compactCards ? 34 : 46;
-    const toolOffset = cardStep * showTools.length + (showLoss ? lossStep : 0);
     // 委託完成行：緊接道具卡堆疊在下方（只在補獲時可能非空，見 resolved 區塊註解）
     const lastComms = (this.registry.get('lastComms') as number[] | undefined) ?? [];
     const commsToday = dailyCommissions(dk); // 純函式、依 dk 決定性重算，供索引取回描述文字
     const commStep = 24;
-    // run 且補獲時，score.gain/score.pot 兩行也併入同一疊層，往下推 caught 分支的按鈕列
+    // run 且補獲時，score.gain/score.pot 兩行也併入同一疊層
     const showScoreGain = caught && s.mode === 'run';
-    const scoreStep = showScoreGain ? (compactCards ? 30 : 40) : 0;
-    const totalOffset = toolOffset + commStep * lastComms.length + scoreStep;
 
     let title: string;
     let body: string;
     if (caught) {
       // 異彩變種：肖像光暈／虛線環／剪影 tint 改用 pal.iris；標題名稱前綴異彩字樣（見下方 name 組字）
-      this.drawCreaturePortrait(cx, 212, creature.id, s.level.iris ? pal.iris : creature.color, s.level.iris);
-      if (quality) this.stampQuality(cx + 128, 268, quality, i18n);
       const name = (s.level.iris ? i18n.t('iris.prefix') : '') + creature.names[loc];
       title = i18n.t('result.recorded', { name });
       body = creature.descs[loc];
@@ -169,79 +163,110 @@ export class ResultScene extends Phaser.Scene {
       body = i18n.t('result.exhausted.body');
     }
 
-    this.add.text(cx, 336, title, {
+    // 內文行高：16px 字、lineSpacing 6，wordWrap 460。中文多為 1 行、英文常 2 行，
+    // 失敗文案最長 3 行。以量測值決定區塊高度，避免用猜的。
+    const bodyProbe = this.add.text(0, -999, body, {
+      fontFamily: FONTS.body, fontSize: '16px',
+      wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 6,
+    });
+    const bodyH = bodyProbe.height;
+    bodyProbe.destroy();
+
+    // 版面改由 flowY 排定（見 src/core/layout.ts）。舊版自 y=336 起全是固定座標，
+    // 只有按鈕列有 h-96 這類夾限，於是內容一長就從下方溢出撞進按鈕——實測截圖裡
+    // 「研究度 n / m」正好被主鈕蓋掉一半（兩者都落在 y=526）。現在整疊同一套規則。
+    const blocks: FlowBlock[] = [];
+    const slot: Record<string, number> = {};
+    const add = (name: string, b: FlowBlock) => { slot[name] = blocks.length; blocks.push(b); };
+
+    if (caught) add('portrait', { h: 150, gap: 24, maxGap: 60 });
+    add('title', { h: 38, gap: caught ? 20 : 56, maxGap: 96 });
+    add('dots', { h: 14, gap: 18, minGap: 10 });
+    add('divider', { h: 6, gap: 18, minGap: 10 });
+    add('body', { h: bodyH, gap: 22, minGap: 12 });
+    showTools.forEach((_, i) => add(`tool${i}`, { h: cardStep - 8, gap: 14, minGap: 8 }));
+    lastComms.forEach((_, i) => add(`comm${i}`, { h: commStep - 6, gap: 10, minGap: 6 }));
+    if (showLoss) add('loss', { h: 30, gap: 14, minGap: 8 });
+    if (showScoreGain) add('gain', { h: 40, gap: 16, minGap: 10 });
+    if (!caught) add('notes', { h: 58, gap: 18, minGap: 10 });
+    if (s.mode === 'daily') add('streak', { h: 16, gap: 18, minGap: 10 });
+    add('primary', { h: 52, gap: 26, minGap: 16 });
+    add('secondary', { h: 48, gap: 14, minGap: 12 });
+    if (!caught && s.mode === 'run') add('demo', { h: 34, gap: 16, minGap: 10 });
+
+    const ys = flowY(blocks, 24, h - 20);
+    const at = (name: string): number => ys[slot[name]];
+
+    if (caught) {
+      this.drawCreaturePortrait(cx, at('portrait'), creature.id, s.level.iris ? pal.iris : creature.color, s.level.iris);
+      if (quality) this.stampQuality(cx + 128, at('portrait') + 56, quality, i18n);
+    }
+
+    this.add.text(cx, at('title'), title, {
       fontFamily: displayFont(loc), fontSize: '30px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(1);
 
-    this.drawCodexDots(cx, 372, codex);
+    this.drawCodexDots(cx, at('dots'), codex);
 
     const divider = this.add.graphics();
     divider.lineStyle(1.6, pal.gold, 0.5);
     divider.beginPath();
-    divider.moveTo(cx - 105, 402);
+    const dy = at('divider');
+    divider.moveTo(cx - 105, dy);
     for (let i = 1; i <= 6; i++) {
-      divider.lineTo(cx - 105 + i * 35, 402 + (i % 2 === 0 ? 1.5 : -1.5));
+      divider.lineTo(cx - 105 + i * 35, dy + (i % 2 === 0 ? 1.5 : -1.5));
     }
     divider.strokePath();
 
-    this.add.text(cx, 438, body, {
+    this.add.text(cx, at('body'), body, {
       fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.paperDim),
       wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 6,
     }).setOrigin(0.5);
 
     // 道具解鎖卡（至多同幀 2 枚）：caught 排在圖鑑點列/分隔線下方；
-    // !caught 疊在筆記掉落區之上，筆記掉落再依卡片數往下推 toolOffset
-    const toolBaseY = caught ? 470 : 486;
+    // !caught 疊在筆記掉落區之上——確切位置全數改由 flowY 決定
     showTools.forEach((id, i) => {
-      this.renderToolCard(cx, toolBaseY + i * cardStep, id, i18n, compactCards);
+      this.renderToolCard(cx, at(`tool${i}`), id, i18n, compactCards);
     });
     // 委託完成行接在道具卡之後（同一堆疊區塊，道具卡在上、委託行在下）
     lastComms.forEach((idx, i) => {
-      this.renderCommissionLine(cx, toolBaseY + toolOffset + i * commStep, commsToday[idx], i18n);
+      this.renderCommissionLine(cx, at(`comm${i}`), commsToday[idx], i18n);
     });
 
     // 押注顯示：補獲時接在道具卡／委託行之後顯示本次入袋收穫＋目前未入袋總額
     if (showScoreGain) {
       const lastGain = (this.registry.get('lastGain') as number | undefined) ?? 0;
-      // 矮視窗＋多張卡片時，未夾限的 gainY 可能落在按鈕列附近甚至重疊（見 F7）——
-      // 夾進與 [安全歇腳] 按鈕（yPrimary）同一份版面預算。yPrimary 是按鈕「中心」y，
-      // 按鈕填色矩形頂緣在 yPrimary-26（高度 52 之半）；pot 行以 setOrigin(0.5) 置中繪製，
-      // 故其量測基準須是「按鈕頂緣」而非按鈕中心——56 讓 pot 行中心落在 yPrimary-36，
-      // 與頂緣還留 10px 淨空，扣掉 pot 行自身字框半高後仍不會被按鈕矩形蓋到
-      const yPrimary = Math.min(552 + totalOffset, h - 96);
-      const gainY = Math.min(toolBaseY + toolOffset + commStep * lastComms.length, yPrimary - 56);
-      this.add.text(cx, gainY, i18n.t('score.gain', { n: lastGain }), {
+      const gy = at('gain');
+      this.add.text(cx, gy - 10, i18n.t('score.gain', { n: lastGain }), {
         fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.gold), fontStyle: 'bold',
       }).setOrigin(0.5);
-      this.add.text(cx, gainY + 20, i18n.t('score.pot', { n: score.state().pot }), {
+      this.add.text(cx, gy + 10, i18n.t('score.pot', { n: score.state().pot }), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
       }).setOrigin(0.5);
     }
 
     // 押注軟著陸：未入袋收穫散進霧裡的溫柔提示，接在道具卡之後、筆記掉落區之上
-    // （佔用一格 lossStep 高的疊層槽位，筆記掉落已因 toolOffset 內含 lossStep 而往下讓出空間）
     if (showLoss) {
-      this.add.text(cx, 486 + cardStep * showTools.length + (compactCards ? 16 : 20), i18n.t('score.lost'), {
+      this.add.text(cx, at('loss'), i18n.t('score.lost'), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
         wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
       }).setOrigin(0.5);
     }
-    if (!caught) this.showNotesDrop(cx, 486 + totalOffset, creature.id, notes, codex, i18n);
+    // showNotesDrop 的 y 是它第一行文字的中心，其下 18–26px 是進度條、+40 是研究度文字，
+    // 整塊高約 58px，因此傳入 at('notes') - 20 讓整塊以 flowY 給的中心對齊。不改
+    // showNotesDrop 內部的相對位移——那組數字本身沒有問題，出事的是整塊被放得太低
+    if (!caught) this.showNotesDrop(cx, at('notes') - 20, creature.id, notes, codex, i18n);
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
-    // 依視窗高度夾限座標，避免矮視窗（如橫向手機）裁切按鈕；780 全高時維持原座標不變
+    // 座標全數改由 flowY 決定，不再需要各自的 Math.min(…, h-96) 之類夾限
     const runRound: number = this.registry.get('runRound');
     if (s.mode === 'daily') {
-      // 失敗時 showNotesDrop 佔用 486~530 一帶，連勝列往下挪，避免文字互疊；
-      // 解鎖卡／委託完成行出現時再疊加 totalOffset，避免卡片與連勝列相撞
-      const streakY = caught ? Math.min(500 + totalOffset, h - 148) : Math.min(542 + totalOffset, h - 150);
-      const campY = Math.min(caught ? 614 + totalOffset : streakY + 112, h - 30);
       const streak: StreakStore = this.registry.get('streak');
-      this.add.text(cx, streakY, i18n.t('camp.streak', { n: streak.state().streak }).toUpperCase(), {
+      this.add.text(cx, at('streak'), i18n.t('camp.streak', { n: streak.state().streak }).toUpperCase(), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
       }).setOrigin(0.5).setLetterSpacing(2);
       if (caught) {
-        const copyY = streakY + 52;
+        const copyY = at('primary');
         const text = shareText(i18n, {
           dateKey: dk, caught, quality,
           steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
@@ -250,19 +275,18 @@ export class ResultScene extends Phaser.Scene {
         this.button(cx, copyY, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
           () => this.copyShare(text, i18n, copyY));
       } else {
-        const retryY = streakY + 52;
-        this.button(cx, retryY, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
+        this.button(cx, at('primary'), 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
           this.registry.set('session', createDailySessionFromKey(dk));
           fadeToScene(this, 'Map');
         });
       }
-      this.button(cx, campY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+      this.button(cx, at('secondary'), 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
       // 押注雙卡：[安全歇腳] 入袋收工回營地／[乘勝續追] 疊高倍率繼續下一局，
       // 歇腳即回營地取代原本的 [下一場狩獵]+[返回營地] 雙鈕，故 btn.camp 次鈕移除
-      const yPrimary = Math.min(552 + totalOffset, h - 96);
-      const ySecondary = Math.min(614 + totalOffset, h - 34);
+      const yPrimary = at('primary');
+      const ySecondary = at('secondary');
       const curMult = score.state().multiplier;
       const nextIdx = Math.min((MULTIPLIERS as readonly number[]).indexOf(curMult) + 1, MULTIPLIERS.length - 1);
       const nextMult = MULTIPLIERS[nextIdx];
@@ -285,8 +309,8 @@ export class ResultScene extends Phaser.Scene {
       });
     } else {
       // Daily retry lives in the daily branch above; this is run mode only
-      const yPrimary = Math.min(552 + toolOffset, h - 96);
-      const ySecondary = Math.min(614 + toolOffset, h - 34);
+      const yPrimary = at('primary');
+      const ySecondary = at('secondary');
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
         this.registry.set('session', newSession(s.round, rng));
         fadeToScene(this, 'Map');
@@ -294,18 +318,11 @@ export class ResultScene extends Phaser.Scene {
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
       // 示範入口：剛失敗、最想知道「我到底該怎麼想」的那一刻。
-      // 放在次鈕「之下」而非主鈕之上——主鈕上方被觀察筆記區佔滿（進度條與研究度
-      // 文字一路排到主鈕頂緣），塞在那裡會直接蓋住它。做成文字連結而非第三顆按鈕，
-      // 是因為本畫面的按鈕列已被夾限到 h-34，沒有再加一列的預算（見 F7 的重疊教訓）。
-      // 矮視窗下算出來的位置若會碰到次鈕，寧可整個不畫：少一個入口，
-      // 好過一個疊在按鈕上的入口——營地工具列與說明頁仍然進得去。
-      // 次鈕高 48、中心在 ySecondary，底緣因此在 ySecondary+24。
-      // 連結固定畫在 ySecondary+44，點擊區高 36（英文字串在 420px 寬會折成兩行，
-      // 需要 36 才涵蓋得住），上緣落在 ySecondary+26，離次鈕底緣有 2px。
-      // 不夾限、改為「畫得下才畫」：只要下緣 ySecondary+62 還在畫面內就畫，
-      // 否則整個略過。如此「不與按鈕重疊」與「不超出畫面」都是可證明的，
-      // 而不是靠一個近似的門檻值。
-      const demoLinkY = ySecondary + 44;
+      // 放在次鈕「之下」而非主鈕之上——主鈕上方被觀察筆記區佔滿。做成文字連結而非
+      // 第三顆按鈕，是因為本畫面的按鈕列預算裡沒有再加一列的空間。
+      // flowY 會在空間不足時誠實地把區塊排到 bottom 之外，此處據此決定畫不畫：
+      // 矮視窗下若連結會落到畫面外，寧可整個不畫——營地工具列與說明頁仍然進得去。
+      const demoLinkY = at('demo');
       if (demoLinkY + 18 <= h) {
         this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
           fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
