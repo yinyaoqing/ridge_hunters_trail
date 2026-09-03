@@ -66,6 +66,43 @@ describe('buildRoute: 結構', () => {
     }
   });
 
+  // 再審覆核新增：上面那條測試只驗上限，SPACING 因此完全沒有下限守護——
+  // 可解性掃描（tests/solvability.test.ts）獎勵更短的攔截路，任何調小 SPACING
+  // 的改動都會讓可解性掃描的數字變好看，而 route.test.ts 之前沒有任何測試會因此
+  // 變紅。壓力因此全部指向同一個方向：把 SPACING 一路收到 1，直到「預測牠會在
+  // 哪」這個 Phase 6a 的核心前提被壓成雜訊也不會被抓到。
+  //
+  // 個別 leg 的距離不能直接下界：edge clamping 會把靠近地圖邊緣的候選點拉近，
+  // 上面那條測試的註解已經說明這一點，量測也證實單一 leg 確實會量到 1.000
+  // （即與相鄰格同格的下一格，clampToMap／nearestUnusedPassable 保底命中邊緣時）。
+  // 因此改成量測「平均」：seed 1..30、五條規則（與上面同一份 30 顆種子慣例）
+  // 量得 mean leg ≈2.70–2.88、mean total（4 段合計）≈10.8–11.5，20 次重疊視窗
+  // 抽樣都落在這個範圍內，穩定不飄。刻意把 SPACING 全部下修到 1 做對照組
+  // （退化探針，量完即還原）：mean leg 崩到 1.191、mean total 崩到 4.764——
+  // 與真實範圍有清楚的間隔。門檻取兩者中間、偏向真實值那一側：
+  // mean leg ≥ 1.8（比退化值 1.191 高 0.6，比真實下緣 2.70 低 0.9）、
+  // mean total ≥ 7.0（比退化值 4.764 高 2.2，比真實下緣 10.8 低 3.8）——
+  // 兩邊都留了看得見的餘裕，SPACING 若真的被壓向 1，這裡會先紅。
+  it('節距與總路線長度的平均值不會被壓成退化值（下限，回歸測試）', () => {
+    const allLegs: number[] = [];
+    const allTotals: number[] = [];
+    for (const rule of RULES) {
+      for (let seed = 1; seed <= 30; seed++) {
+        const { route } = routeFor(seed, rule);
+        let total = 0;
+        for (let i = 1; i < route.waypoints.length; i++) {
+          const d = dist(route.waypoints[i - 1], route.waypoints[i]);
+          allLegs.push(d);
+          total += d;
+        }
+        allTotals.push(total);
+      }
+    }
+    const mean = (xs: number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
+    expect(mean(allLegs)).toBeGreaterThanOrEqual(1.8);
+    expect(mean(allTotals)).toBeGreaterThanOrEqual(7.0);
+  });
+
   it('route 帶著自己的規則，供揭曉畫面說明物種走法', () => {
     expect(routeFor(1, 'doubling').route.rule).toBe('doubling');
   });
