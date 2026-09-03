@@ -78,8 +78,11 @@ export class CampScene extends Phaser.Scene {
         : [{ h: 16, gap: 34, minGap: 16 } as FlowBlock]), // 收合成單行「委託板 n/3」
       { h: 44, gap: 26, minGap: 16 },          // 工具列（命中區高 44）
     ];
-    // 底界留 96px 給營火：光暈半徑 60，加上工具列與它之間該有的呼吸空間
-    const ys = flowY(blocks, 0, h - 96);
+    // 底界留 150px 給營火。光暈半徑 60，所以它的中心至少要離工具列底緣 72px
+    // （60 的半徑加 12px 淨空），而中心本身又要離畫面底部 64px 才不會被裁掉——
+    // 兩者相加就是 136，留 150 才有餘裕。舊版只留 96，於是光暈永遠貼著工具列，
+    // 而且外圈固定被畫面底部切掉約 24px。
+    const ys = flowY(blocks, 0, h - 150);
     let bi = 0;
 
     this.add.text(cx, ys[bi++], "RIDGE HUNTER'S TRAIL", {
@@ -294,9 +297,10 @@ export class CampScene extends Phaser.Scene {
   // 舊版的百分比定位因此會讓工具列坐進營火光暈裡（h=840 時工具列 730.8、光暈 696–816）。
   private drawCampfire(w: number, h: number, minY: number) {
     const pal = this.pal;
-    // 光暈半徑 60，因此中心至少要在 minY + 60 才不會碰到上方元素；
-    // 同時不低於畫面底部 30px，避免整團被裁掉
-    const fy = Math.min(Math.max(h * 0.9, minY + 60), h - 30);
+    // 光暈半徑 60。中心至少要在 minY + 72，才能在光暈上緣與上方元素之間留 12px 淨空
+    // （用 60 會讓兩者正好相貼，等於沒有淨空）；同時中心不低於 h - 64，
+    // 讓整團光暈連外圈都留在畫面內。
+    const fy = Math.min(Math.max(h * 0.9, minY + 72), h - 64);
     const glow = this.add.graphics();
     glow.fillStyle(pal.gold, 0.12).fillCircle(w / 2, fy, 60);
     glow.fillStyle(pal.gold, 0.25).fillCircle(w / 2, fy, 22);
