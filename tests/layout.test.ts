@@ -28,15 +28,16 @@ describe('flowY: 空間充足時', () => {
     expect(e[e.length - 1].bottom).toBeLessThanOrEqual(700);
   });
 
-  it('多出來的空間分給每一道間距，而不是全部堆在最上面', () => {
-    // 這條測的是營地畫面的實際缺陷：舊版把所有寬裕都留在標題與第一顆按鈕之間，
-    // 高視窗因此恆有 26% 的高度是空的。
-    const ys = flowY(blocks, 0, 900);
-    const e = edges(blocks, ys);
-    const firstGap = e[0].top - 0;
-    const laterGaps = [e[1].top - e[0].bottom, e[2].top - e[1].bottom];
-    for (const g of laterGaps) expect(g).toBeGreaterThan(30); // 都拿到了額外空間
-    expect(firstGap).toBeLessThan(200);                        // 沒有把寬裕全塞進第一道
+  it('多出來的空間平均分給每一道間距，而不是先把第一道撐到上限', () => {
+    // 這條測的是營地畫面的實際缺陷：舊版把所有寬裕都留在標題與第一顆按鈕之間。
+    // bottom 刻意選在「寬裕不足以讓每道間距都觸頂」的區間（內容 140 ＋ 理想間距 80，
+    // 餘裕總量 120，此處 slack 只有 60）——若選得太寬，平均分配與依序填滿會得到
+    // 完全相同的結果，這條測試就分辨不出兩者，等於什麼都沒測。
+    // 平均分配 → [40, 50, 50]；依序把第一道填到上限 → [60, 50, 30]。
+    const e = edges(blocks, flowY(blocks, 0, 280));
+    expect(e[0].top - 0).toBeCloseTo(40, 5);
+    expect(e[1].top - e[0].bottom).toBeCloseTo(50, 5);
+    expect(e[2].top - e[1].bottom).toBeCloseTo(50, 5);
   });
 
   it('間距不會被撐到無限大——每一道都有上限', () => {
@@ -60,12 +61,15 @@ describe('flowY: 空間不足時', () => {
     for (const g of gaps) expect(g).toBeGreaterThanOrEqual(4); // 預設 minGap
   });
 
-  it('尊重個別區塊指定的 minGap', () => {
-    // 按鈕之間需要比文字之間更大的最小間距，否則兩顆按鈕的 44px 命中區會相黏
+  it('尊重個別區塊指定的 minGap，且壓到下限就停住', () => {
+    // 按鈕之間需要比文字之間更大的最小間距，否則兩顆按鈕的 44px 命中區會相黏。
+    // bottom 取「內容 140 ＋ 所有最小間距 32」的臨界值 172，每一道間距因此正好
+    // 落在自己的下限上——比隨便挑一個較寬的值更能驗出下限本身有沒有被套用。
     const tight = [B(40, 20), B(50, 30, { minGap: 14 }), B(50, 30, { minGap: 14 })];
-    const e = edges(tight, flowY(tight, 0, 190));
-    expect(e[1].top - e[0].bottom).toBeGreaterThanOrEqual(14);
-    expect(e[2].top - e[1].bottom).toBeGreaterThanOrEqual(14);
+    const e = edges(tight, flowY(tight, 0, 172));
+    expect(e[0].top - 0).toBeCloseTo(4, 5);
+    expect(e[1].top - e[0].bottom).toBeCloseTo(14, 5);
+    expect(e[2].top - e[1].bottom).toBeCloseTo(14, 5);
   });
 
   it('連下限都塞不下時，回報溢出而不是靜默重疊', () => {
@@ -96,5 +100,18 @@ describe('flowY: 邊界情形', () => {
   it('同樣的輸入永遠得到同樣的輸出', () => {
     const b = [B(40, 20), B(50, 30)];
     expect(flowY(b, 0, 400)).toEqual(flowY(b, 0, 400));
+  });
+
+  it('負的間距與負的 minGap 都當成 0，不會吐出重疊的座標', () => {
+    // 這是回歸測試。呼叫端若把某個動態偏移算成負值，本函式寧可吸收掉，
+    // 也不能回傳一組看起來正常、實際互疊的座標——那種版面在場景層測不出來，
+    // 只會在玩家的截圖裡出現。三個 bottom 分別打中「恰好塞滿」「有餘」「不足」三個分支。
+    const b = [B(40, 0), B(40, -10), B(40, 20, { minGap: -30 })];
+    for (const bottom of [70, 300, 1000]) {
+      const e = edges(b, flowY(b, 0, bottom));
+      for (let i = 1; i < e.length; i++) {
+        expect(e[i].top).toBeGreaterThanOrEqual(e[i - 1].bottom);
+      }
+    }
   });
 });

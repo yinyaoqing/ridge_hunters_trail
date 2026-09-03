@@ -26,9 +26,13 @@ const DEFAULT_MAX_GAP_SLACK = 40;
 export function flowY(blocks: FlowBlock[], top: number, bottom: number): number[] {
   if (blocks.length === 0) return [];
 
-  const gaps = blocks.map((b) => b.gap ?? 0);
-  const mins = blocks.map((b, i) => Math.min(b.minGap ?? DEFAULT_MIN_GAP, gaps[i]));
-  const maxes = blocks.map((b, i) => b.maxGap ?? gaps[i] + DEFAULT_MAX_GAP_SLACK);
+  // 間距一律夾在非負，上限一律不小於理想值。負的間距會讓兩個區塊真的疊在一起，
+  // 而本函式對呼叫端的唯一承諾正是「寧可誠實溢出，也不靜默重疊」——呼叫端若把
+  // 動態偏移算成負值，在這裡吸收掉，遠好過讓場景畫出一個看似正常實則互疊的版面
+  // （場景層在本專案是測不到的）。
+  const gaps = blocks.map((b) => Math.max(0, b.gap ?? 0));
+  const mins = blocks.map((b, i) => Math.max(0, Math.min(b.minGap ?? DEFAULT_MIN_GAP, gaps[i])));
+  const maxes = blocks.map((b, i) => Math.max(gaps[i], b.maxGap ?? gaps[i] + DEFAULT_MAX_GAP_SLACK));
 
   const content = blocks.reduce((sum, b) => sum + b.h, 0);
   const wanted = gaps.reduce((sum, g) => sum + g, 0);
