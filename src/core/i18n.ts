@@ -38,7 +38,10 @@ export type MsgKey =
   | 'demo.s1' | 'demo.s2' | 'demo.s3' | 'demo.s4' | 'demo.s5' | 'demo.s6' | 'demo.s7'
   | 'demo.s8' | 'demo.s9' | 'demo.s10' | 'demo.s11' | 'demo.s12' | 'demo.s13' | 'demo.s14'
   | 'demo.hint.exclude' | 'demo.hint.mute' | 'demo.hint.wager'
-  | 'btn.demo' | 'btn.next' | 'btn.prev';
+  | 'btn.demo' | 'btn.next' | 'btn.prev'
+  | 'age.fresh' | 'age.night' | 'age.older' | 'age.all' | 'hud.age'
+  | 'reveal.route'
+  | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -167,6 +170,17 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '[ Walkthrough ]',
     'btn.next': '[ Next ]',
     'btn.prev': '[ Back ]',
+    'age.fresh': 'This morning',
+    'age.night': 'Last night',
+    'age.older': 'Older',
+    'age.all': 'All',
+    'hud.age': 'Freshness',
+    'reveal.route': 'It was moving. The trail below is where it walked, oldest to newest.',
+    'rule.lowland': 'Follows the valley floor',
+    'rule.highland': 'Keeps to the ridgeline',
+    'rule.cover': 'Hugs the thickets',
+    'rule.straight': 'Travels in a straight line',
+    'rule.doubling': 'Doubles back on itself',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -294,6 +308,17 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '［看示範］',
     'btn.next': '［下一步］',
     'btn.prev': '［上一步］',
+    'age.fresh': '今晨',
+    'age.night': '昨夜',
+    'age.older': '更早',
+    'age.all': '全部',
+    'hud.age': '新鮮度',
+    'reveal.route': '牠一直在移動。下面這條就是牠走過的路，由舊到新。',
+    'rule.lowland': '沿溪谷低處走',
+    'rule.highland': '沿稜線高處走',
+    'rule.cover': '貼著密叢走',
+    'rule.straight': '一路直行',
+    'rule.doubling': '走出去再折返',
   },
 };
 
