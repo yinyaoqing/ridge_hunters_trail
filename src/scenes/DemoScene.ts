@@ -110,6 +110,14 @@ export class DemoScene extends Phaser.Scene {
 
     this.gridG = this.add.graphics();
 
+    // 遮罩：把網格圖層剪裁在網格矩形內。drawClueOverlay 是以格數換算世界座標畫距離圈，
+    // 氣味線索半徑達 6 格，在這張窄卡片裡足以畫出面板外、蓋過旁白與按鈕——
+    // MapScene 沒事是因為地圖本身佔滿整個視窗，沒有邊界可越。這裡網格只是卡片裡
+    // 的一小塊，必須自己擋住溢出（做法同 HelpScene 列表捲動用的幾何遮罩）。
+    const gridMask = this.make.graphics({}, false);
+    gridMask.fillStyle(0xffffff).fillRect(this.gx, this.gy, this.cell * DEMO_SIZE, this.cell * DEMO_SIZE);
+    this.gridG.setMask(gridMask.createGeometryMask());
+
     // 單一互動矩形覆蓋整個網格，由座標換算格子——比建立 81 個互動物件簡單，
     // 也與 MapScene 的做法一致。
     const gw = this.cell * DEMO_SIZE;
@@ -162,8 +170,10 @@ export class DemoScene extends Phaser.Scene {
   // 上一步／下一步因此永遠不會累積狀態漂移。
   private marksFor(i: number): MarkMap {
     const m: MarkMap = new Map();
-    // 排除標記從玩家做完動手點 ① 的下一步開始出現
-    if (this.excluded && i > 2) m.set(key(this.excluded), 'exclude');
+    // 排除標記從玩家做完動手點 ① 的那一步起就要畫（含當步本身）：
+    // 這樣「上一步」從第 4 步退回第 3 步時，玩家自己選的那個 ✕ 仍在原地——
+    // 首次造訪第 3 步時 this.excluded 還是 null，不受影響。
+    if (this.excluded && i >= 2) m.set(key(this.excluded), 'exclude');
     if (DEMO_STEPS[i].autoSuspect) {
       for (const k of DEMO_PAIR) if (!m.has(k)) m.set(k, 'suspect');
     }
@@ -200,6 +210,16 @@ export class DemoScene extends Phaser.Scene {
 
     const live = step.clues.filter((i) => !step.muted.includes(i)).map((i) => DEMO_CLUES[i]);
 
+    // 迷霧：畫在地形與格線之後、疊層之前——順序刻意與 MapScene 不同。真實地圖上迷霧
+    // 代表「這片地你看不見」，蓋在所有東西最上層合理；但示範裡的疊層、記號都是在
+    // 教玩家對「已經在教的那片地」做推理，不是要重現視野限制本身，所以必須留在迷霧
+    // 之上維持可讀——第 3 步要玩家「挑一格在錐外的排除」，兩列霧區裡就有 10 格落在
+    // 錐內，壓在迷霧最上層會讓那 10 格的金色錐形壓暗到看不出來，排除變成看運氣。
+    for (const uk of demoUnseen(step)) {
+      const [ux, uy] = uk.split(',').map(Number);
+      g.fillStyle(0x000000, 0.62).fillRect(this.gx + ux * cs, this.gy + uy * cs, cs, cs);
+    }
+
     // 疊層：heat 沿用 MapScene 的正規化透明度公式，讓示範看到的濃淡與真實地圖一致；
     // intersect 用單一較高透明度，把「只剩這一格」講死。
     if (step.overlay === 'heat' && live.length > 0) {
@@ -219,10 +239,14 @@ export class DemoScene extends Phaser.Scene {
       }
     }
 
-    // 線索覆蓋層（未靜音者）與線索記號
-    for (const i of step.clues) {
-      if (step.muted.includes(i)) continue;
-      drawClueOverlay(g, DEMO_CLUES[i], this.px(DEMO_CLUES[i].position), cs, pal, false);
+    // 線索覆蓋層（未靜音者）。overlay 為 'none' 時不畫任何範圍圈——那代表「線索的
+    // 記號已經在地圖上，但玩家還沒走過去判讀它」，正是真實遊戲裡「看到標記」與
+    // 「走到標記旁才解出範圍」的差別；記號本身仍要畫（見下方 token 迴圈，不受此限）。
+    if (step.overlay !== 'none') {
+      for (const i of step.clues) {
+        if (step.muted.includes(i)) continue;
+        drawClueOverlay(g, DEMO_CLUES[i], this.px(DEMO_CLUES[i].position), cs, pal, false);
+      }
     }
     const tokenR = Math.max(8, cs * 0.34);
     for (const i of step.clues) {
@@ -240,12 +264,6 @@ export class DemoScene extends Phaser.Scene {
       const [mx, my] = mk.split(',').map(Number);
       const p = this.px({ x: mx, y: my });
       drawMark(g, kind, p.x, p.y, cs, pal);
-    }
-
-    // 迷霧：同 MapScene 的壓暗而非全黑
-    for (const uk of demoUnseen(step)) {
-      const [ux, uy] = uk.split(',').map(Number);
-      g.fillStyle(0x000000, 0.62).fillRect(this.gx + ux * cs, this.gy + uy * cs, cs, cs);
     }
 
     // 玩家：光暈＋紙墨白圓點

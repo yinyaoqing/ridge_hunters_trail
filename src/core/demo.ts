@@ -85,8 +85,11 @@ const CONE = candidates(DEMO_CLUES[0], DEMO_SIZE);
 export const DEMO_STEPS: readonly DemoStep[] = [
   // 第一章：一條線索只會排除
   {
+    // 記號在，但範圍還沒解出來：overlay 為 'none' 時 DemoScene 只畫線索記號、
+    // 不畫範圍圈，所以這裡列 clues: [0] 不會讓畫面提早爆雷答案，只是讓足跡標記
+    // 出現在地圖上——第 2 步的旁白「判讀足跡」才有一個已經看得到的東西可以指。
     chapter: 1, narration: 'demo.s1', vars: { n: TOTAL_CELLS },
-    clues: [], muted: [], overlay: 'none', seen: 'near', player: DEMO_START,
+    clues: [0], muted: [], overlay: 'none', seen: 'near', player: DEMO_START,
   },
   {
     chapter: 1, narration: 'demo.s2', vars: { n: CONE.size },
