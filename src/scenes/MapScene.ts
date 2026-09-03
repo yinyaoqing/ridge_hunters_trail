@@ -86,6 +86,9 @@ export class MapScene extends Phaser.Scene {
   private chipRowLeft = 0; // chip 列最左緣（眺望 chip 左緣，見 buildHud 的 xSurvey）：體力條需與其保持 ≥8px 間距
   private titleRight = 0; // 副標題「RIDGE HUNTER'S TRAIL」右緣（僅 !compact 時量得，見 buildHud）：
                            // 體力條左靠齊版面下，體力標籤要靠這個值閃過副標題，見 updateHud
+  private titleBottom = 0; // 副標題下緣（僅 !compact 時量得，見 buildHud）：步數讀出退路
+                            // （貼體力條那一列）文字比體力條本身高，置中會微幅探出體力條
+                            // 上緣，這個值讓它知道副標題底下留了多少空間可以探，見 updateHud
   private skipFirstRunHelp = false;
   private audio!: AudioBus;
   private tools!: ToolStore;
@@ -178,6 +181,8 @@ export class MapScene extends Phaser.Scene {
     // 殘留的非零舊值會把 compact 版面的標籤硬推到 chip 列上——這正是這個重置區塊
     // 本身要防的那一類殘留欄位，屬性不同、成因相同，理當歸位在此。
     this.titleRight = 0;
+    // titleBottom 同一批殘留欄位，同一個理由歸位在此（見上方欄位宣告的註解）。
+    this.titleBottom = 0;
     // heatAge 故意不在此歸位：它是玩家的選擇（同 heatOn），不是指向已銷毀物件的殘留
     // 參照。chip 標籤每次 buildHud／updateHud 都會照 heatAge 現值重繪，不存在「標籤與
     // 選擇不同步」的風險——resize 觸發的 restart 不該把玩家剛選的「全部」密度視圖丟掉。
@@ -581,6 +586,7 @@ export class MapScene extends Phaser.Scene {
       }).setLetterSpacing(2.5);
       // 量實際畫出來的右緣，不是猜一個寬度——字型／letterSpacing 以後要是變了，這裡自動跟著對
       this.titleRight = title.x + title.width;
+      this.titleBottom = title.y + title.height; // 同一個道理：量實際下緣，供步數讀出的退路使用
     }
 
     // 語言切換鈕、玩法說明鈕、標記模式鈕與靜音鈕（設計板：金邊小chip，由右至左排列）
@@ -1495,22 +1501,25 @@ export class MapScene extends Phaser.Scene {
     this.roundText.setText(i18n.t('hud.round', { n: s.round }));
     this.drawWeatherBadge(s);
     this.stamLabel.setText(`${i18n.t('hud.stamina', { n: s.stamina })} / ${budget}`.toUpperCase());
-    // 步數讀出（Fix 6）：緊接天氣徽章之後，同一列。天氣徽章的實際右緣要看 weatherText
-    // 存不存在（compact 版面只有圖形沒有文字，見 buildHud）——weatherText 存在時量測
-    // 它畫出來的實際寬度（同 legend／stamLabel 一路沿用的「量實際畫出來的，不猜」原則）；
-    // 只有圖形沒有文字時，圖形本身是 drawWeatherGlyph 畫在 bx+6 為圓心、半徑 ≤6 的
+    // 步數讀出——首選位置：緊接天氣徽章之後，同一列（Fix 6 原版）。天氣徽章的實際右緣
+    // 要看 weatherText 存不存在（compact 版面只有圖形沒有文字，見 buildHud）——weatherText
+    // 存在時量測它畫出來的實際寬度（同 legend／stamLabel 一路沿用的「量實際畫出來的，不猜」
+    // 原則）；只有圖形沒有文字時，圖形本身是 drawWeatherGlyph 畫在 bx+6 為圓心、半徑 ≤6 的
     // 固定小圖示（見該函式），右緣即 bx+12，這裡量的是同一個 bx（roundText 右緣 +12）。
+    //
+    // F8（本次修復）：這個位置與 chip 列共用同一段垂直範圍（chipY..chipY+chipH＝13..43），
+    // 可用寬度取決於 chipRowLeft——寬視窗（實測 ≈680px 起，無鈴；≈748px 起，持鈴）量得到、
+    // 放得下，維持這個位置不動；但 compact 斷點（560px）以下 chipRowLeft 常常小於這個位置
+    // 本身的起點，甚至為負（chip 列本身已經被擠出畫面外，見再審報告另記的已知問題），
+    // 568px 以下（含所有手機寬度）因此永遠放不下——實測 320～640px 全部隱藏，「compact
+    // 版面更需要這個數字」的欄位註解反而被自己這條可見度判斷鎖死，見下方退路分支。
     const weatherBx = this.roundText.x + this.roundText.width + 12;
     const weatherRight = this.weatherText ? this.weatherText.x + this.weatherText.width : weatherBx + 12;
     this.stepLabel.setText(i18n.t('hud.step', { n: s.steps }).toUpperCase());
-    this.stepLabel.setPosition(weatherRight + 14, this.roundText.y + this.roundText.height / 2);
-    // 步數讀出這一列（y 約 11–25，見 roundText 字高）與 chip 列同一段垂直範圍
-    // （chipY=13 到 43）重疊，寬視窗夠寬時量到的右緣自然落在 chipRowLeft 之內，
-    // 但這裡仍主動夾一次右緣：不夾的話，未來若局數／天氣文字變長（例如三位數局數、
-    // 更長的天氣字串），步數讀出會被推進 chip 列——量到才夾，不是猜多寬才夠。
-    // 放不進去時毫不猶豫地整個藏起來，而不是硬擠：蓋住 chip 上的文字比看不到步數更糟。
-    const stepRight = this.stepLabel.x + this.stepLabel.width;
-    this.stepLabel.setVisible(stepRight <= this.chipRowLeft - 8);
+    const stepPrimaryX = weatherRight + 14;
+    const stepPrimaryY = this.roundText.y + this.roundText.height / 2;
+    const stepW = this.stepLabel.width; // 量測不受後續 setPosition 影響，寬度只看文字內容
+    const stepPrimaryFits = stepPrimaryX + stepW <= this.chipRowLeft - 8;
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
     if (this.bellChipG) this.drawBellChip(this.bellChipX, this.bellChipY, 60, 30);
@@ -1536,6 +1545,34 @@ export class MapScene extends Phaser.Scene {
     const bw = barLeft ? Math.max(6, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
     const bh = barLeft ? 10 : 12;
     const by = barLeft ? 46 : 27;
+
+    // 步數讀出——退路：首選位置（見上）放不下時，改貼體力條右側，同一列（by..by+bh）。
+    // barLeft 版由 by/bh＝46/10 訂出 46..56，跟 chip 列所在的 13..43 完全不重疊——
+    // 不論視窗多窄、chipRowLeft 多小甚至為負，這一列右側永遠有整段空間可用，只需夾一次
+    // 畫面右緣（w-8）即可，這正是 compact／手機寬度唯一放得下這個數字的地方。
+    // centered 版由 27/12 訂出 27..39，仍落在 chip 列的垂直範圍內——但 centered 只在
+    // chipRowLeft 夠大（視窗夠寬）時才會啟用，首選位置在那個寬度早已放得下（見上方量測，
+    // 無鈴 680px／持鈴 748px 即可見，遠早於進入 centered 版面所需的寬度），這條退路實務上
+    // 不會被 centered 版面用到；仍防禦性地對它套用 chipRowLeft 的夾限，不假設用不到就不管。
+    if (stepPrimaryFits) {
+      this.stepLabel.setPosition(stepPrimaryX, stepPrimaryY);
+      this.stepLabel.setVisible(true);
+    } else {
+      const stepFallbackX = bx + bw + 10;
+      // 退路的文字（13px 高）比它靠齊的體力條（barLeft 版只有 10px 高）還高，直接疊在
+      // 體力條垂直正中會讓文字上緣探出體力條上緣一截；barLeft 版面下副標題「RIDGE
+      // HUNTER'S TRAIL」的下緣（this.titleBottom）恰好落在附近，兩者的包框可能因此
+      // 重疊不到 1px（實測 560px 持鈴時上緣只差 0.5px）。量出來的下緣加 1px 緩衝，
+      // 需要時把文字垂直中心往下推，不改左右位置——這一列到 HUD_HEIGHT(56) 還有
+      // 餘裕，往下讓一點不會撞進地圖（oy 最小值是 HUD_HEIGHT+4＝60）。
+      const stepFallbackY = this.titleBottom > 0
+        ? Math.max(by + bh / 2, this.titleBottom + 1 + this.stepLabel.height / 2)
+        : by + bh / 2;
+      this.stepLabel.setPosition(stepFallbackX, stepFallbackY);
+      const rightLimit = barLeft ? w - 8 : this.chipRowLeft - 8;
+      this.stepLabel.setVisible(stepFallbackX + stepW <= rightLimit);
+    }
+
     if (barLeft) {
       // 左靠齊版面下，標籤原本疊在體力條正上方置中（bx+bw/2），與副標題「RIDGE HUNTER'S
       // TRAIL」同一橫列——兩者的 y 範圍本來就重疊（副標題 y≈34–46，標籤 y≈30–43），

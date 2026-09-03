@@ -169,7 +169,19 @@ export class RevealScene extends Phaser.Scene {
     // 不是「牠去過那邊」。
     if (!hideAnswer) {
       const w = L.route.waypoints;
-      const reachedIdx = Math.min(ROUTE_START_INDEX + Math.floor(s.steps / MOVE_EVERY), w.length - 1);
+      // F7：分割點必須跟金環讀同一個來源，否則兩者會各說各話——F5 的寬容判定
+      // 讓 capturePos 有時落在「移動前」那個節點，此時用 steps／MOVE_EVERY
+      // 反推出的節點索引會比金環實際畫的位置多走一格：路線畫成已走過、實線、
+      // 最亮，金環卻停在前一個節點，同一張小地圖上兩者互相矛盾（實測 7.03%
+      // 的補獲局如此，其中 100% 的金環節點不是「最新最亮的實心節點」）。
+      // 改成直接在 waypoints 裡找 target（金環畫的那個座標）的索引：
+      // target 恆為 capturePos ?? currentTarget(s)，兩者都是 targetAt() 的回傳值，
+      // 而 targetAt() 保證回傳 waypoints 陣列裡的某一個元素，因此這裡找得到。
+      // findIndex 找不到（理論上不會發生，只作為未來改動的保險）時才退回舊算法。
+      const targetIdx = w.findIndex((p) => p.x === target.x && p.y === target.y);
+      const reachedIdx = targetIdx >= 0
+        ? targetIdx
+        : Math.min(ROUTE_START_INDEX + Math.floor(s.steps / MOVE_EVERY), w.length - 1);
       for (let i = 1; i < w.length; i++) {
         const a = px(w[i - 1]);
         const b = px(w[i]);

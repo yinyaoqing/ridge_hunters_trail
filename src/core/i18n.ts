@@ -110,8 +110,14 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'comm.done': 'Done',
     'comm.reward': '+{n} field notes',
     'tut.move': 'See that marker? Walk over and read it.',
-    'tut.read': 'A clue! The creature is somewhere it points to.',
-    'tut.cross': 'Two clues overlap — the truth hides where both agree.',
+    // F3（owner 核准改字）：獵物現在會沿路線走，「牠就在這指向的範圍裡」只在讀到的
+    // 剛好是最新齡線索時為真（實測僅 37.5%）。改成過去式——線索永遠精確錨定在
+    // 「牠留下痕跡當下」所在的節點，這句話因此不論齡別都恆真，不再暗示「現在」。
+    'tut.read': 'A clue! It shows where the creature was, not where it is now.',
+    // 同理改過去式：同齡交集在幾何上保證含該齡節點（checkTutStep1to2 只餵同齡真線索），
+    // 但那是「牠當時」所在，不是「牠現在」所在——舊句「真相藏在交集之處」用現在式
+    // 暗示交集等於現在的位置，只有 38.1% 為真。
+    'tut.cross': "Two clues of the same freshness agree — that's where the creature was at that moment.",
     'tut.qte': 'You are close. Get ready to tap in rhythm!',
     'score.gain': '+{n} pts',
     'score.pot': 'Unbanked {n}',
@@ -248,8 +254,11 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'comm.done': '已完成',
     'comm.reward': '觀察筆記 +{n}',
     'tut.move': '看到那個記號了嗎？走過去判讀。',
-    'tut.read': '線索！牠就在這指向的範圍裡。',
-    'tut.cross': '兩條線索重疊——真相藏在交集之處。',
+    // 與英文版同一次改字（見 en 區塊註解）：線索永遠錨定在牠留下痕跡當下所在的節點，
+    // 改成過去式後不論齡別都恆真，不再暗示「現在」。
+    'tut.read': '線索！這是牠留下痕跡當下的位置，不是牠現在的位置。',
+    // 同齡交集保證含該齡節點，但那是牠「當時」所在，不是「現在」所在——改過去式。
+    'tut.cross': '兩條齡別相同的線索重疊——那是牠當時所在的位置。',
     'tut.qte': '很近了，準備節奏點擊！',
     'score.gain': '得分 +{n}',
     'score.pot': '待入袋 {n}',
