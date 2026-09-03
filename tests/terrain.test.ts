@@ -99,17 +99,19 @@ describe('buildTerrain', () => {
   });
 
   // ridgecrest 專屬：F6 的 0.30 上界是針對 bias 0（觀測最糟 14.75%）訂的，headroom
-  // 是觀測值的兩倍多，對 ridgecrest 的 elevationBias（原本 0.15，owner 裁定下修至
-  // 0.08，見 quirks.ts）太鬆——這正是 G1 這次要補的洞：0.15 在 round-1、無霧的
-  // 300 顆種子上量到均值 15.9%、單張最糟 44.4%，本測試改用同一套 seed 1..100、
-  // size 20 慣例，逐張地圖檢查下修後的 0.08 是否真的把崖壁佔比拉回可玩範圍。
+  // 是觀測值的兩倍多，對 ridgecrest 的 elevationBias（歷史：0.15 → 0.08，見
+  // quirks.ts）太鬆——這正是 G1 這次要補的洞：0.15 在 round-1、無霧的 300 顆種子
+  // 上量到均值 15.9%、單張最糟 44.4%，本測試改用同一套 seed 1..100、size 20
+  // 慣例，逐張地圖檢查下修後的 bias 是否真的把崖壁佔比拉回可玩範圍。
+  //
+  // Phase 6a 的攔截路追加後，0.08 在 round-1、1000 顆種子上讓理想路線超預算率
+  // 衝到 6.20%（見 quirks.ts 最新一段歷史），owner 再次核准下修，這次調到
+  // 0.04。三個 bias 在同一套 seed 1..100、size 20 慣例下實測：0.15 最糟
+  // 44.75%、0.08 最糟 27.25%（seed 92）、目前的 0.04 均值 4.19%、單張最糟
+  // 20.00%（seed 70）。上界隨之收緊到 0.24：仍在最糟值之上留約 4 個百分點
+  // headroom，但比舊的 0.30 更貼——bias 若被打回 0.08（最糟 27.25%）或更高，
+  // 這裡會立刻紅；BAND_CLIFF 被調鬆時同理。
   it("bounds ridgecrest's cliff share on every individual map at the lowered bias (G1)", () => {
-    // 實測（seed 1..100，size 20，bias = elevationBiasFor('ridgecrest') = 0.08）：
-    // 均值 7.37%，p90 ≈ 15.5%，單張最糟 27.25%（seed 92）。0.30 訂在最糟值之上，
-    // 但只留約 2.75 個百分點的 headroom——刻意比上面 F6 的 0.30 更緊，因為這條
-    // 測試的職責就是抓 ridgecrest 的 bias 被調回過高（例如打回 0.15，同一套種子
-    // 量到單張最糟 44.75%）或 BAND_CLIFF 被調鬆（例如退回 0.74，同一套種子量到
-    // 11/100 張超過 0.30）時，這裡要立刻紅。
     const bias = elevationBiasFor('ridgecrest');
     for (let seed = 1; seed <= 100; seed++) {
       const { terrain } = buildTerrain(mulberry32(seed), 20, bias);
@@ -121,7 +123,7 @@ describe('buildTerrain', () => {
           if (t === 'cliff') cliff++;
         }
       }
-      expect(cliff / total).toBeLessThan(0.30);
+      expect(cliff / total).toBeLessThan(0.24);
     }
   });
 
