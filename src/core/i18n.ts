@@ -39,7 +39,7 @@ export type MsgKey =
   | 'demo.s8' | 'demo.s9' | 'demo.s10' | 'demo.s11' | 'demo.s12' | 'demo.s13' | 'demo.s14'
   | 'demo.hint.exclude' | 'demo.hint.mute' | 'demo.hint.wager'
   | 'btn.demo' | 'btn.next' | 'btn.prev'
-  | 'age.fresh' | 'age.night' | 'age.older' | 'age.all' | 'hud.age'
+  | 'age.fresh' | 'age.night' | 'age.older' | 'age.all'
   | 'reveal.route'
   | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling';
 
@@ -135,7 +135,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'reveal.dailyHidden': "Today's trail keeps its secret — everyone is hunting the same map.",
     'btn.continue': '[ Continue ]',
     'help.marks': 'Mark a cell again and again to cycle it: ruled out, maybe, my call. Your call sets your record quality.',
-    'help.layer': 'Layer shades each cell by how many read clues agree. Mark a clue you already read to mute it.',
+    'help.layer': 'Layer shades each cell by how many read clues of one freshness agree — the chip beside it picks which. Mark a clue you already read to mute it.',
     'help.reveal': 'Every hunt ends by revealing where it really was and how close your call landed.',
     'hud.survey': 'Look',
     'hud.surveyCost': '-{n} to look around',
@@ -174,7 +174,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'age.night': 'Last night',
     'age.older': 'Older',
     'age.all': 'All',
-    'hud.age': 'Freshness',
     'reveal.route': 'It was moving. The trail below is where it walked, oldest to newest.',
     'rule.lowland': 'Follows the valley floor',
     'rule.highland': 'Keeps to the ridgeline',
@@ -273,7 +272,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'reveal.dailyHidden': '今日行蹤不揭曉——全球同題，答案得自己找。',
     'btn.continue': '［繼續］',
     'help.marks': '反覆標記同一格可循環：排除、存疑、押注。押注格決定你的記錄品質。',
-    'help.layer': '「圖層」依符合的已判讀線索數為格子上色；標記已判讀的線索可將它靜音。',
+    'help.layer': '「圖層」依符合選定齡別的已判讀線索數上色，chip 選哪一齡；標記已判讀線索可靜音。',
     'help.reveal': '每一局結束都會揭曉牠實際在哪，以及你的押注差了幾格。',
     'hud.survey': '眺望',
     'hud.surveyCost': '眺望 -{n}',
@@ -312,7 +311,6 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'age.night': '昨夜',
     'age.older': '更早',
     'age.all': '全部',
-    'hud.age': '新鮮度',
     'reveal.route': '牠一直在移動。下面這條就是牠走過的路，由舊到新。',
     'rule.lowland': '沿溪谷低處走',
     'rule.highland': '沿稜線高處走',
