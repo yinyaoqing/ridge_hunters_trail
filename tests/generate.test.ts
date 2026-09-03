@@ -21,7 +21,7 @@ describe('generateLevel (property tests over 200 seeds)', () => {
   }));
 
   it('每一齡的交集都包含該齡在路線上的位置（可解性保證的廣義化版本）', () => {
-    // 舊版斷言「全部線索的交集包含 targetPos」，但線索現在分齡錨定在不同的路線節點，
+    // 舊版斷言「全部線索的交集包含獵物開局位置」，但線索現在分齡錨定在不同的路線節點，
     // 混齡交集不再保證包含任何單一位置——這正是本階段刻意的語意變更
     // （見 generate.ts 的逐齡收斂註解）。廣義化後的保證改成逐齡驗證。
     for (const { seed, round } of cases) {
@@ -79,14 +79,14 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       expect(level.terrain[0].length).toBe(p.mapSize);
       const creature = CREATURES.find((c) => c.id === level.creatureId);
       expect(creature).toBeDefined();
-      // 強制生物偏好地形的格子現在是路線終點（覓食地），不再是開局位置 targetPos——
+      // 強制生物偏好地形的格子現在是路線終點（覓食地），不再是開局位置——
       // 牠最後停在哪，那裡才是牠的地盤（見 generate.ts 的 forage 註解）。
       const forage = level.route.waypoints[level.route.waypoints.length - 1];
       expect(level.terrain[forage.y][forage.x]).toBe(creature!.terrain);
       const pq = applyQuirk(p, level.creatureId);
       expect(level.supplies.length).toBeLessThanOrEqual(pq.supplyCount);
       for (const s of level.supplies) {
-        expect(key(s)).not.toBe(key(level.targetPos));
+        expect(key(s)).not.toBe(key(level.route.waypoints[ROUTE_START_INDEX]));
       }
     }
   });
@@ -114,7 +114,7 @@ describe('generateLevel (property tests over 200 seeds)', () => {
   });
 
   it('no clue, real or decoy, lies within Chebyshev 1 of the quarry\'s starting cell', () => {
-    // 守的是「免費勝利」這個機制：age 2 的錨點就是 targetPos（獵物開局站的節點），
+    // 守的是「免費勝利」這個機制：age 2 的錨點就是獵物開局站的節點，
     // session.move 在玩家踏進與獵物相距 1 格時就進入近距離判讀。只擋節點本身不夠——
     // 一條擾動線索的偏移量最小只有 1 格，剛好可能落在節點旁邊那一圈，而那一圈
     // 距離獵物一樣是 Chebyshev 1。若這圈沒被擋住，開局唯一揭示、地圖上還畫著
@@ -124,7 +124,7 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     for (const { seed, round } of cases) {
       const level = generateLevel(round, mulberry32(seed));
       for (const c of level.clues) {
-        expect(cheb(c.position, level.targetPos)).toBeGreaterThan(1);
+        expect(cheb(c.position, level.route.waypoints[ROUTE_START_INDEX])).toBeGreaterThan(1);
       }
     }
   });
@@ -170,7 +170,7 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       const scent = level.clues.find((c) => c.type === 'scent' && !c.isDecoy);
       if (scent && scent.type === 'scent') {
         found = true;
-        const trueBearing = angleDeg(scent.position, level.targetPos);
+        const trueBearing = angleDeg(scent.position, level.route.waypoints[ROUTE_START_INDEX]);
         expect(angleDiff(scent.data.biasDirection, trueBearing)).toBeLessThanOrEqual(30);
       }
     }
@@ -203,12 +203,13 @@ describe('generateLevel: physical reachability', () => {
     for (let seed = 1; seed <= 40; seed++) {
       for (const round of [1, 5, 9]) {
         const level = generateLevel(round, mulberry32(seed));
+        const target = level.route.waypoints[ROUTE_START_INDEX];
         const s = level.mapSize - 1;
         const corners = [{ x: 0, y: 0 }, { x: s, y: 0 }, { x: 0, y: s }, { x: s, y: s }];
         const start = corners.reduce((a, b) =>
-          (dist(b, level.targetPos) > dist(a, level.targetPos) ? b : a));
+          (dist(b, target) > dist(a, target) ? b : a));
         const seen = reachableFrom(level.terrain, start);
-        expect(seen.has(key(level.targetPos))).toBe(true);
+        expect(seen.has(key(target))).toBe(true);
         for (const c of level.clues) expect(seen.has(key(c.position))).toBe(true);
         for (const p of level.supplies) expect(seen.has(key(p))).toBe(true);
       }
@@ -218,7 +219,8 @@ describe('generateLevel: physical reachability', () => {
   it('never places the target on an impassable cell', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const level = generateLevel(5, mulberry32(seed));
-      expect(level.terrain[level.targetPos.y][level.targetPos.x]).not.toBe('cliff');
+      const target = level.route.waypoints[ROUTE_START_INDEX];
+      expect(level.terrain[target.y][target.x]).not.toBe('cliff');
     }
   });
 
@@ -273,7 +275,7 @@ describe('generateLevel: trailhead', () => {
     for (let seed = 1; seed <= 40; seed++) {
       for (const round of [1, 5, 9]) {
         const level = generateLevel(round, mulberry32(seed));
-        const start = startCorner(level.mapSize, level.targetPos);
+        const start = startCorner(level.mapSize, level.route.waypoints[ROUTE_START_INDEX]);
         const costs = routeCostsFrom(level.terrain, start);
         const real = level.clues
           .map((c, i) => ({ c, i }))
@@ -304,10 +306,13 @@ describe('generateLevelFor: 線索新鮮度', () => {
     return out;
   };
 
-  it('每一局的路線長度固定，且獵物開局站在 W2', () => {
+  it('每一局的路線長度固定', () => {
+    // 「獵物開局站在 W2」現在是 ROUTE_START_INDEX 本身的定義（見 route.ts），
+    // 不再是一個獨立欄位可以拿來互相核對——這裡不再需要另外斷言它。
+    // currentTarget(newSession(...)) 開局即等於 route.waypoints[ROUTE_START_INDEX]
+    // 已由 tests/session.test.ts 的 currentTarget 測試涵蓋。
     for (const L of levels()) {
       expect(L.route.waypoints).toHaveLength(ROUTE_WAYPOINTS);
-      expect(L.targetPos).toEqual(L.route.waypoints[ROUTE_START_INDEX]);
     }
   });
 

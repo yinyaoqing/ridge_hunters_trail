@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   newSession, canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, resolveQte, nextSession, useBell, survey,
+  currentTarget, isTargetVisible,
   TERRAIN_COST, isPassable, type SessionState,
 } from '../src/core/session';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key } from '../src/core/clues';
 import { SURVEY_COST } from '../src/core/vision';
+import { MOVE_EVERY, ROUTE_START_INDEX, finalTarget } from '../src/core/route';
 import type { Level, TerrainType } from '../src/core/types';
 
 // 手工關卡：5x5 全草地，目標 (4,4)，補給 (1,0)，scent 線索 (2,0)
@@ -15,12 +17,11 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
     Array.from({ length: 5 }, () => 'meadow' as TerrainType));
   const elevation: number[][] = Array.from({ length: 5 }, () =>
     Array.from({ length: 5 }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
-  const targetPos = { x: 4, y: 4 };
+  // 這批測試不涉及獵物移動，退化成五個節點都停在同一點的路線即可。
+  const target = { x: 4, y: 4 };
   const level: Level = {
     round: 1, mapSize: 5,
-    // 這批測試不涉及路線／新鮮度，退化成五個節點都停在同一點的路線即可。
-    route: { waypoints: Array(5).fill(targetPos), rule: 'straight' },
-    targetPos,
+    route: { waypoints: Array(5).fill(target), rule: 'straight' },
     clues: [{
       type: 'scent', position: { x: 2, y: 0 }, isDecoy: false, age: 2,
       data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
@@ -452,5 +453,52 @@ describe('survey', () => {
     expect(survey(s)).toBe(true);
     expect(s.stamina).toBe(1);
     expect(s.phase).toBe('exhausted');
+  });
+});
+
+describe('currentTarget: 獵物會沿路線移動', () => {
+  it('開局時就是路線的起始節點', () => {
+    const s = newSession(1, mulberry32(3));
+    expect(currentTarget(s)).toEqual(s.level.route.waypoints[ROUTE_START_INDEX]);
+  });
+
+  it('步數累積到一個週期就換節點', () => {
+    const s = newSession(1, mulberry32(3));
+    const before = currentTarget(s);
+    s.steps = MOVE_EVERY;
+    const after = currentTarget(s);
+    expect(after).toEqual(s.level.route.waypoints[ROUTE_START_INDEX + 1]);
+    expect(after).not.toEqual(before);
+  });
+
+  it('走到覓食地就停住', () => {
+    const s = newSession(1, mulberry32(3));
+    s.steps = MOVE_EVERY * 50;
+    expect(currentTarget(s)).toEqual(finalTarget(s.level.route));
+  });
+});
+
+describe('isTargetVisible', () => {
+  it('站在獵物身上一定看得見', () => {
+    const s = newSession(1, mulberry32(5));
+    s.player = { ...currentTarget(s) };
+    expect(isTargetVisible(s)).toBe(true);
+  });
+
+  it('隔著整張地圖看不見', () => {
+    const s = newSession(1, mulberry32(5));
+    const t = currentTarget(s);
+    s.player = { x: t.x >= s.level.mapSize / 2 ? 0 : s.level.mapSize - 1, y: t.y >= s.level.mapSize / 2 ? 0 : s.level.mapSize - 1 };
+    expect(isTargetVisible(s)).toBe(false);
+  });
+
+  it('看得見與否只看當前位置，不受 seen 影響', () => {
+    // seen 是單向累積的「看過的地」，而獵物會離開。用 seen 判斷會讓牠走掉之後
+    // 還畫在原地——玩家會追一個已經不在那裡的影子。
+    const s = newSession(1, mulberry32(5));
+    const t = currentTarget(s);
+    s.seen.add(key(t));
+    s.player = { x: t.x >= s.level.mapSize / 2 ? 0 : s.level.mapSize - 1, y: t.y >= s.level.mapSize / 2 ? 0 : s.level.mapSize - 1 };
+    expect(isTargetVisible(s)).toBe(false);
   });
 });

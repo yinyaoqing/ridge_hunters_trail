@@ -4,6 +4,7 @@ import type { SessionState, SessionMode } from '../src/core/session';
 import { cheb, angleDeg, type Vec2 } from '../src/core/geometry';
 import type { Clue, Level, TerrainType } from '../src/core/types';
 import type { Rng } from '../src/core/rng';
+import { ROUTE_START_INDEX } from '../src/core/route';
 
 function scentClueAt(pos: Vec2): Clue {
   return {
@@ -18,7 +19,7 @@ interface Opts {
   microEvents?: number;
   clues?: Clue[];
   supplies?: Vec2[];
-  targetPos?: Vec2;
+  target?: Vec2;
   mapSize?: number;
 }
 
@@ -29,12 +30,11 @@ function makeState(opts: Opts = {}): SessionState {
     Array.from({ length: size }, () => 'meadow' as TerrainType));
   const elevation: number[][] = Array.from({ length: size }, () =>
     Array.from({ length: size }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
-  const targetPos = opts.targetPos ?? { x: size - 1, y: size - 1 };
+  const target = opts.target ?? { x: size - 1, y: size - 1 };
   const level: Level = {
     round: 1, mapSize: size,
-    // 這批測試不涉及路線／新鮮度，退化成五個節點都停在同一點的路線即可。
-    route: { waypoints: Array(5).fill(targetPos), rule: 'straight' },
-    targetPos,
+    // 這批測試不涉及獵物移動，退化成五個節點都停在同一點的路線即可。
+    route: { waypoints: Array(5).fill(target), rule: 'straight' },
     clues: opts.clues ?? [], terrain, elevation, supplies: opts.supplies ?? [],
     creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
   };
@@ -95,18 +95,18 @@ describe('rollMicroEvent — cap', () => {
 describe('rollMicroEvent — proximity gate', () => {
   it('excludes rolling when within chebyshev distance 2 of target', () => {
     const s = makeState({ player: { x: 13, y: 13 } }); // cheb to (14,14) = 1
-    expect(cheb(s.player, s.level.targetPos)).toBe(1);
+    expect(cheb(s.player, s.level.route.waypoints[ROUTE_START_INDEX])).toBe(1);
     expect(rollMicroEvent(s, () => 0.001)).toBeNull();
     expect(s.microEvents).toBe(0);
   });
   it('excludes exactly at chebyshev distance 2', () => {
     const s = makeState({ player: { x: 12, y: 12 } }); // cheb to (14,14) = 2
-    expect(cheb(s.player, s.level.targetPos)).toBe(2);
+    expect(cheb(s.player, s.level.route.waypoints[ROUTE_START_INDEX])).toBe(2);
     expect(rollMicroEvent(s, () => 0.001)).toBeNull();
   });
   it('allows rolling at chebyshev distance 3', () => {
     const s = makeState({ player: { x: 11, y: 11 } }); // cheb to (14,14) = 3
-    expect(cheb(s.player, s.level.targetPos)).toBe(3);
+    expect(cheb(s.player, s.level.route.waypoints[ROUTE_START_INDEX])).toBe(3);
     expect(rollMicroEvent(s, () => 0.001)).not.toBeNull();
   });
 });
@@ -145,13 +145,13 @@ describe('rollMicroEvent — bird-startle / old-trail direction', () => {
     const s = makeState({ player: { x: 5, y: 5 } });
     const rng: Rng = () => 0.001; // chance passes; pickWeighted -> bird-startle
     const ev = rollMicroEvent(s, rng);
-    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg({ x: 5, y: 5 }, s.level.targetPos) });
+    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg({ x: 5, y: 5 }, s.level.route.waypoints[ROUTE_START_INDEX]) });
   });
   it('old-trail direction points from player to target', () => {
     const s = makeState({ player: { x: 5, y: 5 } });
     const { rng } = seqRng([0.01, 0.9]); // chance passes; pickWeighted -> old-trail
     const ev = rollMicroEvent(s, rng);
-    expect(ev).toEqual({ kind: 'old-trail', direction: angleDeg({ x: 5, y: 5 }, s.level.targetPos) });
+    expect(ev).toEqual({ kind: 'old-trail', direction: angleDeg({ x: 5, y: 5 }, s.level.route.waypoints[ROUTE_START_INDEX]) });
   });
 });
 
@@ -184,7 +184,7 @@ describe('rollMicroEvent — bonus-supply', () => {
     const s = makeState({ player, supplies: ringCells });
     const { rng } = seqRng([0.01, 0.5]); // chance passes; pickWeighted -> bonus-supply
     const ev = rollMicroEvent(s, rng);
-    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg(player, s.level.targetPos) });
+    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg(player, s.level.route.waypoints[ROUTE_START_INDEX]) });
     expect(s.microEvents).toBe(1);
     expect(s.level.supplies.length).toBe(ringCells.length); // 未新增補給
   });

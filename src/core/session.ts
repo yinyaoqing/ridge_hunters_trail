@@ -7,6 +7,7 @@ import type { Rng } from './rng';
 import { cycleMark, toggleWager, type MarkMap } from './marks';
 import { TERRAIN_COST, isPassable, startCorner } from './terrain';
 import { visionRadius, cellsWithin, SURVEY_COST, SURVEY_BONUS } from './vision';
+import { targetAt, ROUTE_START_INDEX } from './route';
 
 // 實作已移至 terrain.ts 以打斷 session → generate → reach → session 的循環匯入；
 // 既有呼叫端（MapScene、測試）沿用 session 的匯入點不變
@@ -19,6 +20,20 @@ function groundUnderPlayer(s: SessionState): { terrain: TerrainType; elevation: 
     terrain: s.level.terrain[s.player.y][s.player.x],
     elevation: s.level.elevation[s.player.y][s.player.x],
   };
+}
+
+// 獵物「現在」在哪。整個專案唯一的來源——Phase 6a 之後「牠在哪」不再是常數，
+// 任何直接讀路線節點的地方都會在獵物移動後說謊。
+export function currentTarget(s: SessionState): Vec2 {
+  return targetAt(s.level.route, s.steps);
+}
+
+// 獵物是否落在玩家「當前」的視野半徑內。
+// 刻意不用 s.seen：那是單向累積的「看過的地」，而獵物會離開——
+// 用 seen 判斷會讓牠走掉之後仍畫在原地，玩家會追一個已經不在那裡的影子。
+export function isTargetVisible(s: SessionState): boolean {
+  const { terrain, elevation } = groundUnderPlayer(s);
+  return cheb(s.player, currentTarget(s)) <= visionRadius(terrain, elevation);
 }
 
 // 把玩家當前視野內的格加進 seen。單向累積：看過的地就不會再變回未知。
@@ -77,7 +92,7 @@ export interface SessionState {
 
 export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): SessionState {
   const level = generateLevel(round, rng);
-  const player = startCorner(level.mapSize, level.targetPos);
+  const player = startCorner(level.mapSize, level.route.waypoints[ROUTE_START_INDEX]);
   const s: SessionState = {
     round,
     level,
@@ -151,7 +166,9 @@ export function move(s: SessionState, to: Vec2): void {
   }
 
   // 逼近目標的判定先於力竭判定：最後一步逼近仍可觸發 QTE
-  if (cheb(to, s.level.targetPos) <= 1) {
+  // steps 已於本函式開頭遞增，因此這裡取到的是「這一步之後」獵物的位置——
+  // 牠可能剛好在這一步換了節點而落到玩家旁邊，那也算逼近成功。
+  if (cheb(to, currentTarget(s)) <= 1) {
     s.phase = 'qte';
     return;
   }

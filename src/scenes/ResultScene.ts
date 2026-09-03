@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { newSession, type SessionState } from '../core/session';
+import { newSession, currentTarget, type SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
 import {
   notesForRun, MILESTONE_NAME, MILESTONE_DETAIL, MILESTONE_QUIRK, type CodexStore,
@@ -64,7 +64,7 @@ export class ResultScene extends Phaser.Scene {
     // 品質改由本局判讀精準度決定（Phase 4／診斷 C-03）：QTE 仍決定成敗，但不再決定品質
     const wk = wagerKey(s.marks);
     const wager = wk === null ? null : parseKey(wk);
-    const quality: Quality | null = caught ? qualityFromAccuracy(wager, s.level.targetPos) : null;
+    const quality: Quality | null = caught ? qualityFromAccuracy(wager, currentTarget(s)) : null;
     const notes = caught ? 0 : notesForRun(s.readClues.size);
     // 單一取樣：daily 的 dateKey 由 Camp 進入時取樣一次存進 registry，
     // 記帳與分享卡都讀同一值，避免跨 UTC 午夜時分歧（沒有存到值時退回現場取樣）。

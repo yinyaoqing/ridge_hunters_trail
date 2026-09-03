@@ -4,6 +4,7 @@ import { key } from './clues';
 import { isPassable } from './terrain';
 import type { SessionState } from './session';
 import type { Level } from './types';
+import { targetAt } from './route';
 
 export type MicroEvent =
   | { kind: 'bird-startle'; direction: number }  // 指向目標的精確方位（顯示層加寬呈現）
@@ -13,9 +14,9 @@ export type MicroEvent =
 export const EVENT_CHANCE = 0.04;
 export const MAX_EVENTS_PER_RUN = 2;
 
-function isOccupiedCell(level: Level, p: Vec2): boolean {
+function isOccupiedCell(level: Level, p: Vec2, target: Vec2): boolean {
   const k = key(p);
-  if (key(level.targetPos) === k) return true;
+  if (key(target) === k) return true;
   if (level.clues.some((c) => key(c.position) === k)) return true;
   if (level.supplies.some((s) => key(s) === k)) return true;
   // 崖壁上的補給撿不到——視同已佔用，讓 findNearbyEmptyCell 換下一格
@@ -43,15 +44,16 @@ function findNearbyEmptyCell(s: SessionState): Vec2 | null {
     return a.x - b.x;
   });
   for (const p of candidates) {
-    if (!isOccupiedCell(level, p)) return p;
+    if (!isOccupiedCell(level, p, targetAt(level.route, s.steps))) return p;
   }
   return null;
 }
 
 export function rollMicroEvent(s: SessionState, rng: Rng): MicroEvent | null {
   if (s.mode !== 'run') return null;
+  const target = targetAt(s.level.route, s.steps);
   if (s.microEvents >= MAX_EVENTS_PER_RUN) return null;
-  if (cheb(s.player, s.level.targetPos) <= 2) return null;
+  if (cheb(s.player, target) <= 2) return null;
   const playerKey = key(s.player);
   const onClueOrSupply =
     s.level.clues.some((c) => key(c.position) === playerKey) ||
@@ -73,12 +75,12 @@ export function rollMicroEvent(s: SessionState, rng: Rng): MicroEvent | null {
       return { kind: 'bonus-supply', pos };
     }
     // 保底：找不到空格時改回傳 bird-startle
-    const direction = angleDeg(s.player, s.level.targetPos);
+    const direction = angleDeg(s.player, target);
     s.microEvents++;
     return { kind: 'bird-startle', direction };
   }
 
-  const direction = angleDeg(s.player, s.level.targetPos);
+  const direction = angleDeg(s.player, target);
   s.microEvents++;
   return { kind, direction };
 }

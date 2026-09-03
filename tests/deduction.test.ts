@@ -3,20 +3,23 @@ import {
   unmutedReadClues, heatMap, maxHeat, infoCompleteStep, misleadingDecoy,
 } from '../src/core/deduction';
 import type { Clue, Level, TerrainType } from '../src/core/types';
+import type { Vec2 } from '../src/core/geometry';
 
 const disturbance = (x: number, y: number, radius: number, isDecoy = false): Clue =>
   ({ type: 'disturbance', position: { x, y }, isDecoy, age: 2, data: { radius } });
+
+// 這批測試手工組出來的關卡固定用這一格當獵物位置：退化成五個節點都停在
+// 同一點的路線，misleadingDecoy 現在不再自己從 level 讀它，呼叫端要把它傳進去。
+const TARGET: Vec2 = { x: 6, y: 5 };
 
 function makeLevel(clues: Clue[], mapSize = 12): Level {
   const terrain: TerrainType[][] = Array.from({ length: mapSize }, () =>
     Array.from({ length: mapSize }, () => 'meadow' as TerrainType));
   const elevation: number[][] = Array.from({ length: mapSize }, () =>
     Array.from({ length: mapSize }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
-  const targetPos = { x: 6, y: 5 };
-  // 這批測試不涉及路線／新鮮度，退化成五個節點都停在同一點的路線即可。
   return {
-    round: 1, mapSize, route: { waypoints: Array(5).fill(targetPos), rule: 'straight' },
-    targetPos, clues, terrain, elevation,
+    round: 1, mapSize, route: { waypoints: Array(5).fill(TARGET), rule: 'straight' },
+    clues, terrain, elevation,
     supplies: [], creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
   };
 }
@@ -135,20 +138,20 @@ describe('misleadingDecoy', () => {
   const readLog = [{ clueIndex: 0, step: 3 }, { clueIndex: 1, step: 7 }];
 
   it('names the read decoy whose candidate set contains the wager cell', () => {
-    const found = misleadingDecoy(level, readLog, { x: 1, y: 2 });
+    const found = misleadingDecoy(level, readLog, { x: 1, y: 2 }, TARGET);
     expect(found?.position).toEqual({ x: 1, y: 1 });
   });
 
   it('returns null when the wager sits outside every read decoy', () => {
-    expect(misleadingDecoy(level, readLog, { x: 6, y: 5 })).toBe(null);
+    expect(misleadingDecoy(level, readLog, { x: 6, y: 5 }, TARGET)).toBe(null);
   });
 
   it('returns null when the player placed no wager', () => {
-    expect(misleadingDecoy(level, readLog, null)).toBe(null);
+    expect(misleadingDecoy(level, readLog, null, TARGET)).toBe(null);
   });
 
   it('ignores decoys the player never read', () => {
-    expect(misleadingDecoy(level, [{ clueIndex: 0, step: 3 }], { x: 1, y: 2 })).toBe(null);
+    expect(misleadingDecoy(level, [{ clueIndex: 0, step: 3 }], { x: 1, y: 2 }, TARGET)).toBe(null);
   });
 
   it('returns null when the wager landed exactly on the target, even if a read decoy covers it', () => {
@@ -158,7 +161,7 @@ describe('misleadingDecoy', () => {
       disturbance(6, 5, 9, true), // 幌子候選集合極大，涵蓋目標與押注格
     ]);
     const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 1, step: 2 }];
-    expect(misleadingDecoy(coveringTarget, log, { x: 6, y: 5 })).toBe(null);
+    expect(misleadingDecoy(coveringTarget, log, { x: 6, y: 5 }, TARGET)).toBe(null);
   });
 
   it('returns null when the decoy candidate set also covers the true target (it did not mislead)', () => {
@@ -167,7 +170,7 @@ describe('misleadingDecoy', () => {
       disturbance(6, 5, 9, true), // 涵蓋押注格 (1,2)？半徑9從(6,5)幾乎涵蓋全圖，含(1,2)與目標(6,5)
     ]);
     const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 1, step: 2 }];
-    expect(misleadingDecoy(coversBoth, log, { x: 1, y: 2 })).toBe(null);
+    expect(misleadingDecoy(coversBoth, log, { x: 1, y: 2 }, TARGET)).toBe(null);
   });
 
   it('picks the earlier-read decoy when two read decoys both cover the wager and neither covers the target', () => {
@@ -176,7 +179,7 @@ describe('misleadingDecoy', () => {
       disturbance(0, 3, 2, true),  // 也涵蓋 (1,2)，不涵蓋目標 (6,5)
     ]);
     const log = [{ clueIndex: 1, step: 3 }, { clueIndex: 0, step: 7 }]; // 判讀順序：index1先、index0後
-    const found = misleadingDecoy(twoDecoys, log, { x: 1, y: 2 });
+    const found = misleadingDecoy(twoDecoys, log, { x: 1, y: 2 }, TARGET);
     expect(found?.position).toEqual({ x: 0, y: 3 }); // 判讀順序在前的那一條（index1）
   });
 });

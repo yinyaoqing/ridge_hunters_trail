@@ -133,7 +133,6 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   // 這也改變了 rng 的取用順序——本階段的關卡本來就與舊版不同，無需相容。
   const { terrain, elevation } = buildTerrain(rng, size, elevationBiasFor(creatureId));
   const route = buildRoute(rng, terrain, elevation, size, routeRuleFor(creatureId));
-  const targetPos = route.waypoints[ROUTE_START_INDEX];
 
   // 線索不得落在路線的任何節點上，也不得落在「獵物起始格」周圍一圈。
   // 節點本身：獵物會依序停在每一個，token 畫在上面等於走過去就贏。
@@ -221,7 +220,7 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
 
   // 物理可達性保證（見 reach.ts）：路線上的每一個節點都要走得到——獵物會停在其中
   // 任何一個，玩家就得能追到那裡。所有線索、所有補給也都必須從出生角走得到。
-  const start = startCorner(size, targetPos);
+  const start = startCorner(size, route.waypoints[ROUTE_START_INDEX]);
   ensureReachable(terrain, start, [...route.waypoints, ...clues.map((c) => c.position), ...supplies]);
 
   // 起始蹤跡：出生角走過去體力花費最低的真線索（F2：不能用直線距離——一條隔著挖通
@@ -263,7 +262,7 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   }
 
   return {
-    round, mapSize: size, route, targetPos, clues, terrain, elevation, supplies,
+    round, mapSize: size, route, clues, terrain, elevation, supplies,
     creatureId: creature.id, trailheadIndex, weather, iris,
   };
 }

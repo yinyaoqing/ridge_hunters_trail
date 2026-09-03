@@ -44,9 +44,6 @@ export interface Level {
   round: number;
   mapSize: number;
   route: Route;             // 覓食路線；獵物依步數沿它移動（見 core/route.ts）
-  // 鷹架：Task 3 移除。等於 route.waypoints[ROUTE_START_INDEX]，
-  // 存在的唯一理由是讓 Task 2 結束時既有消費端仍能編譯。
-  targetPos: Vec2;
   clues: Clue[];
   terrain: TerrainType[][]; // terrain[y][x]
   elevation: number[][];    // elevation[y][x]，0..1；地形由它推導，視野加成也讀它

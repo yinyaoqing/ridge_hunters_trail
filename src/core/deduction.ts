@@ -71,13 +71,15 @@ export function infoCompleteStep(level: Level, readLog: ClueRead[]): number | nu
 // ②該幌子的候選集合不涵蓋真實目標格——涵蓋真相的幌子並沒有把你指往錯的地方，
 // 只是剛好也涵蓋了你押的格子，冤枉它沒有意義。
 // 沒有押注、或沒有任何已讀幌子同時滿足這兩個條件時回傳 null（揭曉畫面就不顯示這一行）。
+// target 由呼叫端傳入而非從 level 取：Phase 6a 之後獵物會移動，
+// 「真實位置」只有在結算那一刻才確定，deduction 不該自己猜是哪一刻。
 export function misleadingDecoy(
-  level: Level, readLog: ClueRead[], wager: Vec2 | null,
+  level: Level, readLog: ClueRead[], wager: Vec2 | null, target: Vec2,
 ): Clue | null {
   if (!wager) return null;
-  if (cheb(wager, level.targetPos) === 0) return null; // 押中了，沒有東西騙到你
+  if (cheb(wager, target) === 0) return null; // 押中了，沒有東西騙到你
   const wk = key(wager);
-  const tk = key(level.targetPos);
+  const tk = key(target);
   for (const entry of readLog) {
     const clue = level.clues[entry.clueIndex];
     if (!clue || !clue.isDecoy) continue;
