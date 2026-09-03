@@ -16,6 +16,7 @@ import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, guardLowFps, PARTICLE_CAPS,
 } from './fx';
+import { flowY, type FlowBlock } from '../core/layout';
 
 export class CampScene extends Phaser.Scene {
   private pal!: Palette;
@@ -58,7 +59,30 @@ export class CampScene extends Phaser.Scene {
 
     this.drawRidges(w, h);
 
-    this.add.text(cx, h * 0.16, "RIDGE HUNTER'S TRAIL", {
+    // 版面改由 flowY 排定（見 src/core/layout.ts）。舊版標題釘在 0.16h、按鈕列從 0.42h
+    // 起算，兩者之間因此恆有 26% 的高度是空的；而下半部又是流式累加，內容一長就撞進
+    // 營火光暈。現在整疊由同一套規則排列，寬裕平均分給各道間距，不足時等比壓縮。
+    const showRows = h >= 692; // 委託板是否展開成三列（矮視窗收合為單行）
+    const blocks: FlowBlock[] = [
+      { h: 44, gap: 40, maxGap: 96 },          // 標題
+      { h: 54, gap: 56, minGap: 24 },          // 上山追蹤
+      { h: 50, gap: 14, minGap: 10 },          // 今日行蹤
+      { h: 50, gap: 14, minGap: 10 },          // 生態圖鑑
+      ...(showRows
+        ? [
+          { h: 14, gap: 34, minGap: 16 } as FlowBlock, // 「委託板」小標
+          { h: 44, gap: 8, minGap: 6 } as FlowBlock,
+          { h: 44, gap: 6, minGap: 6 } as FlowBlock,
+          { h: 44, gap: 6, minGap: 6 } as FlowBlock,
+        ]
+        : [{ h: 16, gap: 34, minGap: 16 } as FlowBlock]), // 收合成單行「委託板 n/3」
+      { h: 44, gap: 26, minGap: 16 },          // 工具列（命中區高 44）
+    ];
+    // 底界留 96px 給營火：光暈半徑 60，加上工具列與它之間該有的呼吸空間
+    const ys = flowY(blocks, 0, h - 96);
+    let bi = 0;
+
+    this.add.text(cx, ys[bi++], "RIDGE HUNTER'S TRAIL", {
       fontFamily: FONTS.display, fontSize: '34px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(3);
 
@@ -88,13 +112,11 @@ export class CampScene extends Phaser.Scene {
     const today = dailyKey(new Date());
     const dailyDone = st.lastPlayed === today;
     const bw = Math.min(320, w - 48);
-    let by = h * 0.42;
 
-    this.button(cx, by, bw, 54, stripBrackets(i18n.t('camp.continue', { n: runRound })), true, () => {
+    this.button(cx, ys[bi++], bw, 54, stripBrackets(i18n.t('camp.continue', { n: runRound })), true, () => {
       this.registry.set('session', newSession(runRound, rng));
       fadeToScene(this, 'Map');
     });
-    by += 68;
 
     // 今日天氣：僅生成一次每日 session 取其 weather 欄位（成本可忽略），不存入 registry/session——
     // 真正要玩的 session 仍由下方按鈕的 createDailySession(now) 產生
@@ -104,49 +126,44 @@ export class CampScene extends Phaser.Scene {
     const dailyLabel = (dailyDone
       ? `${i18n.t('camp.daily')} · ${i18n.t('camp.dailyDone')} ✓`
       : `${i18n.t('camp.daily')} · ${today}`) + `${sep}${i18n.t(WEATHER_KEY[todayWeather])}`;
-    this.button(cx, by, bw, 50, dailyLabel, false, () => {
+    this.button(cx, ys[bi++], bw, 50, dailyLabel, false, () => {
       const now = new Date();
       this.registry.set('session', createDailySession(now));
       // 單一取樣：與 ResultScene 記帳/分享卡共用同一 dateKey，避免跨 UTC 午夜時分歧
       this.registry.set('dailyKey', dailyKey(now));
       fadeToScene(this, 'Map');
     });
-    by += 64;
 
     const found = CREATURES.filter((c) => codex.entry(c.id).count > 0).length;
-    this.button(cx, by, bw, 50,
+    this.button(cx, ys[bi++], bw, 50,
       `${stripBrackets(i18n.t('btn.guide'))} ${found}/${CREATURES.length}`, false,
       () => fadeToScene(this, 'Codex'));
-    by += 72;
 
     // 委託板：三則每日委託（同 dailyKey 種子，與 ResultScene 結算共用判定邏輯）；
     // 矮視窗（h<692，見 rowH=44 換算）已很擁擠，收合為單行「委託板 n/3」，避免與下方工具列相撞
     const commStore = this.registry.get('commissions') as CommissionStore;
     const comms = dailyCommissions(today);
     const commStatus = commStore.statusFor(today);
-    if (h < 692) {
+    if (!showRows) {
       const doneCount = commStatus.filter(Boolean).length;
-      this.add.text(cx, by, `${i18n.t('comm.title')} ${doneCount}/3`, {
+      this.add.text(cx, ys[bi++], `${i18n.t('comm.title')} ${doneCount}/3`, {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
       }).setOrigin(0.5).setLetterSpacing(1);
-      by += 28;
     } else {
-      this.add.text(cx, by, i18n.t('comm.title'), {
+      this.add.text(cx, ys[bi++], i18n.t('comm.title'), {
         fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
       }).setOrigin(0.5).setLetterSpacing(1.5);
-      by += 20;
       // rowH 34→44：描述加上 wordWrap 後兩行文字需要更高的列高才不會貼邊（見 drawCommissionRow）
       const rowH = 44;
-      const rowGap = 6;
       comms.forEach((c, i) => {
-        this.drawCommissionRow(cx, by, bw, rowH, c, commStatus[i], i18n);
-        by += rowH + rowGap;
+        // drawCommissionRow 的 y 是卡片「上緣」，flowY 回傳的是中心，故減去半高
+        this.drawCommissionRow(cx, ys[bi++] - rowH / 2, bw, rowH, c, commStatus[i], i18n);
       });
-      by += 4; // 與工具列留一點呼吸空間
     }
 
     // 小工具列：靜音＋說明＋示範＋語言（四鈕置中排列）。
     // x 座標重排以容納示範入口，整列的視覺跨距維持對稱（-123 到 +123）。
+    const by = ys[bi++];
     const xSound = cx - 101;
     const xHelp = cx - 45;
     const xDemo = cx + 11;
@@ -188,6 +205,10 @@ export class CampScene extends Phaser.Scene {
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
         this.scene.restart();
       });
+
+    // 營火最後畫：它的位置取決於工具列落在哪裡（見 drawCampfire）。
+    // 它是背景美術，畫在最上層不影響觀感——三層山稜仍由 drawRidges 在最開頭畫好。
+    this.drawCampfire(w, h, by + 22);
 
     this.audio.ambient(true); // 營地環境風聲（靜音時 ambient 內部自行忽略）
   }
@@ -267,17 +288,24 @@ export class CampScene extends Phaser.Scene {
       pts.push({ x: w, y: h });
       g.fillPoints(pts, true);
     });
-    // 營火微光（靜態，不做循環動畫）
+  }
+
+  // 營火：位置由版面決定而非固定在 0.9h——工具列在內容變長時會下移，
+  // 舊版的百分比定位因此會讓工具列坐進營火光暈裡（h=840 時工具列 730.8、光暈 696–816）。
+  private drawCampfire(w: number, h: number, minY: number) {
+    const pal = this.pal;
+    // 光暈半徑 60，因此中心至少要在 minY + 60 才不會碰到上方元素；
+    // 同時不低於畫面底部 30px，避免整團被裁掉
+    const fy = Math.min(Math.max(h * 0.9, minY + 60), h - 30);
     const glow = this.add.graphics();
-    glow.fillStyle(pal.gold, 0.12).fillCircle(w / 2, h * 0.9, 60);
-    glow.fillStyle(pal.gold, 0.25).fillCircle(w / 2, h * 0.9, 22);
-    glow.fillStyle(0xe8b06a, 0.9).fillTriangle(
-      w / 2 - 7, h * 0.9 + 8, w / 2 + 7, h * 0.9 + 8, w / 2, h * 0.9 - 12);
+    glow.fillStyle(pal.gold, 0.12).fillCircle(w / 2, fy, 60);
+    glow.fillStyle(pal.gold, 0.25).fillCircle(w / 2, fy, 22);
+    glow.fillStyle(0xe8b06a, 0.9).fillTriangle(w / 2 - 7, fy + 8, w / 2 + 7, fy + 8, w / 2, fy - 12);
 
     // 營火火星：低密度上飄粒子，減少動態偏好時完全不生成
     if (motionOK()) {
       ensureDotTexture(this, 'dot-ember', 0xe8b06a, 3);
-      const emitter = this.add.particles(w / 2, h * 0.9 - 6, 'dot-ember', {
+      const emitter = this.add.particles(w / 2, fy - 6, 'dot-ember', {
         frequency: 400,
         lifespan: 1400,
         speedY: { min: -40, max: -15 },
