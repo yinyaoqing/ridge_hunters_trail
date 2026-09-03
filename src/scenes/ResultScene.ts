@@ -191,20 +191,22 @@ export class ResultScene extends Phaser.Scene {
     add('dots', { h: 14, gap: 18, minGap: 10 });
     add('divider', { h: 6, gap: 18, minGap: 10 });
     add('body', { h: bodyH, gap: 22, minGap: 12 });
-    // 非精簡時卡片是「名稱 ＋ 其下 16px 的說明」，實際範圍 y-8.75 到 y+23，
-    // 中心在 y+7.1；精簡時只有名稱，中心就在 y。cardStep 是舊版累加版面的步進值，
-    // 拿它減 8 當高度只是巧合，改為直接寫出量到的高度。
+    // 非精簡時卡片是「名稱 ＋ 其下 16px 的說明」，實際範圍 y-8.5 到 y+23.5，
+    // 中心在 y+7.5；精簡時只有名稱，中心就在 y。高度直接寫出量到的值，
+    // 不再由舊版累加版面的步進值減去一個常數推導。
     showTools.forEach((_, i) => add(`tool${i}`, { h: compactCards ? 18 : 32, gap: 14, minGap: 8 }));
     lastComms.forEach((_, i) => add(`comm${i}`, { h: commStep - 6, gap: 10, minGap: 6 }));
     if (showLoss) add('loss', { h: 30, gap: 14, minGap: 8 });
     if (showScoreGain) add('gain', { h: 40, gap: 16, minGap: 10 });
-    // 真實高度 61.25：計數行（補間後停在 y-6）到研究度說明（y+40）的完整範圍，
-    // 其中心在 y+15.9，因此下方傳入的錨點要往上退約 16 才能與區塊對齊
+    // 真實高度 61：計數行補間後停在 y-6（字框上緣 y-14.5）、進度條在 y+18…y+26、
+    // 研究度說明在 y+40（字框下緣 y+46.5），合計 y-14.5 … y+46.5，中心在 y+16。
+    // 因此下方繪製時傳入的錨點要比區塊中心往上退 16。
     if (!caught) add('notes', { h: 62, gap: 18, minGap: 10 });
     if (s.mode === 'daily') add('streak', { h: 16, gap: 18, minGap: 10 });
     add('primary', { h: 52, gap: 26, minGap: 16 });
     add('secondary', { h: 48, gap: 14, minGap: 12 });
-    if (!caught && s.mode === 'run') add('demo', { h: 34, gap: 16, minGap: 10 });
+    // 高度取 36，與下方那塊 420x36 的點擊矩形一致——區塊要涵蓋實際畫出／可點擊的範圍
+    if (!caught && s.mode === 'run') add('demo', { h: 36, gap: 16, minGap: 10 });
 
     const ys = flowY(blocks, 24, h - 20);
     const at = (name: string): number => ys[slot[name]];
@@ -214,7 +216,8 @@ export class ResultScene extends Phaser.Scene {
         cx, at('portrait'), creature.id, s.level.iris ? pal.iris : creature.color, s.level.iris, portraitScale);
       // 蓋印隨肖像等比移位，否則縮小後它會浮在肖像外面
       if (quality) {
-        this.stampQuality(cx + 128 * portraitScale, at('portrait') + 56 * portraitScale, quality, i18n);
+        this.stampQuality(
+          cx + 128 * portraitScale, at('portrait') + 56 * portraitScale, quality, i18n, portraitScale);
       }
     }
 
@@ -242,7 +245,7 @@ export class ResultScene extends Phaser.Scene {
     // 道具解鎖卡（至多同幀 2 枚）：caught 排在圖鑑點列/分隔線下方；
     // !caught 疊在筆記掉落區之上——確切位置全數改由 flowY 決定
     showTools.forEach((id, i) => {
-      this.renderToolCard(cx, at(`tool${i}`) - (compactCards ? 0 : 7), id, i18n, compactCards);
+      this.renderToolCard(cx, at(`tool${i}`) - (compactCards ? 0 : 7.5), id, i18n, compactCards);
     });
     // 委託完成行接在道具卡之後（同一堆疊區塊，道具卡在上、委託行在下）
     lastComms.forEach((idx, i) => {
@@ -386,7 +389,10 @@ export class ResultScene extends Phaser.Scene {
   }
 
   // 品質墨章：蓋印動畫（縮放 1.8 → 1、Back ease）
-  private stampQuality(x: number, y: number, q: Quality, i18n: I18n) {
+  // scale 與肖像同一個係數：位置與尺寸一起縮放，整個配置才與滿版時幾何相似，
+  // 原本章印與虛線環之間的淨空關係就原封不動地保留下來。
+  // 只縮位置不縮尺寸的話，矮視窗下章印會貼上虛線環、壓在生物身上。
+  private stampQuality(x: number, y: number, q: Quality, i18n: I18n, scale: number) {
     const color = QUALITY_COLORS[q];
     const g = this.add.graphics();
     g.lineStyle(2.5, color, 0.9).strokeCircle(0, 0, 30);
@@ -397,9 +403,9 @@ export class ResultScene extends Phaser.Scene {
     const label = this.add.text(0, 0, stampLabel, {
       fontFamily: displayFont(i18n.locale()), fontSize: '13px', color: cssHex(color),
     }).setOrigin(0.5);
-    const holder = this.add.container(x, y, [g, label]).setScale(1.8).setAlpha(0);
+    const holder = this.add.container(x, y, [g, label]).setScale(1.8 * scale).setAlpha(0);
     this.tweens.add({
-      targets: holder, scale: 1, alpha: 1, duration: 350, delay: 400, ease: 'Back.easeOut',
+      targets: holder, scale, alpha: 1, duration: 350, delay: 400, ease: 'Back.easeOut',
     });
   }
 
@@ -522,8 +528,11 @@ export class ResultScene extends Phaser.Scene {
       ensureDotTexture(this, sporeKey, color, 4);
       const spores = this.add.particles(cx, cy, sporeKey, {
         lifespan: 1800,
-        speedY: { min: 20, max: 60 },
-        speedX: { min: -30, max: 30 },
+        // 噴散速度隨肖像縮放，否則縮小後的肖像會噴出與它不成比例的孢子。
+        // 粒子本身的貼圖半徑不縮——它的材質 key 不含縮放值，改動半徑會讓不同
+        // 縮放下共用到同一張快取材質。
+        speedY: { min: 20 * scale, max: 60 * scale },
+        speedX: { min: -30 * scale, max: 30 * scale },
         alpha: { start: 0.9, end: 0 },
         scale: { start: 1, end: 0.4 },
         emitting: false,
