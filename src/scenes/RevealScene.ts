@@ -6,8 +6,9 @@ import { infoCompleteStep, misleadingDecoy } from '../core/deduction';
 import { cheb, type Vec2 } from '../core/geometry';
 import { key } from '../core/clues';
 import { CREATURES } from '../data/creatures';
-import type { I18n } from '../core/i18n';
+import type { I18n, MsgKey } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
+import type { RouteRule } from '../core/route';
 import { cssHex, FONTS, displayFont, BRUSH_RADIUS, stripBrackets } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
@@ -98,6 +99,17 @@ export class RevealScene extends Phaser.Scene {
       }
     }
 
+    // 覓食路線說明：規格 §7——沒有這一行，doubling／straight 對玩家而言只是隨機，
+    // 這是玩家唯一能學會物種走法的地方。跟上面幾行一樣受 hideAnswer 保護：路線本身
+    // 就是答案的一部分（等於指出目前所在的候選格），daily 未捕獲時不能洩漏。
+    // 文字區版面已有 3 行變動空間（noCall/dailyHidden、offBy/exact、decoy、infoAt 最多疊 3 行），
+    // 兩行式（reveal.route＋物種走法各一行）會把小視窗擠出下方圖例／按鈕的預算，
+    // 因此依規格容許的做法併成一行，用破折號連接。
+    if (!hideAnswer) {
+      const rule = s.level.route.rule;
+      ty = this.line(cx, ty, `${i18n.t('reveal.route')} — ${i18n.t(RULE_KEY[rule])}`, pal.paperDim, 13);
+    }
+
     // 圖例：牠在這裡／你的押注。hideAnswer 時不畫「牠在這裡」——否則圖例文字本身就洩漏答案
     const legendY = Math.min(ty + 14, h - 108);
     if (!hideAnswer) this.legend(cx - 78, legendY, i18n.t('reveal.wasHere'), pal.gold, true);
@@ -131,6 +143,27 @@ export class RevealScene extends Phaser.Scene {
         if (s.seen.has(key({ x, y }))) continue;
         g.fillStyle(0x000000, 0.45).fillRect(ox + x * cell, oy + y * cell, cell, cell);
       }
+    }
+
+    // 覓食路線：由舊到新連成一線，節點越新畫得越亮。這是玩家唯一能學會
+    // 「這個物種怎麼走」的地方——看不到路線，折返與直行對他而言只是隨機。
+    // 畫在壓暗層之後（不被未探索的暗色蓋掉）、玩家路徑／線索／押注框／真實位置之前
+    // ——這條線是新揭露的背景資訊，不能蓋掉本畫面原本就有、玩家第一眼要看的
+    // 「牠在這裡」與「你的押注」，所以必須疊在它們下面。
+    // hideAnswer 時整段不畫：五個節點等於指出目前所在的候選格，比色點洩漏更多（同 F3），
+    // 揭曉真相等於把答案遞給 daily 的重玩。
+    if (!hideAnswer) {
+      const w = L.route.waypoints;
+      for (let i = 1; i < w.length; i++) {
+        const a = px(w[i - 1]);
+        const b = px(w[i]);
+        g.lineStyle(2, pal.glow, 0.25 + 0.15 * i);
+        g.lineBetween(a.x, a.y, b.x, b.y);
+      }
+      w.forEach((p, i) => {
+        const q = px(p);
+        g.fillStyle(pal.glow, 0.3 + 0.17 * i).fillCircle(q.x, q.y, cell * 0.16);
+      });
     }
 
     // 玩家路徑：連續折線，讓玩家看見自己繞了多遠
@@ -214,3 +247,10 @@ export class RevealScene extends Phaser.Scene {
       .on('pointerup', () => { txt.setScale(1); this.audio.unlock(); this.audio.play('click'); onClick(); });
   }
 }
+
+// 走法字串鍵映射：同 MapScene WEATHER_KEY／ResultScene QUALITY_KEY 手法，
+// 避免模板字面型別（`rule.${RouteRule}`）無法收斂為 MsgKey 聯集
+const RULE_KEY: Record<RouteRule, MsgKey> = {
+  lowland: 'rule.lowland', highland: 'rule.highland', cover: 'rule.cover',
+  straight: 'rule.straight', doubling: 'rule.doubling',
+};
