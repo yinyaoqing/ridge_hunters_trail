@@ -59,6 +59,33 @@ export class CampScene extends Phaser.Scene {
 
     this.drawRidges(w, h);
 
+    // 右上角的連勝／戰績 chip 用固定座標，不在 flowY 的流裡。標題置中、寬約 440px，
+    // 在手機直向的寬度下必定與它們水平重疊，因此下方要把流的起點推到 chip 之下。
+    let chipsBottom = 0;
+    const st = streak.state();
+    if (st.streak > 0) {
+      this.add.text(w - 20, 24, i18n.t('camp.streak', { n: st.streak }).toUpperCase(), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
+      }).setOrigin(1, 0.5).setLetterSpacing(2);
+      chipsBottom = 32;
+    }
+    const score: ScoreStore = this.registry.get('score');
+    const sc = score.state();
+    let scoreY = st.streak > 0 ? 42 : 24;
+    if (sc.bestRun > 0) {
+      this.add.text(w - 20, scoreY, i18n.t('camp.best', { n: sc.bestRun }), {
+        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.gold),
+      }).setOrigin(1, 0.5).setLetterSpacing(1);
+      chipsBottom = scoreY + 8;
+      scoreY += 16;
+    }
+    if (sc.banked + sc.pot > 0) {
+      this.add.text(w - 20, scoreY, i18n.t('camp.carry', { b: sc.banked, p: sc.pot }), {
+        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
+      }).setOrigin(1, 0.5).setLetterSpacing(1);
+      chipsBottom = scoreY + 8;
+    }
+
     // 版面改由 flowY 排定（見 src/core/layout.ts）。舊版標題釘在 0.16h、按鈕列從 0.42h
     // 起算，兩者之間因此恆有 26% 的高度是空的；而下半部又是流式累加，內容一長就撞進
     // 營火光暈。現在整疊由同一套規則排列，寬裕平均分給各道間距，不足時等比壓縮。
@@ -82,35 +109,15 @@ export class CampScene extends Phaser.Scene {
     // （60 的半徑加 12px 淨空），而中心本身又要離畫面底部 64px 才不會被裁掉——
     // 兩者相加就是 136，留 150 才有餘裕。舊版只留 96，於是光暈永遠貼著工具列，
     // 而且外圈固定被畫面底部切掉約 24px。
-    const ys = flowY(blocks, 0, h - 150);
+    // 起點推到 chip 之下（沒有 chip 時就是 8）。底界保留給營火，
+    // 但矮視窗本來就放不下營火（drawCampfire 會自行略過），保留額度因此跟著縮小，
+    // 把空間還給內容——否則矮視窗會為了一團畫不出來的火犧牲 150px。
+    const ys = flowY(blocks, chipsBottom + 8, h - (h >= 640 ? 150 : 40));
     let bi = 0;
 
     this.add.text(cx, ys[bi++], "RIDGE HUNTER'S TRAIL", {
       fontFamily: FONTS.display, fontSize: '34px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(3);
-
-    // 連勝 chip（右上，>0 才顯示）
-    const st = streak.state();
-    if (st.streak > 0) {
-      this.add.text(w - 20, 24, i18n.t('camp.streak', { n: st.streak }).toUpperCase(), {
-        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
-      }).setOrigin(1, 0.5).setLetterSpacing(2);
-    }
-    // 押注戰績（右上，接在連勝 chip 之下）：最佳連追紀錄＋目前入袋/待入袋結餘，各自獨立判斷是否顯示
-    const score: ScoreStore = this.registry.get('score');
-    const sc = score.state();
-    let scoreY = st.streak > 0 ? 42 : 24;
-    if (sc.bestRun > 0) {
-      this.add.text(w - 20, scoreY, i18n.t('camp.best', { n: sc.bestRun }), {
-        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.gold),
-      }).setOrigin(1, 0.5).setLetterSpacing(1);
-      scoreY += 16;
-    }
-    if (sc.banked + sc.pot > 0) {
-      this.add.text(w - 20, scoreY, i18n.t('camp.carry', { b: sc.banked, p: sc.pot }), {
-        fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
-      }).setOrigin(1, 0.5).setLetterSpacing(1);
-    }
 
     const today = dailyKey(new Date());
     const dailyDone = st.lastPlayed === today;
@@ -300,7 +307,11 @@ export class CampScene extends Phaser.Scene {
     // 光暈半徑 60。中心至少要在 minY + 72，才能在光暈上緣與上方元素之間留 12px 淨空
     // （用 60 會讓兩者正好相貼，等於沒有淨空）；同時中心不低於 h - 64，
     // 讓整團光暈連外圈都留在畫面內。
-    const fy = Math.min(Math.max(h * 0.9, minY + 72), h - 64);
+    // 只保留下限，不再用 h-64 夾回來：那個 min 會在矮視窗覆蓋掉下限，
+    // 把營火拉回工具列上——正是上一版要修掉的缺陷。
+    const fy = Math.max(h * 0.9, minY + 72);
+    // 放不下就整個不畫。營火是背景美術，缺席遠好過擋住按鈕。
+    if (fy + 60 > h) return;
     const glow = this.add.graphics();
     glow.fillStyle(pal.gold, 0.12).fillCircle(w / 2, fy, 60);
     glow.fillStyle(pal.gold, 0.25).fillCircle(w / 2, fy, 22);

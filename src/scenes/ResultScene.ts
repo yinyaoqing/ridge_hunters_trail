@@ -136,7 +136,9 @@ export class ResultScene extends Phaser.Scene {
     const showTools = (this.registry.get('lastUnlocks') as ToolId[] | undefined) ?? [];
     // h<700 視窗已很擁擠，解鎖卡收窄為僅標題行——卡片間距縮小，降低與按鈕重疊的機率；
     // 版面本身已改由下方 flowY 排定，這裡只留下「畫不畫副標」與「區塊多高」兩個決定
-    const compactCards = h < 700;
+    // 斷點取 720 而非 700：離開精簡模式時肖像 132→194、道具卡 18→32，一口氣多出 76px，
+    // 若斷點壓在剛好放得下的高度上，把視窗拉高一像素反而會讓版面更擠。
+    const compactCards = h < 720;
     // 肖像在矮視窗縮小，沿用道具卡同一個斷點。實際畫出來的硬範圍是
     // cy-92（虛線環）到 cy+96.4（剪影後備貼圖 208x176 縮放 1.05 畫在 cy+4），
     // 合計 188.4px——舊版宣告 150，等於對版面謊報了近 40px，flowY 因此把標題
@@ -151,7 +153,6 @@ export class ResultScene extends Phaser.Scene {
     // 委託完成行：緊接道具卡堆疊在下方（只在補獲時可能非空，見 resolved 區塊註解）
     const lastComms = (this.registry.get('lastComms') as number[] | undefined) ?? [];
     const commsToday = dailyCommissions(dk); // 純函式、依 dk 決定性重算，供索引取回描述文字
-    const commStep = 24;
     // run 且補獲時，score.gain/score.pot 兩行也併入同一疊層
     const showScoreGain = caught && s.mode === 'run';
 
@@ -195,7 +196,9 @@ export class ResultScene extends Phaser.Scene {
     // 中心在 y+7.5；精簡時只有名稱，中心就在 y。高度直接寫出量到的值，
     // 不再由舊版累加版面的步進值減去一個常數推導。
     showTools.forEach((_, i) => add(`tool${i}`, { h: compactCards ? 18 : 32, gap: 14, minGap: 8 }));
-    lastComms.forEach((_, i) => add(`comm${i}`, { h: commStep - 6, gap: 10, minGap: 6 }));
+    // 高度直接寫出量到的值（13px 單行字約 15px 高，18 涵蓋得住），
+    // 不再由舊版累加版面的步進值減去一個常數推導
+    lastComms.forEach((_, i) => add(`comm${i}`, { h: 18, gap: 10, minGap: 6 }));
     if (showLoss) add('loss', { h: 30, gap: 14, minGap: 8 });
     if (showScoreGain) add('gain', { h: 40, gap: 16, minGap: 10 });
     // 真實高度 61：計數行補間後停在 y-6（字框上緣 y-14.5）、進度條在 y+18…y+26、
@@ -210,6 +213,14 @@ export class ResultScene extends Phaser.Scene {
 
     const ys = flowY(blocks, 24, h - 20);
     const at = (name: string): number => ys[slot[name]];
+    // 按鈕是這個畫面唯一的出口——每日挑戰補獲時，「返回營地」更是唯一能離開的路。
+    // flowY 在空間不足時會誠實地把區塊排到 bottom 之外，那對內容區塊是對的選擇，
+    // 對按鈕卻是死路：玩家會被困在結算畫面，只能重新載入頁面。因此按鈕最後夾回畫面內。
+    // 極矮視窗下寧可讓按鈕蓋住上方的文字，也不能讓按鈕自己消失——
+    // 被蓋住的說明還讀得到一部分，按不到的按鈕沒有任何替代方案。
+    // 次鈕高 48，中心夾在 h-32 讓底緣留 8px；主鈕高 52，中心再往上 62 讓兩者至少相距 12px。
+    const btnSecondaryY = Math.min(at('secondary'), h - 32);
+    const btnPrimaryY = Math.min(at('primary'), btnSecondaryY - 62);
 
     if (caught) {
       this.drawCreaturePortrait(
@@ -286,7 +297,7 @@ export class ResultScene extends Phaser.Scene {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.gold),
       }).setOrigin(0.5).setLetterSpacing(2);
       if (caught) {
-        const copyY = at('primary');
+        const copyY = btnPrimaryY;
         const text = shareText(i18n, {
           dateKey: dk, caught, quality,
           steps: s.steps, staminaLeft: Math.max(0, s.stamina), streak: streak.state().streak,
@@ -295,18 +306,18 @@ export class ResultScene extends Phaser.Scene {
         this.button(cx, copyY, 250, 52, stripBrackets(i18n.t('btn.copy')), true,
           () => this.copyShare(text, i18n, copyY));
       } else {
-        this.button(cx, at('primary'), 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
+        this.button(cx, btnPrimaryY, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
           this.registry.set('session', createDailySessionFromKey(dk));
           fadeToScene(this, 'Map');
         });
       }
-      this.button(cx, at('secondary'), 250, 48, stripBrackets(i18n.t('btn.camp')), false,
+      this.button(cx, btnSecondaryY, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
     } else if (caught) {
       // 押注雙卡：[安全歇腳] 入袋收工回營地／[乘勝續追] 疊高倍率繼續下一局，
       // 歇腳即回營地取代原本的 [下一場狩獵]+[返回營地] 雙鈕，故 btn.camp 次鈕移除
-      const yPrimary = at('primary');
-      const ySecondary = at('secondary');
+      const yPrimary = btnPrimaryY;
+      const ySecondary = btnSecondaryY;
       const curMult = score.state().multiplier;
       const nextIdx = Math.min((MULTIPLIERS as readonly number[]).indexOf(curMult) + 1, MULTIPLIERS.length - 1);
       const nextMult = MULTIPLIERS[nextIdx];
@@ -329,8 +340,8 @@ export class ResultScene extends Phaser.Scene {
       });
     } else {
       // Daily retry lives in the daily branch above; this is run mode only
-      const yPrimary = at('primary');
-      const ySecondary = at('secondary');
+      const yPrimary = btnPrimaryY;
+      const ySecondary = btnSecondaryY;
       this.button(cx, yPrimary, 250, 52, stripBrackets(i18n.t('btn.retry')), true, () => {
         this.registry.set('session', newSession(s.round, rng));
         fadeToScene(this, 'Map');
@@ -342,7 +353,9 @@ export class ResultScene extends Phaser.Scene {
       // 點擊區高 36 而非 32：英文字串在 420px 寬會折成兩行，36 才涵蓋得住；
       // 因此這裡用半高 18 判斷它是否還在畫面內，放不下就整個不畫——
       // 少一個入口，好過一個被裁掉一半的入口。
-      const demoLinkY = at('demo');
+      // 錨在實際畫出來的次鈕之下，而不是自己的區塊位置——次鈕被夾上來時，
+      // 連結必須跟著上來，否則會疊在按鈕上
+      const demoLinkY = btnSecondaryY + 44;
       if (demoLinkY + 18 <= h) {
         this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
           fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
