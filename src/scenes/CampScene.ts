@@ -112,7 +112,7 @@ export class CampScene extends Phaser.Scene {
     // 起點推到 chip 之下（沒有 chip 時就是 8）。底界保留給營火，
     // 但矮視窗本來就放不下營火（drawCampfire 會自行略過），保留額度因此跟著縮小，
     // 把空間還給內容——否則矮視窗會為了一團畫不出來的火犧牲 150px。
-    const ys = flowY(blocks, chipsBottom + 8, h - (h >= 640 ? 150 : 40));
+    const ys = flowY(blocks, chipsBottom + 8, h - (h >= 600 ? 150 : 40));
     let bi = 0;
 
     this.add.text(cx, ys[bi++], "RIDGE HUNTER'S TRAIL", {
@@ -173,7 +173,11 @@ export class CampScene extends Phaser.Scene {
 
     // 小工具列：靜音＋說明＋示範＋語言（四鈕置中排列）。
     // x 座標重排以容納示範入口，整列的視覺跨距維持對稱（-123 到 +123）。
-    const by = ys[bi++];
+    // 工具列夾回畫面內。它是靜音／說明／示範／語言的唯一入口，而 flowY 在空間不足時
+    // 會誠實地把區塊排到 bottom 之外——那對背景與說明文字是對的，對唯一入口卻不是。
+    // 與結算畫面的按鈕同一個取捨：寧可讓它壓住上方的委託列，也不能讓它整排消失。
+    // 命中區高 44，中心夾在 h-26 讓底緣還留 4px。
+    const by = Math.min(ys[bi++], h - 26);
     const xSound = cx - 101;
     const xHelp = cx - 45;
     const xDemo = cx + 11;
@@ -305,8 +309,7 @@ export class CampScene extends Phaser.Scene {
   private drawCampfire(w: number, h: number, minY: number) {
     const pal = this.pal;
     // 光暈半徑 60。中心至少要在 minY + 72，才能在光暈上緣與上方元素之間留 12px 淨空
-    // （用 60 會讓兩者正好相貼，等於沒有淨空）；同時中心不低於 h - 64，
-    // 讓整團光暈連外圈都留在畫面內。
+    // （用 60 會讓兩者正好相貼，等於沒有淨空）。
     // 只保留下限，不再用 h-64 夾回來：那個 min 會在矮視窗覆蓋掉下限，
     // 把營火拉回工具列上——正是上一版要修掉的缺陷。
     const fy = Math.max(h * 0.9, minY + 72);

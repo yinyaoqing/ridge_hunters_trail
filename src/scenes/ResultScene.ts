@@ -208,7 +208,9 @@ export class ResultScene extends Phaser.Scene {
     if (s.mode === 'daily') add('streak', { h: 16, gap: 18, minGap: 10 });
     add('primary', { h: 52, gap: 26, minGap: 16 });
     add('secondary', { h: 48, gap: 14, minGap: 12 });
-    // 高度取 36，與下方那塊 420x36 的點擊矩形一致——區塊要涵蓋實際畫出／可點擊的範圍
+    // 這個區塊只用來替示範連結預留尾端空間，位置並不會被讀取——連結實際錨在
+    // 畫出來的次鈕之下（見下方 demoLinkY），因為次鈕被夾上來時它必須跟著上來。
+    // 高度取 36，與那塊 420x36 的點擊矩形一致。
     if (!caught && s.mode === 'run') add('demo', { h: 36, gap: 16, minGap: 10 });
 
     const ys = flowY(blocks, 24, h - 20);
@@ -289,7 +291,8 @@ export class ResultScene extends Phaser.Scene {
     if (!caught) this.showNotesDrop(cx, at('notes') - 16, creature.id, notes, codex, i18n);
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
-    // 座標全數改由 flowY 決定，不再需要各自的 Math.min(…, h-96) 之類夾限
+    // 按鈕列座標由 flowY 排定，再由上方的 btnPrimaryY／btnSecondaryY 夾回畫面內——
+    // 內容可以誠實地溢出，唯一的出口不行。
     const runRound: number = this.registry.get('runRound');
     if (s.mode === 'daily') {
       const streak: StreakStore = this.registry.get('streak');
