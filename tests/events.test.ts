@@ -4,7 +4,7 @@ import type { SessionState, SessionMode } from '../src/core/session';
 import { cheb, angleDeg, type Vec2 } from '../src/core/geometry';
 import type { Clue, Level, TerrainType } from '../src/core/types';
 import type { Rng } from '../src/core/rng';
-import { ROUTE_START_INDEX } from '../src/core/route';
+import { ROUTE_START_INDEX, MOVE_EVERY } from '../src/core/route';
 
 function scentClueAt(pos: Vec2): Clue {
   return {
@@ -43,7 +43,7 @@ function makeState(opts: Opts = {}): SessionState {
     round: 1, level, player, stamina: 10,
     readClues: new Set(),
     marks: new Map(), path: [player], readLog: [], mutedClues: new Set(),
-    seen: new Set(), surveyed: new Set(),
+    seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
     phase: 'explore',
     steps: 0, mode: opts.mode ?? 'run', resolved: false, bellUsed: false,
     microEvents: opts.microEvents ?? 0,
@@ -187,5 +187,40 @@ describe('rollMicroEvent — bonus-supply', () => {
     expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg(player, s.level.route.waypoints[ROUTE_START_INDEX]) });
     expect(s.microEvents).toBe(1);
     expect(s.level.supplies.length).toBe(ringCells.length); // 未新增補給
+  });
+});
+
+describe('rollMicroEvent — direction tracks the quarry\'s current waypoint, not its starting one', () => {
+  it('bird-startle points at the route\'s current waypoint once steps has advanced past MOVE_EVERY', () => {
+    // 這份檔案其餘案例的路線五個節點全部相同、steps 又恆為 0，就算 events.ts
+    // 誤讀 waypoints[ROUTE_START_INDEX]（起始節點）而不是「現在」的節點，這些
+    // 斷言照樣會通過——對「方向隨步數走」這件事完全沒有涵蓋。這裡刻意讓節點
+    // 不同、steps 前進超過一個 MOVE_EVERY 週期，驗證方向真的指向現在的節點。
+    const size = 15;
+    const terrain: TerrainType[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 'meadow' as TerrainType));
+    const elevation: number[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 0.2));
+    const startWaypoint: Vec2 = { x: 0, y: 0 };     // W2：開局節點，誤讀時會指向這裡
+    const currentWaypoint: Vec2 = { x: 14, y: 14 }; // W3：steps = MOVE_EVERY 之後該指向這裡
+    const level: Level = {
+      round: 1, mapSize: size,
+      route: {
+        waypoints: [startWaypoint, startWaypoint, startWaypoint, currentWaypoint, currentWaypoint],
+        rule: 'straight',
+      },
+      clues: [], terrain, elevation, supplies: [],
+      creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
+    };
+    const player: Vec2 = { x: 5, y: 5 };
+    const s: SessionState = {
+      round: 1, level, player, stamina: 10,
+      readClues: new Set(), marks: new Map(), path: [player], readLog: [], mutedClues: new Set(),
+      seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
+      phase: 'explore', steps: MOVE_EVERY, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+    };
+    const rng: Rng = () => 0.001; // chance passes; pickWeighted -> bird-startle
+    const ev = rollMicroEvent(s, rng);
+    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg(player, currentWaypoint) });
   });
 });

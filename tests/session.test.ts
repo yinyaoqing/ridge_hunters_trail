@@ -32,7 +32,7 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
     round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
     readClues: new Set(),
     marks: new Map(), path: [{ x: 0, y: 0 }], readLog: [], mutedClues: new Set(),
-    seen: new Set(), surveyed: new Set(),
+    seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
     phase: 'explore',
     steps: 0, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
     ...overrides,
@@ -499,6 +499,78 @@ describe('isTargetVisible', () => {
     const t = currentTarget(s);
     s.seen.add(key(t));
     s.player = { x: t.x >= s.level.mapSize / 2 ? 0 : s.level.mapSize - 1, y: t.y >= s.level.mapSize / 2 ? 0 : s.level.mapSize - 1 };
+    expect(isTargetVisible(s)).toBe(false);
+  });
+});
+
+describe('move: forgiving capture across a waypoint swap (F1 owner decision)', () => {
+  it('closes on the quarry when the step both crosses MOVE_EVERY and lands beside its pre-move waypoint, even though it jumped away in the same step', () => {
+    // 迴避「7.8% 追擊局遭拒判」的迴歸測試：玩家這一步踏進獵物「移動前」所在節點
+    // 的相鄰格，但這一步剛好讓 steps 跨過 MOVE_EVERY 邊界，獵物在同一瞬間換到
+    // 下一個（很遠的）節點。寬容判定要求「移動前」或「移動後」任一位置相距 1 格
+    // 即算逼近成功；若少了對「移動前」位置的比對，這一步會被誤判為沒有逼近。
+    const size = 10;
+    const terrain: TerrainType[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 'meadow' as TerrainType));
+    const elevation: number[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 0.2));
+    const level: Level = {
+      round: 1, mapSize: size,
+      // W2（steps=11 時，即移動前，仍對應的節點）在 (2,2)，緊鄰玩家即將踏上的 (1,1)；
+      // W3（steps=12 時，即移動後對應的節點）在 (9,9)，離 (1,1) 很遠。
+      route: {
+        waypoints: [{ x: 9, y: 9 }, { x: 9, y: 9 }, { x: 2, y: 2 }, { x: 9, y: 9 }, { x: 9, y: 9 }],
+        rule: 'straight',
+      },
+      clues: [], terrain, elevation, supplies: [],
+      creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
+    };
+    const s: SessionState = {
+      round: 1, level, player: { x: 0, y: 0 }, stamina: 10,
+      readClues: new Set(), marks: new Map(), path: [{ x: 0, y: 0 }], readLog: [],
+      mutedClues: new Set(), seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
+      phase: 'explore', steps: MOVE_EVERY - 1, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+    };
+    move(s, { x: 1, y: 1 });
+    expect(s.phase).toBe('qte');
+  });
+});
+
+describe('isTargetVisible: survey bonus reveals the quarry too (F2 owner decision)', () => {
+  function makeSurveyState(): SessionState {
+    const size = 10;
+    const terrain: TerrainType[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 'meadow' as TerrainType));
+    const elevation: number[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 0.2));
+    const target = { x: 4, y: 0 }; // cheb((0,0),(4,0))=4：超出基礎視野(3)，落在眺望視野(3+3=6)內
+    const level: Level = {
+      round: 1, mapSize: size,
+      route: { waypoints: Array(5).fill(target), rule: 'straight' },
+      clues: [], terrain, elevation, supplies: [],
+      creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
+    };
+    return {
+      round: 1, level, player: { x: 0, y: 0 }, stamina: 20,
+      readClues: new Set(), marks: new Map(), path: [{ x: 0, y: 0 }], readLog: [],
+      mutedClues: new Set(), seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
+      phase: 'explore', steps: 0, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+    };
+  }
+
+  it('a quarry just outside base vision but inside survey vision becomes visible after a successful survey', () => {
+    const s = makeSurveyState();
+    expect(isTargetVisible(s)).toBe(false); // 基礎視野半徑3看不到距離4的獵物
+    expect(survey(s)).toBe(true);
+    expect(isTargetVisible(s)).toBe(true);
+  });
+
+  it('the bonus is gone once the player moves off the surveyed cell', () => {
+    const s = makeSurveyState();
+    survey(s);
+    expect(isTargetVisible(s)).toBe(true);
+    move(s, { x: 0, y: 1 }); // 移到另一格：cheb((0,1),(4,0))=4，仍超出基礎視野
+    expect(s.surveyBonusHere).toBe(false);
     expect(isTargetVisible(s)).toBe(false);
   });
 });

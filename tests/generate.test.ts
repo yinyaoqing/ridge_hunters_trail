@@ -199,7 +199,12 @@ describe('generateLevel (property tests over 200 seeds)', () => {
 });
 
 describe('generateLevel: physical reachability', () => {
-  it('every clue, supply and the target is walkable from the spawn corner', () => {
+  it('every clue, supply and every waypoint of the route is walkable from the spawn corner', () => {
+    // 舊版只驗證 W2（開局節點）生成後可達，但獵物大半局都站在 W2 之後的節點——
+    // 正是 generate.ts 特意把每個節點都餵給 ensureReachable，就是為了保證它們可達。
+    // 只驗證起點會讓「牠整條路線是否真的抓得到」這個性質，在最重要的區段完全沒有網。
+    // 玩家出生的角落仍由開局節點（W2）決定——那是實際遊戲裡玩家出生位置的依據——
+    // 但現在逐一驗證路線上的每一個節點，而不只是起點。
     for (let seed = 1; seed <= 40; seed++) {
       for (const round of [1, 5, 9]) {
         const level = generateLevel(round, mulberry32(seed));
@@ -209,18 +214,21 @@ describe('generateLevel: physical reachability', () => {
         const start = corners.reduce((a, b) =>
           (dist(b, target) > dist(a, target) ? b : a));
         const seen = reachableFrom(level.terrain, start);
-        expect(seen.has(key(target))).toBe(true);
+        for (const wp of level.route.waypoints) expect(seen.has(key(wp))).toBe(true);
         for (const c of level.clues) expect(seen.has(key(c.position))).toBe(true);
         for (const p of level.supplies) expect(seen.has(key(p))).toBe(true);
       }
     }
   });
 
-  it('never places the target on an impassable cell', () => {
+  it('never places any waypoint of the route on an impassable cell', () => {
+    // 同理：獵物整條路線的每一個節點都必須是可通行格，不只是開局那一個——
+    // 牠在後面的節點停留的時間並不比開局節點短。
     for (let seed = 1; seed <= 40; seed++) {
       const level = generateLevel(5, mulberry32(seed));
-      const target = level.route.waypoints[ROUTE_START_INDEX];
-      expect(level.terrain[target.y][target.x]).not.toBe('cliff');
+      for (const wp of level.route.waypoints) {
+        expect(level.terrain[wp.y][wp.x]).not.toBe('cliff');
+      }
     }
   });
 

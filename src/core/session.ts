@@ -33,7 +33,8 @@ export function currentTarget(s: SessionState): Vec2 {
 // 用 seen 判斷會讓牠走掉之後仍畫在原地，玩家會追一個已經不在那裡的影子。
 export function isTargetVisible(s: SessionState): boolean {
   const { terrain, elevation } = groundUnderPlayer(s);
-  return cheb(s.player, currentTarget(s)) <= visionRadius(terrain, elevation);
+  const r = visionRadius(terrain, elevation) + (s.surveyBonusHere ? SURVEY_BONUS : 0);
+  return cheb(s.player, currentTarget(s)) <= r;
 }
 
 // 把玩家當前視野內的格加進 seen。單向累積：看過的地就不會再變回未知。
@@ -54,6 +55,7 @@ export function survey(s: SessionState): boolean {
   const { terrain, elevation } = groundUnderPlayer(s);
   const r = visionRadius(terrain, elevation) + SURVEY_BONUS;
   for (const kk of cellsWithin(s.player, r, s.level.mapSize)) s.seen.add(kk);
+  s.surveyBonusHere = true;
   // F1：眺望花光體力（或花完後已無負擔得起的鄰格移動）卻不宣告力竭，會把玩家鎖進一個
   // 永遠回不到 'exhausted'、也做不了任何動作的 'explore' 狀態。套用與 move() 結尾
   // 相同的兩項判斷，讓眺望也能正常觸發力竭收尾。
@@ -82,6 +84,9 @@ export interface SessionState {
   mutedClues: Set<number>; // 被玩家靜音、不計入候選熱區的線索索引
   seen: Set<string>;      // 曾進入視野的格（單向累積，看過就不會忘）
   surveyed: Set<string>;  // 已在此格眺望過，避免重複花體力卻沒有新資訊
+  // 這一格眺望過之後，視野半徑在原地維持加成——否則花了 4 點體力掃過去、
+  // 掃描範圍正好蓋到獵物，卻只看到地面看不到牠，讀起來像是畫面壞了。
+  surveyBonusHere: boolean;
   phase: Phase;
   steps: number;          // 本局累計移動步數（分享卡用）
   mode: SessionMode;      // 主線 run / 每日挑戰 daily
@@ -105,6 +110,7 @@ export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): 
     mutedClues: new Set(),
     seen: new Set(),
     surveyed: new Set(),
+    surveyBonusHere: false,
     phase: 'explore',
     steps: 0,
     mode,
@@ -142,6 +148,7 @@ export function move(s: SessionState, to: Vec2): void {
   s.steps++;
   s.stamina -= TERRAIN_COST[s.level.terrain[to.y][to.x]];
   s.player = to;
+  s.surveyBonusHere = false; // 加成屬於掃出去的那一格，不是玩家本人；一移動就失效
   s.path.push(to);
   revealAround(s); // 走到新位置立即揭示視野，供本次移動後的所有判斷共用
 
@@ -165,10 +172,15 @@ export function move(s: SessionState, to: Vec2): void {
     });
   }
 
-  // 逼近目標的判定先於力竭判定：最後一步逼近仍可觸發 QTE
-  // steps 已於本函式開頭遞增，因此這裡取到的是「這一步之後」獵物的位置——
-  // 牠可能剛好在這一步換了節點而落到玩家旁邊，那也算逼近成功。
-  if (cheb(to, currentTarget(s)) <= 1) {
+  // 逼近判定對「獵物剛好在這一步換節點」寬容：只要這一步結束時與牠移動前
+  // 或移動後的位置任一相距 1 格，就算逼近成功。
+  // steps 在本函式開頭已遞增，所以 currentTarget(s) 取到的是移動「後」的位置；
+  // 移動前的位置要用遞增前的步數回推。
+  // 少了寬容那一半，實測 7.8% 的追擊局會出現「踏到牠旁邊、牠同一瞬間跳走、
+  // 什麼都沒發生」——玩家做對了每一件事卻一無所獲，而下一階把獵物畫出來之後，
+  // 他會眼睜睜看著牠從身邊消失。物理上說得通不代表讀得懂。
+  const beforeMove = targetAt(s.level.route, s.steps - 1);
+  if (cheb(to, currentTarget(s)) <= 1 || cheb(to, beforeMove) <= 1) {
     s.phase = 'qte';
     return;
   }

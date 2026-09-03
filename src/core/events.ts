@@ -43,8 +43,10 @@ function findNearbyEmptyCell(s: SessionState): Vec2 | null {
     if (a.y !== b.y) return a.y - b.y;
     return a.x - b.x;
   });
+  // 迴圈不變量：候選最多 24 格，每格都會重算一次 targetAt 太浪費——先算一次再傳進去。
+  const target = targetAt(level.route, s.steps);
   for (const p of candidates) {
-    if (!isOccupiedCell(level, p, targetAt(level.route, s.steps))) return p;
+    if (!isOccupiedCell(level, p, target)) return p;
   }
   return null;
 }
