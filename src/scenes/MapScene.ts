@@ -79,6 +79,8 @@ export class MapScene extends Phaser.Scene {
   private bellChipX = 0;
   private bellChipY = 0;
   private chipRowLeft = 0; // chip 列最左緣（眺望 chip 左緣，見 buildHud 的 xSurvey）：體力條需與其保持 ≥8px 間距
+  private titleRight = 0; // 副標題「RIDGE HUNTER'S TRAIL」右緣（僅 !compact 時量得，見 buildHud）：
+                           // 體力條左靠齊版面下，體力標籤要靠這個值閃過副標題，見 updateHud
   private skipFirstRunHelp = false;
   private audio!: AudioBus;
   private tools!: ToolStore;
@@ -104,11 +106,12 @@ export class MapScene extends Phaser.Scene {
   private ageChipText?: Phaser.GameObjects.Text;
   private ageChipX = 0;
   private ageChipY = 0;
-  // 固定寬度，比照其餘 chip（60px）的做法，只是稍寬以容納最長的齡別字詞本身
-  // （不含 hud.age 前綴——前綴已移除，見 ageLabel）。84 已量測涵蓋兩語系四態中最長的
-  // 「This morning」；改用量測寬度曾經讓整列版面隨語系與量測結果浮動，撞上地形圖例、
-  // 體力條置中門檻與副標題（見 buildHud 與 updateHud 的 F6 註解）。
-  private readonly ageChipW = 84;
+  // 固定寬度，與其餘 chip 一致採 60px（不再稍寬）——英文標籤縮短為 Morning/Night/Older/All
+  // 後，兩語系四態中最寬的是英文「Morning」，11px 字級量得 42.07px（Karla 字型，見任務
+  // 附的量測腳本），60px 內還有近 18px 餘裕；中文四態皆為兩個全形字，11px 下固定 22.00px，
+  // 餘裕更大。改用量測寬度（而非固定值）曾經讓整列版面隨語系與量測結果浮動，撞上地形圖例、
+  // 體力條置中門檻與副標題（見 buildHud 與 updateHud 的 F6 註解）——固定寬度不會有這個問題。
+  private readonly ageChipW = 60;
 
   private surveyChipG?: Phaser.GameObjects.Graphics;
   private surveyChipText?: Phaser.GameObjects.Text;
@@ -551,26 +554,71 @@ export class MapScene extends Phaser.Scene {
       this.weatherText = this.add.text(0, 0, '', {
         fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.paperDim),
       }).setOrigin(0, 0.5).setLetterSpacing(1);
-      this.add.text(50, 34, "RIDGE HUNTER'S TRAIL", {
+      const title = this.add.text(50, 34, "RIDGE HUNTER'S TRAIL", {
         fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.paperDim),
       }).setLetterSpacing(2.5);
+      // 量實際畫出來的右緣，不是猜一個寬度——字型／letterSpacing 以後要是變了，這裡自動跟著對
+      this.titleRight = title.x + title.width;
     }
 
-    // 迷你地形圖例（僅寬螢幕：副標題右側，四色塊＋成本數字；窄螢幕圖例改放 HelpScene）
-    if (w >= 900) {
+    // 語言切換鈕、玩法說明鈕、標記模式鈕與靜音鈕（設計板：金邊小chip，由右至左排列）
+    // 窄螢幕（w<560）隱藏語言 chip 並將標記／靜音 chip 右移，避免與置中體力條相撞
+    // （語言切換仍可從 Camp/Help 進行）
+    // chip 列座標提到地形圖例之前計算：圖例畫不畫，得先知道 chip 列的左緣落在哪
+    // （見下方圖例區塊），不能再像舊版那樣只看視窗寬度猜一個門檻。
+    const chipY = 13;
+    const chipH = 30;
+    const xHelp = w - 12 - 32;                            // '?' chip 左緣
+    const xLang = xHelp - 8 - 72;                         // 語言 chip 左緣（僅非 compact 顯示）
+    const xMark = compact ? xHelp - 8 - 60 : xLang - 8 - 60; // 標記 chip 左緣
+    const xSound = xMark - 8 - 32;                        // 靜音 chip 左緣
+    const hasBell = this.tools.has('glowbell');
+    const xBell = xSound - 8 - 60;                        // 鈴 chip 左緣（僅持有微光鈴時顯示）
+    const xHeat = (hasBell ? xBell : xSound) - 8 - 60; // 熱區圖層 chip 左緣
+    // 新鮮度 chip 寬度固定於欄位宣告處（this.ageChipW = 60），比照其餘 chip 的做法——不再量測，
+    // 量測曾讓整列 chip 隨語系與文字結果浮動寬度，撞上地形圖例、體力條置中門檻與副標題三處版面。
+    const xAge = xHeat - 8 - this.ageChipW; // 新鮮度 chip 左緣（緊接圖層 chip 左側）
+    const xSurvey = xAge - 8 - 60;       // 眺望 chip 左緣
+    this.chipRowLeft = xSurvey;          // 供 updateHud（體力條）與下方地形圖例保持間距
+
+    // 迷你地形圖例（副標題右側，四色塊＋成本數字；窄螢幕圖例改放 HelpScene）
+    // 舊版用 `w >= 900` 判斷要不要畫圖例，這個常數其實是在賭「chip 列夠窄，900px 內不會
+    // 撞到」——chip 列一變寬（加新鮮度 chip 那次），這個賭注就輸了：900px 寬時圖例仍被
+    // chip 列蓋住 46px。改成直接量圖例畫完後的實際右緣，跟 chip 列左緣（this.chipRowLeft）
+    // 比較——不管 chip 列以後再加減幾格、寬度怎麼變，這裡都會自動跟著算對，不必再猜一個
+    // 視窗寬度門檻。圖例讓位給 chip 列、不是反過來：chip 是操作用的控制項，圖例只是輔助
+    // 閱讀的參考資料，版面不夠兩者並存時，控制項優先於參考資料。
+    //
+    // 體力條左靠齊版面（見 updateHud）下，體力標籤會被推到副標題右側（this.titleRight + 12，
+    // 約 x=213）——這個起點只由副標題文字本身決定，跟視窗寬度無關，標籤本身還有近百px
+    // 寬，一路延伸到遠超過圖例固定起點 x=232。也就是說：只要選的是左靠齊版面，體力標籤
+    // 就一定會撞進圖例的地盤，無論視窗多寬。體力標籤同樣是操作用的即時狀態顯示（不是裝飾），
+    // 圖例要讓的不只是 chip 列，這種情況也要讓。判斷條件沿用 updateHud 選版面的同一條件
+    // （純看寬度，執行期間不變，這裡算一次即可）。
+    const staminaCentered = this.scale.width / 2 + 105 <= this.chipRowLeft - 8;
+    {
       const legendG = this.add.graphics();
       const legendY = 36;
       const order: TerrainType[] = ['meadow', 'mist', 'thicket', 'rock', 'cliff'];
       // 崖壁成本為 Infinity，直接印會變成 "Infinity"——改用 ✕ 表示不可通行
       const costs = order.map((t) => (isPassable(t) ? String(TERRAIN_COST[t]) : '✕'));
       let lx = 232;
+      const labels: Phaser.GameObjects.Text[] = [];
       order.forEach((t, i) => {
         legendG.fillStyle(pal.terrain[t], 1).fillRect(lx, legendY, 12, 12);
-        this.add.text(lx + 16, legendY + 6, costs[i], {
+        labels.push(this.add.text(lx + 16, legendY + 6, costs[i], {
           fontFamily: FONTS.body, fontSize: '10px', color: cssHex(pal.paperDim),
-        }).setOrigin(0, 0.5);
+        }).setOrigin(0, 0.5));
         lx += 16 + 12 + 12; // 色塊(12)+間距(4)+數字寬+組間距
       });
+      const lastLabel = labels[labels.length - 1];
+      // 直接量最後一個數字標籤實際畫完的右緣，而非沿用排版時的寬度預算（lx）——後者假設
+      // 每個成本數字都窄到某個寬度以內，成本改成兩位數之類就會悄悄算錯；量測到的寬度不會。
+      const legendRight = lastLabel.x + lastLabel.width;
+      if (legendRight + 8 > this.chipRowLeft || !staminaCentered) {
+        legendG.destroy();
+        labels.forEach((l) => l.destroy());
+      }
     }
 
     // 體力條（筆觸感不規則圓角，動態填色於 redraw）
@@ -595,23 +643,6 @@ export class MapScene extends Phaser.Scene {
       }).setOrigin(1, 0);
     }
 
-    // 語言切換鈕、玩法說明鈕、標記模式鈕與靜音鈕（設計板：金邊小chip，由右至左排列）
-    // 窄螢幕（w<560）隱藏語言 chip 並將標記／靜音 chip 右移，避免與置中體力條相撞
-    // （語言切換仍可從 Camp/Help 進行）
-    const chipY = 13;
-    const chipH = 30;
-    const xHelp = w - 12 - 32;                            // '?' chip 左緣
-    const xLang = xHelp - 8 - 72;                         // 語言 chip 左緣（僅非 compact 顯示）
-    const xMark = compact ? xHelp - 8 - 60 : xLang - 8 - 60; // 標記 chip 左緣
-    const xSound = xMark - 8 - 32;                        // 靜音 chip 左緣
-    const hasBell = this.tools.has('glowbell');
-    const xBell = xSound - 8 - 60;                        // 鈴 chip 左緣（僅持有微光鈴時顯示）
-    const xHeat = (hasBell ? xBell : xSound) - 8 - 60; // 熱區圖層 chip 左緣
-    // 新鮮度 chip 寬度固定於欄位宣告處（this.ageChipW = 84），不再量測——量測曾讓整列
-    // chip 隨語系與文字結果浮動寬度，撞上地形圖例、體力條置中門檻與副標題三處版面。
-    const xAge = xHeat - 8 - this.ageChipW; // 新鮮度 chip 左緣（緊接圖層 chip 左側）
-    const xSurvey = xAge - 8 - 60;       // 眺望 chip 左緣
-    this.chipRowLeft = xSurvey;          // 供 updateHud 計算體力條寬度時保持間距
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
     if (!compact) {
@@ -1443,18 +1474,29 @@ export class MapScene extends Phaser.Scene {
     const bx = barLeft ? 50 : w / 2 - 105;
     // F6：Math.max(90, ...) 這個下限本身會壓過 Math.min 的夾限——當 chipRowLeft - 8 - bx < 90，
     // 也就是 chipRowLeft < 148（bx=50 時），體力條寬度仍被撐到 90，右緣就超出 chipRowLeft - 8，
-    // 8px 間距保證在此失效。新鮮度 chip 改回固定寬度（84，見 ageChipW 宣告處）後仍要重算：
-    // 持有微光鈴時 chipRowLeft = w - 528（非 compact）／w - 448（compact，w<560）——compact
-    // 上限 w=559 也只算得 111，門檻要到 w ≥ 676 才達標；不持鈴則 w - 460／w - 380，門檻在
-    // w ≥ 608（compact 內 w∈[528,560) 會先短暫達標，跨進非 compact 因語言 chip 冒出來又
-    // 掉回門檻之下，直到 608 才回穩）。兩種情況門檻都已跨出 compact（<560）範圍，落進一般
-    // 桌機寬度——1366×768、1280×800 這類常見桌機解析度仍在受影響區間內，不再只是「行動
-    // 裝置限定」（舊版本此處聲稱的 504px 門檻確實全落在 compact 內；固定寬度的新鮮度 chip
-    // 把整列往左推得夠遠，這個結論不再成立）。行動裝置尚非出貨目標，但這個門檻現在已不只影響它。
+    // 8px 間距保證在此失效。這是既有缺陷，本次任務未動這個下限本身——新鮮度 chip 縮寬
+    // （84→60，見 ageChipW 宣告處）後門檻隨之下修：持有微光鈴時 chipRowLeft = w - 504
+    // （非 compact）／w - 424（compact，w<560，上限 w=559 只算得 135，永遠到不了 148）——
+    // 門檻要到 w ≥ 652（非 compact）才達標；不持鈴則 w - 436／w - 356，門檻在 w ≥ 584
+    // （compact 內 w∈[504,560) 會先短暫達標，跨進非 compact 因語言 chip 冒出來又掉回門檻
+    // 之下，直到 584 才回穩）。驗收要求的八個寬度中只有 560 落在失效區間（無鈴 124、
+    // 有鈴 56，都 <148）；660 以上（無論有無鈴）皆已跨過門檻，保證成立。
     const bw = barLeft ? Math.max(90, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
     const bh = barLeft ? 10 : 12;
     const by = barLeft ? 46 : 27;
-    this.stamLabel.setPosition(barLeft ? bx + bw / 2 : w / 2, barLeft ? 30 : 8);
+    if (barLeft) {
+      // 左靠齊版面下，標籤原本疊在體力條正上方置中（bx+bw/2），與副標題「RIDGE HUNTER'S
+      // TRAIL」同一橫列——兩者的 y 範圍本來就重疊（副標題 y≈34–46，標籤 y≈30–43），
+      // 疊在一起必撞字。HUD 只有 56px 高，局數列／副標題列／體力條三列已佔滿垂直空間，
+      // 標籤挪不到別的列；唯一挪得動的方向是水平——把標籤起點移到副標題實際量到的右緣
+      // （this.titleRight，來自 buildHud 對它的量測，不是猜的寬度）之後，兩者 x 範圍
+      // 就不再重疊，不必再靠 y 錯開，也不會受字型或語系改變副標題寬度而重新撞上。
+      this.stamLabel.setOrigin(0, 0);
+      this.stamLabel.setPosition(Math.max(bx, this.titleRight + 12), 30);
+    } else {
+      this.stamLabel.setOrigin(0.5, 0);
+      this.stamLabel.setPosition(w / 2, 8);
+    }
     this.hudG.clear();
     this.hudG.fillStyle(0x0d1310, 1).fillRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
     this.hudG.lineStyle(1, pal.paper, 0.18).strokeRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);
