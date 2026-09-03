@@ -2,12 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Ridge Hunter's Trail</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Karla:wght@400;500;700&display=swap" />
-  <style>html,body{margin:0;padding:0;background:#131a17;height:100%}#app{height:100%}</style>
+  <style>
+    /* height:100dvh 讓行動瀏覽器網址列收合時不會反覆改變版面高度（100% 會）；
+       舊瀏覽器落回前一行的 100%。 */
+    html, body { margin: 0; padding: 0; background: #131a17; height: 100%; height: 100dvh; }
+    /* overflow/overscroll：擋掉下拉重新整理與橡皮筋捲動，兩者都會搶走遊戲的觸控。 */
+    body { overflow: hidden; overscroll-behavior: none; }
+    #app { height: 100%; }
+    /* touch-action:none 是本專案手機輸入延遲的主因——Phaser 從不設定它
+       （node_modules/phaser 的 input/ 與 scale/ 全域搜尋零命中），
+       瀏覽器因此要先判斷這次觸控是不是捲動或縮放手勢，才把 pointerdown 派送出去。
+       tap-highlight 則是點擊時的灰色閃框，在遊戲畫面上只是雜訊。 */
+    #app canvas { touch-action: none; -webkit-tap-highlight-color: transparent; }
+  </style>
 </head>
 <body>
   <div id="app"></div>

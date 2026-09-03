@@ -7,7 +7,7 @@ import type { Rng } from '../core/rng';
 import type { I18n } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
 import { cssHex, FONTS, displayFont, creatureTexKey, creatureScale } from './paint';
-import { fadeIn, fadeToScene, addGlowIfWebGL } from './fx';
+import { fadeIn, fadeToScene } from './fx';
 
 const DIAL_BG_KEY = 'qte-dial-bg';
 const R = 150;
@@ -15,8 +15,12 @@ const R = 150;
 export class QteScene extends Phaser.Scene {
   private q!: QteState;
   private cfg!: QteParams;
-  private g!: Phaser.GameObjects.Graphics;
-  private dots!: Phaser.GameObjects.Graphics;
+  private arcG!: Phaser.GameObjects.Graphics;    // 弧區：只在弧區換位置時重畫
+  private needleG!: Phaser.GameObjects.Graphics; // 指針與軸心：每幀重畫
+  private dots!: Phaser.GameObjects.Graphics;    // 命中點列：只在命中數變動時重畫
+  private shownArc = -1;   // 上次畫出的 arcStart，用來判斷弧區要不要重畫
+  private shownHits = -1;  // 上次畫出的命中數
+  private shownAttempt = -1;
   private info!: Phaser.GameObjects.Text;
   private i18n!: I18n;
   private pal!: Palette;
@@ -60,15 +64,25 @@ export class QteScene extends Phaser.Scene {
       if (s.level.iris) this.sil.setTint(this.pal.iris);
     }
 
-    this.g = this.add.graphics();
+    this.arcG = this.add.graphics();
+    this.needleG = this.add.graphics();
     this.dots = this.add.graphics();
+    // 場景實例跨局存活，這些「上次畫了什麼」的快取必須明確重設，
+    // 否則第二局的弧區會因為與上一局的殘值相同而不重畫
+    this.shownArc = -1;
+    this.shownHits = -1;
+    this.shownAttempt = -1;
     this.info = this.add.text(cx, cy + R + 62, '', {
       fontFamily: FONTS.body, fontSize: '16px', color: cssHex(this.pal.gold),
     }).setOrigin(0.5).setLetterSpacing(1);
 
-    // WebGL 時疊加發光後製；Canvas fallback 完全不受影響（弧線/剪影疊圈畫法照舊）
-    addGlowIfWebGL(this, this.g, this.pal.gold);
-    if (this.sil) addGlowIfWebGL(this, this.sil, s.level.iris ? this.pal.iris : this.pal.glow);
+    // 這裡刻意不掛 Glow 後製。Phaser 的 Glow shader 以
+    // SIZE = 1/(quality×distance) = 1/(0.1×10) = 1.0 編譯，角度迴圈 ceil(2π/1)=7 步
+    // × 半徑迴圈 10 步 = 每像素 70 次貼圖取樣；轉盤約 340×340 CSS px，手機 DPR 2 下
+    // 單這一層每幀就是 3200 萬次取樣，還要加一次 render target 來回。而它掛的又是
+    // 每幀清空重畫的 Graphics——這正是玩家回報「指針有延遲感」的來源。
+    // 弧區的光暈改由下方 drawArc() 的「寬幅低透明度 ＋ 窄幅實線」兩道描邊手繪，
+    // 視覺接近而成本可忽略。
 
     this.input.on('pointerdown', () => this.onPress());
     this.input.keyboard?.on('keydown-SPACE', () => this.onPress());
@@ -144,32 +158,56 @@ export class QteScene extends Phaser.Scene {
   private draw() {
     const cx = this.scale.width / 2;
     const cy = this.scale.height / 2 + 20;
-    const pal = this.pal;
-    this.g.clear();
 
-    // 發光弧區：寬幅低透明度模擬光暈＋窄幅實線
+    if (this.shownArc !== this.q.arcStart) {
+      this.shownArc = this.q.arcStart;
+      this.drawArc(cx, cy);
+    }
+    if (this.shownHits !== this.q.hits || this.shownAttempt !== this.q.attempt) {
+      this.shownHits = this.q.hits;
+      this.shownAttempt = this.q.attempt;
+      this.drawDots(cx, cy);
+      this.info.setText(this.i18n.t('qte.progress', {
+        hits: this.q.hits, needed: this.cfg.needed,
+        attempt: this.q.attempt, rounds: this.cfg.rounds,
+      }));
+    }
+    this.drawNeedle(cx, cy);
+  }
+
+  // 發光弧區：寬幅低透明度模擬光暈＋窄幅實線（手繪光暈，取代成本高昂的 Glow 後製）
+  private drawArc(cx: number, cy: number) {
+    const pal = this.pal;
     const a0 = Phaser.Math.DegToRad(this.q.arcStart);
     const a1 = Phaser.Math.DegToRad(this.q.arcStart + this.cfg.arcSize);
-    this.g.lineStyle(18, pal.gold, 0.3);
-    this.g.beginPath();
-    this.g.arc(cx, cy, R, a0, a1);
-    this.g.strokePath();
-    this.g.lineStyle(8, pal.gold, 1);
-    this.g.beginPath();
-    this.g.arc(cx, cy, R, a0, a1);
-    this.g.strokePath();
+    this.arcG.clear();
+    this.arcG.lineStyle(18, pal.gold, 0.3);
+    this.arcG.beginPath();
+    this.arcG.arc(cx, cy, R, a0, a1);
+    this.arcG.strokePath();
+    this.arcG.lineStyle(8, pal.gold, 1);
+    this.arcG.beginPath();
+    this.arcG.arc(cx, cy, R, a0, a1);
+    this.arcG.strokePath();
+  }
 
-    // 指針與軸心
+  // 指針與軸心：全場唯一每幀都要重畫的東西
+  private drawNeedle(cx: number, cy: number) {
+    const pal = this.pal;
     const pr = Phaser.Math.DegToRad(this.q.pointer);
-    this.g.lineStyle(4, pal.paper, 1);
-    this.g.lineBetween(
+    this.needleG.clear();
+    this.needleG.lineStyle(4, pal.paper, 1);
+    this.needleG.lineBetween(
       cx - 22 * Math.cos(pr), cy - 22 * Math.sin(pr),
       cx + (R - 8) * Math.cos(pr), cy + (R - 8) * Math.sin(pr),
     );
-    this.g.fillStyle(pal.paper, 1).fillCircle(cx, cy, 7);
-    this.g.lineStyle(1.2, pal.paper, 0.4).strokeCircle(cx, cy, 10.5);
+    this.needleG.fillStyle(pal.paper, 1).fillCircle(cx, cy, 7);
+    this.needleG.lineStyle(1.2, pal.paper, 0.4).strokeCircle(cx, cy, 10.5);
+  }
 
-    // 命中點列（needed 顆，命中者填金）
+  // 命中點列（needed 顆，命中者填金）
+  private drawDots(cx: number, cy: number) {
+    const pal = this.pal;
     this.dots.clear();
     const gap = 26;
     const startX = cx - ((this.cfg.needed - 1) * gap) / 2;
@@ -183,10 +221,5 @@ export class QteScene extends Phaser.Scene {
         this.dots.lineStyle(1.5, pal.paper, 0.4).strokeCircle(x, y, 6.5);
       }
     }
-
-    this.info.setText(this.i18n.t('qte.progress', {
-      hits: this.q.hits, needed: this.cfg.needed,
-      attempt: this.q.attempt, rounds: this.cfg.rounds,
-    }));
   }
 }
