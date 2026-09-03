@@ -105,12 +105,17 @@ describe('buildTerrain', () => {
   // 慣例，逐張地圖檢查下修後的 bias 是否真的把崖壁佔比拉回可玩範圍。
   //
   // Phase 6a 的攔截路追加後，0.08 在 round-1、1000 顆種子上讓理想路線超預算率
-  // 衝到 6.20%（見 quirks.ts 最新一段歷史），owner 再次核准下修，這次調到
-  // 0.04。三個 bias 在同一套 seed 1..100、size 20 慣例下實測：0.15 最糟
-  // 44.75%、0.08 最糟 27.25%（seed 92）、目前的 0.04 均值 4.19%、單張最糟
-  // 20.00%（seed 70）。上界隨之收緊到 0.24：仍在最糟值之上留約 4 個百分點
-  // headroom，但比舊的 0.30 更貼——bias 若被打回 0.08（最糟 27.25%）或更高，
-  // 這裡會立刻紅；BAND_CLIFF 被調鬆時同理。
+  // 衝到 6.20%（見 quirks.ts 最新一段歷史），owner 再次核准下修到 0.04，之後
+  // 再審發現 MOVE_EVERY／SPACING 兩個槓桿在 0.04 下仍不可或缺。這一次
+  // （task-4-report.md 的第四次調整）反過來調用同一支槓桿：把 MOVE_EVERY／
+  // SPACING 都還原成 Phase 6a 之前的值，靠把 bias 從 0.04 進一步下修到 0.01
+  // 來補回可解性——第三次調整替兩個槓桿爭取到的空間，這次直接讓地形偏置自己
+  // 吃下來。四個 bias 在同一套 seed 1..100、size 20 慣例下實測：0.15 最糟
+  // 44.75%、0.08 最糟 27.25%（seed 92）、0.04 最糟 20.00%（seed 70）、目前的
+  // 0.01 均值 2.50%、單張最糟 15.50%（同樣是 seed 70）。上界隨之收緊到 0.19：
+  // 沿用「最糟值×1.2」的同一個 headroom 比例（0.04 時是 20.00%→0.24），比舊的
+  // 0.24 更貼——bias 若被打回 0.04（最糟 20.00%）或更高，這裡會立刻紅；
+  // BAND_CLIFF 被調鬆時同理。
   it("bounds ridgecrest's cliff share on every individual map at the lowered bias (G1)", () => {
     const bias = elevationBiasFor('ridgecrest');
     for (let seed = 1; seed <= 100; seed++) {
@@ -123,7 +128,7 @@ describe('buildTerrain', () => {
           if (t === 'cliff') cliff++;
         }
       }
-      expect(cliff / total).toBeLessThan(0.24);
+      expect(cliff / total).toBeLessThan(0.19);
     }
   });
 
