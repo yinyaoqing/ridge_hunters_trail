@@ -21,6 +21,12 @@ export class QteScene extends Phaser.Scene {
   private shownArc = -1;   // 上次畫出的 arcStart，用來判斷弧區要不要重畫
   private shownHits = -1;  // 上次畫出的命中數
   private shownAttempt = -1;
+  // 轉盤中心在 create() 時決定一次。draw() 曾每幀從 scale 重算，但靜態圓環是
+  // create() 當下畫的——兩者在視窗改變大小後就對不上，指針會脫離自己的圓環。
+  // 這個場景刻意不用 restartOnResize（重啟會呼叫 newQte，把玩家已累積的命中清掉），
+  // 所以改為讓整個盤面共用同一個原點：resize 後位置會偏，但盤面本身始終是完整的。
+  private dialX = 0;
+  private dialY = 0;
   private info!: Phaser.GameObjects.Text;
   private i18n!: I18n;
   private pal!: Palette;
@@ -46,6 +52,8 @@ export class QteScene extends Phaser.Scene {
 
     const cx = this.scale.width / 2;
     const cy = this.scale.height / 2 + 20;
+    this.dialX = cx;
+    this.dialY = cy;
 
     this.buildDialBackdrop(cx, cy);
 
@@ -83,6 +91,8 @@ export class QteScene extends Phaser.Scene {
     // 每幀清空重畫的 Graphics——這正是玩家回報「指針有延遲感」的來源。
     // 弧區的光暈改由下方 drawArc() 的「寬幅低透明度 ＋ 窄幅實線」兩道描邊手繪，
     // 視覺接近而成本可忽略。
+    // 剪影的光暈同樣一併移除：它以 alpha 0.16 呈現，本來就極淡，
+    // 為它單獨保留一次 render target 來回並不划算。
 
     this.input.on('pointerdown', () => this.onPress());
     this.input.keyboard?.on('keydown-SPACE', () => this.onPress());
@@ -156,64 +166,63 @@ export class QteScene extends Phaser.Scene {
   }
 
   private draw() {
-    const cx = this.scale.width / 2;
-    const cy = this.scale.height / 2 + 20;
-
     if (this.shownArc !== this.q.arcStart) {
       this.shownArc = this.q.arcStart;
-      this.drawArc(cx, cy);
+      this.drawArc();
     }
+    // 命中點列只取決於命中數；未命中時它一格都不會變，沒有理由重畫
+    if (this.shownHits !== this.q.hits) this.drawDots();
+    // 進度文字同時顯示命中數與嘗試次數，兩者任一變動都要更新
     if (this.shownHits !== this.q.hits || this.shownAttempt !== this.q.attempt) {
-      this.shownHits = this.q.hits;
-      this.shownAttempt = this.q.attempt;
-      this.drawDots(cx, cy);
       this.info.setText(this.i18n.t('qte.progress', {
         hits: this.q.hits, needed: this.cfg.needed,
         attempt: this.q.attempt, rounds: this.cfg.rounds,
       }));
     }
-    this.drawNeedle(cx, cy);
+    this.shownHits = this.q.hits;
+    this.shownAttempt = this.q.attempt;
+    this.drawNeedle();
   }
 
   // 發光弧區：寬幅低透明度模擬光暈＋窄幅實線（手繪光暈，取代成本高昂的 Glow 後製）
-  private drawArc(cx: number, cy: number) {
+  private drawArc() {
     const pal = this.pal;
     const a0 = Phaser.Math.DegToRad(this.q.arcStart);
     const a1 = Phaser.Math.DegToRad(this.q.arcStart + this.cfg.arcSize);
     this.arcG.clear();
     this.arcG.lineStyle(18, pal.gold, 0.3);
     this.arcG.beginPath();
-    this.arcG.arc(cx, cy, R, a0, a1);
+    this.arcG.arc(this.dialX, this.dialY, R, a0, a1);
     this.arcG.strokePath();
     this.arcG.lineStyle(8, pal.gold, 1);
     this.arcG.beginPath();
-    this.arcG.arc(cx, cy, R, a0, a1);
+    this.arcG.arc(this.dialX, this.dialY, R, a0, a1);
     this.arcG.strokePath();
   }
 
   // 指針與軸心：全場唯一每幀都要重畫的東西
-  private drawNeedle(cx: number, cy: number) {
+  private drawNeedle() {
     const pal = this.pal;
     const pr = Phaser.Math.DegToRad(this.q.pointer);
     this.needleG.clear();
     this.needleG.lineStyle(4, pal.paper, 1);
     this.needleG.lineBetween(
-      cx - 22 * Math.cos(pr), cy - 22 * Math.sin(pr),
-      cx + (R - 8) * Math.cos(pr), cy + (R - 8) * Math.sin(pr),
+      this.dialX - 22 * Math.cos(pr), this.dialY - 22 * Math.sin(pr),
+      this.dialX + (R - 8) * Math.cos(pr), this.dialY + (R - 8) * Math.sin(pr),
     );
-    this.needleG.fillStyle(pal.paper, 1).fillCircle(cx, cy, 7);
-    this.needleG.lineStyle(1.2, pal.paper, 0.4).strokeCircle(cx, cy, 10.5);
+    this.needleG.fillStyle(pal.paper, 1).fillCircle(this.dialX, this.dialY, 7);
+    this.needleG.lineStyle(1.2, pal.paper, 0.4).strokeCircle(this.dialX, this.dialY, 10.5);
   }
 
   // 命中點列（needed 顆，命中者填金）
-  private drawDots(cx: number, cy: number) {
+  private drawDots() {
     const pal = this.pal;
     this.dots.clear();
     const gap = 26;
-    const startX = cx - ((this.cfg.needed - 1) * gap) / 2;
+    const startX = this.dialX - ((this.cfg.needed - 1) * gap) / 2;
     for (let i = 0; i < this.cfg.needed; i++) {
       const x = startX + i * gap;
-      const y = cy + R + 34;
+      const y = this.dialY + R + 34;
       if (i < this.q.hits) {
         this.dots.fillStyle(pal.gold, 0.25).fillCircle(x, y, 10);
         this.dots.fillStyle(pal.gold, 1).fillCircle(x, y, 6.5);
