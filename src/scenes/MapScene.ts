@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, currentTarget, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
+import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, currentTarget, isTargetVisible, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
 import { visionRadius, SURVEY_COST, SURVEY_BONUS } from '../core/vision';
 import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
 import { getDifficulty } from '../core/difficulty';
@@ -89,6 +89,14 @@ export class MapScene extends Phaser.Scene {
   private heatChipText?: Phaser.GameObjects.Text;
   private heatChipX = 0;
   private heatChipY = 0;
+  // 熱區要看哪一齡。分齡之後若把所有線索混在一起算熱度，圖層會糊成一片而失去意義。
+  // null 代表「全部」——保留它是因為玩家有時就是想看整體密度。
+  private heatAge: 0 | 1 | 2 | null = 2;
+  private ageChipG?: Phaser.GameObjects.Graphics;
+  private ageChipText?: Phaser.GameObjects.Text;
+  private ageChipX = 0;
+  private ageChipY = 0;
+  private ageChipW = 60; // 依語系量測後的實際寬度（見 buildHud），供 updateHud 重繪時沿用同一版面
 
   private surveyChipG?: Phaser.GameObjects.Graphics;
   private surveyChipText?: Phaser.GameObjects.Text;
@@ -143,6 +151,10 @@ export class MapScene extends Phaser.Scene {
     // 的 scene.restart() 若沒清掉它，之後的 pointerup 會拿舊時間戳算 held，可能超過 350ms
     // 門檻，把一次輕點誤判成長按的標記手勢——與這個重置區塊本身要防的其他殘留同一類 bug。
     this.pressAt = null;
+    // heatAge 沒有指向任何 GameObject，不會崩潰，但殘留舊選擇會讓 restart 之後的
+    // 熱區「安靜地換了意義」而不重繪 chip 標籤——與這個重置區塊要防的其他殘留同一類問題，
+    // 故一併歸位到預設值（最新一齡）。
+    this.heatAge = 2;
     const w = this.scale.width;
     const h = this.scale.height;
     this.pal = getPalette(s.round);
@@ -584,7 +596,20 @@ export class MapScene extends Phaser.Scene {
     const hasBell = this.tools.has('glowbell');
     const xBell = xSound - 8 - 60;                        // 鈴 chip 左緣（僅持有微光鈴時顯示）
     const xHeat = (hasBell ? xBell : xSound) - 8 - 60; // 熱區圖層 chip 左緣
-    const xSurvey = xHeat - 8 - 60;      // 眺望 chip 左緣
+    // 新鮮度 chip 的文字（hud.age ＋ age.* 組合，如「Freshness: This morning」）中英文
+    // 長度差異很大，用量測而非猜一個常數寬度：量測本語系下四種狀態中最長的一個，
+    // 一次性定案整個 chip 生涯的寬度與命中區，之後切換狀態只改文字內容、不改版面，
+    // 避免命中區跟著文字長度漂移。
+    const ageMeas = this.add.text(0, 0, '', { fontFamily: FONTS.body, fontSize: '11px' });
+    let ageChipW = 60;
+    for (const a of [2, 1, 0, null] as const) {
+      ageMeas.setText(this.ageLabel(a));
+      ageChipW = Math.max(ageChipW, Math.ceil(ageMeas.width) + 20);
+    }
+    ageMeas.destroy();
+    this.ageChipW = ageChipW;
+    const xAge = xHeat - 8 - ageChipW;   // 新鮮度 chip 左緣（緊接圖層 chip 左側）
+    const xSurvey = xAge - 8 - 60;       // 眺望 chip 左緣
     this.chipRowLeft = xSurvey;          // 供 updateHud 計算體力條寬度時保持間距
     const chip = this.add.graphics();
     chip.lineStyle(1.2, pal.gold, 0.55);
@@ -698,6 +723,25 @@ export class MapScene extends Phaser.Scene {
         this.redraw();
       });
 
+    // 新鮮度 chip：四態循環（2→1→0→null→2）。分齡之後熱區可能算的是「今晨」也可能是
+    // 「全部混算」，兩者意義天差地遠，標籤本身必須帶出目前選的是哪一齡，不能只靠
+    // chip 開關色系暗示（那套語彙是給二態開關用的，這裡是四態循環，沒有「開／關」可言）。
+    this.ageChipX = xAge;
+    this.ageChipY = chipY;
+    this.ageChipG = this.add.graphics();
+    this.ageChipText = this.add.text(xAge + ageChipW / 2, chipY + chipH / 2, '', {
+      fontFamily: FONTS.body, fontSize: '11px', color: cssHex(pal.gold),
+    }).setOrigin(0.5);
+    this.drawAgeChip(xAge, chipY, ageChipW, chipH);
+    this.add.rectangle(xAge + ageChipW / 2, chipY + chipH / 2, ageChipW, 44, 0, 0) // 44px 命中區
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', (p: Phaser.Input.Pointer) => {
+        p.event.stopPropagation();
+        this.heatAge = this.heatAge === 2 ? 1 : this.heatAge === 1 ? 0 : this.heatAge === 0 ? null : 2;
+        this.drawAgeChip(xAge, chipY, ageChipW, chipH);
+        this.redraw();
+      });
+
     // 眺望 chip：可用＝供給色描邊，已在此格眺望過或體力不足＝暗色描邊（僅視覺停用，
     // 點擊仍走同一路徑，由 survey() 內部 no-op）——沿用鈴 chip 的同款處理
     this.surveyChipX = xSurvey;
@@ -778,6 +822,22 @@ export class MapScene extends Phaser.Scene {
       g.lineStyle(1.2, pal.gold, 0.7).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
       this.heatChipText!.setColor(cssHex(pal.gold)).setText(label);
     }
+  }
+
+  // 新鮮度 chip 標籤：組合 hud.age（這是什麼）與目前齡對應的 age.* 字串（現在選的是哪一齡），
+  // 兩段都要有——只顯示齡別本身不足以說明這是在調熱區的口徑，只顯示 hud.age 又看不出目前選擇
+  private ageLabel(age: 0 | 1 | 2 | null): string {
+    const valueKey = age === null ? 'age.all' : (['age.older', 'age.night', 'age.fresh'] as const)[age];
+    return `${this.i18n().t('hud.age')}: ${this.i18n().t(valueKey)}`;
+  }
+
+  // 新鮮度 chip：固定金色描邊（四態循環，沒有二態開關語彙可套），文字內容即目前選中的齡
+  private drawAgeChip(x: number, y: number, w: number, h: number) {
+    const pal = this.pal;
+    const g = this.ageChipG!;
+    g.clear();
+    g.lineStyle(1.2, pal.gold, 0.7).strokeRoundedRect(x, y, w, h, BRUSH_RADIUS);
+    this.ageChipText!.setColor(cssHex(pal.gold)).setText(this.ageLabel(this.heatAge));
   }
 
   // 眺望 chip：可用＝供給色描邊＋亮字，不可用＝暗描邊＋暗字
@@ -1261,7 +1321,9 @@ export class MapScene extends Phaser.Scene {
     // 熱度以最大值正規化。玩家可用 HUD 的「圖層」chip 關閉。
     this.heatG.clear();
     if (this.heatOn) {
-      const heat = heatMap(unmutedReadClues(L, s.readLog, s.mutedClues), L.mapSize);
+      const live = unmutedReadClues(L, s.readLog, s.mutedClues)
+        .filter((c) => this.heatAge === null || c.age === this.heatAge);
+      const heat = heatMap(live, L.mapSize);
       const peak = maxHeat(heat);
       if (peak > 0) {
         for (const [hk, n] of heat) {
@@ -1289,6 +1351,10 @@ export class MapScene extends Phaser.Scene {
       const p = px(c.position);
       const r = Math.max(8, cs * 0.34);
       drawClueToken(this.g, p.x, p.y, r, c.type, pal);
+      // 新鮮度：越舊的痕跡越淡。用底色半透明覆蓋而非改 alpha，是因為
+      // drawClueToken 內部自帶多段 fillStyle，逐段調 alpha 會讓圖形散開。
+      const fade = [0.45, 0.22, 0][c.age];
+      if (fade > 0) this.g.fillStyle(pal.bg, fade).fillCircle(p.x, p.y, r + 1);
       if (s.readClues.has(key(c.position))) this.drawReadCheck(p.x, p.y, r);
       // 靜音線索：疊一道斜槓，與 ♪ chip 的靜音語彙一致
       if (s.mutedClues.has(i)) {
@@ -1312,6 +1378,14 @@ export class MapScene extends Phaser.Scene {
         if (s.seen.has(key({ x, y }))) continue;
         this.fogG.fillStyle(0x000000, 0.62).fillRect(this.ox + x * cs, this.oy + y * cs, cs, cs);
       }
+    }
+
+    // 獵物：只在當前視野半徑內顯形。迷霧仍在，所以看得到牠時你已經很近了——
+    // 這讓追蹤的最後一段變得可讀，而不是憑空猜。
+    if (isTargetVisible(s)) {
+      const tp = px(currentTarget(s));
+      this.g.fillStyle(pal.glow, 0.25).fillCircle(tp.x, tp.y, cs * 0.5);
+      this.g.fillStyle(pal.glow, 1).fillCircle(tp.x, tp.y, cs * 0.22);
     }
 
     // 玩家：光暈＋紙墨白圓點（設計板）
@@ -1344,6 +1418,7 @@ export class MapScene extends Phaser.Scene {
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
     if (this.bellChipG) this.drawBellChip(this.bellChipX, this.bellChipY, 60, 30);
     if (this.heatChipG) this.drawHeatChip(this.heatChipX, this.heatChipY, 60, 30);
+    if (this.ageChipG) this.drawAgeChip(this.ageChipX, this.ageChipY, this.ageChipW, 30);
     if (this.surveyChipG) this.drawSurveyChip(this.surveyChipX, this.surveyChipY, 60, 30);
 
     // 置中體力條在較窄視窗（或持有微光鈴、chip 列多一格時）會撞上右側 chip 列
@@ -1357,9 +1432,10 @@ export class MapScene extends Phaser.Scene {
     const bx = barLeft ? 50 : w / 2 - 105;
     // F6：Math.max(90, ...) 這個下限本身會壓過 Math.min 的夾限——當 chipRowLeft - 8 - bx < 90，
     // 也就是 chipRowLeft < 148（bx=50 時），體力條寬度仍被撐到 90，右緣就超出 chipRowLeft - 8，
-    // 8px 間距保證在此失效。持有微光鈴的 compact（w<560）版面下 chipRowLeft = w - 356
-    // （見 buildHud 的 xSurvey 推導），代入 chipRowLeft < 148 得 w < 504，不是 w < 436。
-    // 行動裝置尚非出貨目標，此處只記正確門檻，不改變數值。
+    // 8px 間距保證在此失效。這個門檻對應的 w 不再是單一數字：新鮮度 chip 併入 xSurvey 推導後
+    // （見 buildHud），chipRowLeft 多減去 8 + ageChipW，而 ageChipW 依語系文字量測而非常數，
+    // 換語系換寬度。核心結論不變——此處只記正確門檻（chipRowLeft），不改變數值本身，
+    // 就不受 ageChipW 波動影響。行動裝置尚非出貨目標。
     const bw = barLeft ? Math.max(90, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
     const bh = barLeft ? 10 : 12;
     const by = barLeft ? 46 : 27;
