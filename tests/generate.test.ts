@@ -3,7 +3,7 @@ import { generateLevel, generateLevelFor, IRIS_RATE, perAgeMaxIntersection } fro
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key, intersect } from '../src/core/clues';
-import { dist, angleDiff, angleDeg } from '../src/core/geometry';
+import { dist, angleDiff, angleDeg, cheb } from '../src/core/geometry';
 import { startCorner } from '../src/core/terrain';
 import { CREATURES } from '../src/data/creatures';
 import { applyQuirk } from '../src/core/quirks';
@@ -109,6 +109,22 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       const waypointKeys = new Set(level.route.waypoints.map(key));
       for (const c of level.clues) {
         expect(waypointKeys.has(key(c.position))).toBe(false);
+      }
+    }
+  });
+
+  it('no clue, real or decoy, lies within Chebyshev 1 of the quarry\'s starting cell', () => {
+    // 守的是「免費勝利」這個機制：age 2 的錨點就是 targetPos（獵物開局站的節點），
+    // session.move 在玩家踏進與獵物相距 1 格時就進入近距離判讀。只擋節點本身不夠——
+    // 一條擾動線索的偏移量最小只有 1 格，剛好可能落在節點旁邊那一圈，而那一圈
+    // 距離獵物一樣是 Chebyshev 1。若這圈沒被擋住，開局唯一揭示、地圖上還畫著
+    // 指引記號的起始蹤跡（見 route.ts 的 ROUTE_START_INDEX 與 generate.ts 的
+    // trailheadIndex 優先取 age 2 的規則）就可能直接指在獵物旁邊，走過去就贏，
+    // 完全不需要推理（見 generate.ts 的 forbidden 集合建置註解）。
+    for (const { seed, round } of cases) {
+      const level = generateLevel(round, mulberry32(seed));
+      for (const c of level.clues) {
+        expect(cheb(c.position, level.targetPos)).toBeGreaterThan(1);
       }
     }
   });
@@ -305,16 +321,25 @@ describe('generateLevelFor: 線索新鮮度', () => {
     }
   });
 
-  it('同齡真線索的交集非空、包含該齡節點，且不超過每齡上限', () => {
+  it('同齡真線索的交集非空、包含該齡節點，且不超過每齡上限（或已打滿追加上限）', () => {
     // 這是廣義化後的可解性保證。舊版是「所有線索的交集包含目標」，
     // 現在是「每一齡的交集包含該齡的位置」。
+    // size<=cap 這條沒有逃生門的話，只在這裡的固定生物（plumetail）× 60 顆種子這個
+    // 樣本裡剛好沒踩到「收斂迴圈打滿追加上限仍未收斂」的情況才會通過——實測橫跨全部
+    // 8 個生物在 round 9 量測，4.69% 的齡組超標，最差到 19。逃生門的形狀比照上面
+    // 「per-age intersection converges below the tier cap」那一條：要嘛真的收斂到門檻
+    // 以下，要嘛這一齡已經追加滿 3 條（迴圈打到自己的安全上限），兩者擇一即可。
+    const p9 = getDifficulty(9);
     for (const L of levels()) {
       for (const age of AGES) {
         const group = L.clues.filter((c) => !c.isDecoy && c.age === age);
         const cells = intersect(group, L.mapSize);
         expect(cells.size).toBeGreaterThan(0);
         expect(cells.has(key(L.route.waypoints[age]))).toBe(true);
-        expect(cells.size).toBeLessThanOrEqual(perAgeMaxIntersection(9));
+        const extrasAdded = L.clues.filter(
+          (c, i) => i >= p9.clueCount && !c.isDecoy && c.age === age,
+        ).length;
+        expect(cells.size <= perAgeMaxIntersection(9) || extrasAdded >= 3).toBe(true);
       }
     }
   });

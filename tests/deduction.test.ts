@@ -100,11 +100,19 @@ describe('infoCompleteStep', () => {
   });
 
   it('computes each age separately — a mixed-age read log must not intersect across ages', () => {
-    // 兩條 age 2 的線索先收斂到最終交集，接著讀到一條 age 0 的線索（讀取順序刻意排最後）。
-    // 舊版把三條線索交在一起：age 0 和 age 2 錨定不同節點，混齡交集在多數關卡本來就是空的，
-    // 會在讀到第二條（不同齡）線索的那一步就回報「已完備」（此例會是 step 11）。
-    // 新版逐齡計算：age 2 在 step 11 完備、age 0 只有一條線索、一讀（step 20）就完備，
-    // 兩者取最大值，應回傳 20——也就是「最後一個齡完備的那一步」，而不是混齡交集消失的那一步。
+    // 兩條 age 2 的線索（index 0、1）交集需要兩條才收斂到最終大小（5 格）；
+    // 一條 age 0 的線索（index 2）夾在中間讀到，讀取順序是 index 0, 2, 1
+    // （步數 4, 11, 20）——age 2 的第二條、也是讓它收斂的那一條，被排到最後讀。
+    // 這個順序是刻意的：舊版把全部三條線索交在一起算 finalSize，由於 age 0
+    // 錨定的節點跟 age 2 的相距很遠、候選圓完全不重疊，三條的混合交集恆為 0；
+    // 累加到「index0 + index2」兩條時，交集就已經是 0（＝混合 finalSize），
+    // 舊版會在這裡（step 11）就回報「已完備」——但此時 age 2 那一組其實還沒收斂，
+    // 决定 age 2 答案的第二條線索（index 1）要到 step 20 才讀到。
+    // 新版逐齡計算：age 2 組要等 index 1（step 20）才收斂到 5 格，age 0 組只有
+    // 一條、一讀（step 11）即完備；兩者取最大值，應回傳 20。
+    // 兩個實作在這個讀取順序下給出不同答案（11 對 20），這條測試因此才真的
+    // 會在舊版重新出現時失敗——原本的讀取順序（0,1,2）讓兩個實作剛好都算出 20，
+    // 沒有分辨力。
     const level = makeLevel([
       disturbance(5, 5, 2),
       disturbance(7, 5, 2),
@@ -112,8 +120,8 @@ describe('infoCompleteStep', () => {
     ]);
     const step = infoCompleteStep(level, [
       { clueIndex: 0, step: 4 },
-      { clueIndex: 1, step: 11 },
-      { clueIndex: 2, step: 20 },
+      { clueIndex: 2, step: 11 },
+      { clueIndex: 1, step: 20 },
     ]);
     expect(step).toBe(20);
   });

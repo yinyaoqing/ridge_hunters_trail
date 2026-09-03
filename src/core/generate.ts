@@ -21,15 +21,22 @@ export const IRIS_RATE = 0.05;
 //
 // 三個門檻不是等比例下修就好：round<=3 的線索候選集合天生就大到即使門檻放到 14，
 // 收斂迴圈仍常常打滿每齡 3 條的追加上限（實測仍有 10% 的齡組超標）。門檻必須放得
-// 遠比表面數字看起來寬（30），才能讓多數齡組不需要靠打滿追加上限就收斂；round<=7
+// 遠比表面數字看起來寬，才能讓多數齡組不需要靠打滿追加上限就收斂；round<=7
 // 給中間值（14）；round 9 的線索本來就窄，沿用原本的 5 即可收斂。
-// 數值由 tests/generate.test.ts 與本檔的一次性量測腳本校準（8 個生物 × 3 個難度層
-// × 每種 150 顆種子，共 3600 局），確認兩個性質同時成立：
-//   - 三檔的真線索平均數都落在 clueCount+3 以內：round1 5.96/7、round5 7.44/8、
-//     round9 8.28/9
-//   - 難度曲線不再倒過來：round1 5.96 < round5 7.44 < round9 8.28
+//
+// round<=3 這一檔原本設 30（14 打滿追加上限後的下一個試驗值），但沒有在中間試過別的
+// 數字。逐一掃過 1,200 局後，25 同樣滿足兩個驗收條件——平均真線索數 6.57（門檻
+// clueCount+3=7 以內，也仍低於 round9 的 8.47，難度曲線沒有倒過來）——同時把最新齡
+// （age 2，也就是起始蹤跡所在的那一齡）的候選集合中位數收在 15 格，恰好等於
+// difficulty.ts 對這一層宣稱的 maxIntersection；30 則會放到 16 格，比表面數字寬。
+// 門檻在「線索代幣的視覺雜亂」與「推理精準度」之間取捨，25 是仍能守住這個承諾的
+// 最寬鬆值。數值由 tests/generate.test.ts 與本檔的一次性量測腳本校準（8 個生物 ×
+// 3 個難度層 × 每種 150 顆種子，共 3600 局），確認兩個性質同時成立：
+//   - 三檔的真線索平均數都落在 clueCount+3 以內：round1 6.57/7、round5 7.45/8、
+//     round9 8.47/9
+//   - 難度曲線不再倒過來：round1 6.57 < round5 7.45 < round9 8.47
 export function perAgeMaxIntersection(round: number): number {
-  if (round <= 3) return 30;
+  if (round <= 3) return 25;
   if (round <= 7) return 14;
   return 5;
 }
@@ -53,15 +60,20 @@ function randomPosFarFrom(rng: Rng, size: number, from: Vec2, minDist: number): 
   return corners.reduce((a, b) => (dist(b, from) > dist(a, from) ? b : a));
 }
 
-// 由 from 向外一圈圈掃描，找第一個在圖內且不在 forbidden 裡的格子。
+// 由 from 向外一圈圈掃描，找第一個在圖內、不在 forbidden 裡、也不是錨點本身的格子。
 // makeClue 的保底位移用它收尾：保底位移本身也可能剛好落在另一個節點上。
-function nearestAllowed(from: Vec2, forbidden: Set<string>, size: number): Vec2 {
+// 也要擋錨點：幌子的錨點不保證在 forbidden 裡，若保底位移落在禁區、outward 搜尋
+// 又繞回錨點本身，會生出 pos === anchor 的線索——足跡的話 angleDeg(p, p) 是 0，
+// 而 candidates() 的判定本來就排除線索自己所在的格，等於這條線索的候選集合
+// 不含錨點，自我矛盾、悄悄失效。
+function nearestAllowed(from: Vec2, forbidden: Set<string>, size: number, anchor: Vec2): Vec2 {
   for (let r = 0; r < size; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const p = { x: from.x + dx, y: from.y + dy };
         if (p.x < 0 || p.y < 0 || p.x >= size || p.y >= size) continue;
+        if (p.x === anchor.x && p.y === anchor.y) continue;
         if (!forbidden.has(key(p))) return p;
       }
     }
@@ -93,7 +105,7 @@ function makeClue(
     // 保底位移也可能落在禁區（例如剛好挪到另一個節點上）：由此向外掃到第一個
     // 在圖內且不在 forbidden 裡的格子。
     if (forbidden.has(key(pos))) {
-      pos = nearestAllowed(pos, forbidden, size);
+      pos = nearestAllowed(pos, forbidden, size, anchor);
     }
   }
   const actual = dist(pos, anchor);
@@ -123,11 +135,22 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   const route = buildRoute(rng, terrain, elevation, size, routeRuleFor(creatureId));
   const targetPos = route.waypoints[ROUTE_START_INDEX];
 
-  // 線索不得落在路線的任何節點上。獵物會依序停在每一個節點，而 session.move
-  // 在玩家踏進與獵物相距 1 格時就進入近距離判讀——一個畫在節點上的 token
-  // 等於「走過去就贏」，完全不需要推理。舊版只擋住目標所在格，分齡之後
-  // 舊齡的線索會落在獵物的起始格上，實測第 1 局有 15% 的關卡出現這種免費勝利。
-  const forbidden = new Set(route.waypoints.map(key));
+  // 線索不得落在路線的任何節點上，也不得落在「獵物起始格」周圍一圈。
+  // 節點本身：獵物會依序停在每一個，token 畫在上面等於走過去就贏。
+  // 起始格周圍一圈：session.move 在玩家踏進與獵物相距 1 格時就進入近距離判讀，
+  // 而起始蹤跡（開局唯一揭示、地圖上還畫了指引記號的那一條）取的是最新齡，
+  // 最新齡的錨點正是起始格——擾動線索的偏移量最小是 1 格，因此不擋這一圈的話
+  // 實測 14–16% 的關卡會以「一個指著獵物旁邊的箭頭」開場，跟著走就結束，
+  // 完全不需要推理。這比它取代的「線索剛好落在起始格上」更糟，因為那是碰運氣，
+  // 這是遊戲主動叫你去做的唯一一件事。
+  const forbidden = new Set<string>(route.waypoints.map(key));
+  const startCell = route.waypoints[ROUTE_START_INDEX];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const p = { x: startCell.x + dx, y: startCell.y + dy };
+      if (p.x >= 0 && p.y >= 0 && p.x < size && p.y < size) forbidden.add(key(p));
+    }
+  }
 
   const ratio: [ClueType, number][] = [
     ['footprint', p2.typeRatio.footprint],
