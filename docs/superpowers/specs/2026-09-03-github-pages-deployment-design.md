@@ -118,32 +118,46 @@ concurrency:
 
 ## 4. 上線前的分支整併
 
-三件事卡在 `main` 與線上版之間，順序不能顛倒：
+四件事卡在 `main` 與線上版之間，順序不能顛倒：
 
-1. **workflow 進 PR。** 把 `ci.yml` 當成第一個 PR 的內容，它會在自己的 PR 上
-   先自我驗證一次。若 Node 版本、`npm ci`、或某個測試在 Linux 上與 Windows
-   行為不同，紅燈出現在這裡。
-2. **工作區收尾。** `src/core/quirks.ts` 有一行未提交的修改，合併前要決定提交
-   或丟棄。兩支 `tests/_scratch_*.test.ts` 維持不追蹤——它們是調參數用的探針
-   （會印統計數字、跑 1000 seed 掃描），不屬於 CI。
-3. **Phase 6a 的 12 個 commit 合進 `main`。** 無分歧，快轉即可。
-
-之後才是改預設分支、開 Pages 開關、第一次自動部署。
+1. **workflow 先進 feature 分支並推上去。** `ci.yml` 因此在自己的分支上先自我
+   驗證一次。若 Node 版本、`npm ci`、或某個測試在 Linux 上與 Windows 行為不同，
+   紅燈出現在這裡，而不是在往線上推的時候。
+2. **工作區收尾。** Phase 6a 的調參改動尚未提交（撰寫時是 `src/core/quirks.ts`、
+   `tests/solvability.test.ts`、`tests/terrain.test.ts`，執行時以 `git status`
+   為準），合併前要逐檔決定提交或丟棄。`tests/_scratch_*.test.ts` 維持不追蹤
+   ——它們是調參數用的探針（會印統計數字、跑 1000 seed 掃描），不屬於 CI。
+3. **GitHub 端的兩個設定必須做在合併之前**，見 §5。這一點違反直覺，所以拆出來說：
+   - **改預設分支**要在**開 PR 之前**。GitHub 開 PR 時 base 會預設成 repo 的
+     預設分支，而那個指標現在指著 8/31 的文件分支——不先修，PR 會默默開錯目標。
+   - **啟用 Pages** 要在**合併之前**。合併進 `main` 的那一刻就觸發首次部署，
+     Pages 沒啟用的話 `deploy` job 直接失敗。
+4. **Phase 6a 走 PR 合進 `main`。** 無分歧，但仍走 PR 而非本地快轉——第一次跑
+   這套流程，要讓紅燈有機會出現在合併之前。
 
 ---
 
 ## 5. 只有 owner 能做的手動步驟
 
-Actions 無權自行啟用 Pages，也無權改預設分支。這三步必須在 GitHub 網頁上點：
+本機**沒有 `gh` CLI 也沒有 GitHub token**，因此凡是 GitHub 網頁端的動作都只能
+人工執行。依發生順序：
 
-| 位置 | 動作 | 為什麼非人不可 |
+| 時機 | 位置 | 動作 |
 |---|---|---|
-| Settings → Pages → Source | 選 **GitHub Actions** | 這是 Pages 的啟用開關，workflow 無權自行開啟 |
-| Settings → General → Default branch | 改成 **main** | 修正 `origin/HEAD` 指向 8/31 文件分支的問題 |
-| Actions 頁面（首次） | 若出現授權提示則批准 | 新 repo 首次執行 workflow 偶爾需要 |
+| 開 PR 前 | Settings → General → Default branch | 改成 **main** |
+| 合併前 | Settings → Pages → Source | 選 **GitHub Actions** |
+| 合併前 | Pull requests | 開 PR（base `main`）並確認 `check` 綠燈 |
+| 觸發部署 | Pull requests | 合併 PR |
+| 驗收 | 線上網址 | 實際玩一局（見 §6 第 3 項） |
+| 收尾 | repo 首頁 → About | 勾選 **Use your GitHub Pages website** |
 
-第二項與部署無關也該修：任何人 clone 這個 repo，現在拿到的是三天前的文件分支
-而不是遊戲。選了「推 `main` 就部署」之後，它從衛生問題升級為前提條件。
+前兩項的順序不是任意的：**改預設分支**必須在開 PR 之前，因為 PR 的 base 會預設成
+repo 的預設分支，而那個指標現在指著 8/31 的文件分支；**啟用 Pages** 必須在合併之前，
+因為合併的那一刻就觸發首次部署。兩者都排在合併之後的話，首次部署會失敗，而失敗
+原因看起來會像 workflow 寫錯——實際上只是設定沒開。
+
+改預設分支本身也是該修的衛生問題：任何人 clone 這個 repo，現在拿到的是三天前的
+文件分支而不是遊戲。選了「推 `main` 就部署」之後，它從衛生問題升級為前提條件。
 
 ---
 
