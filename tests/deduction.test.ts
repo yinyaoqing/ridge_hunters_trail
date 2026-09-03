@@ -98,6 +98,25 @@ describe('infoCompleteStep', () => {
     expect(infoCompleteStep(level, [{ clueIndex: 0, step: 2 }])).toBe(null);
     expect(infoCompleteStep(level, [])).toBe(null);
   });
+
+  it('computes each age separately — a mixed-age read log must not intersect across ages', () => {
+    // 兩條 age 2 的線索先收斂到最終交集，接著讀到一條 age 0 的線索（讀取順序刻意排最後）。
+    // 舊版把三條線索交在一起：age 0 和 age 2 錨定不同節點，混齡交集在多數關卡本來就是空的，
+    // 會在讀到第二條（不同齡）線索的那一步就回報「已完備」（此例會是 step 11）。
+    // 新版逐齡計算：age 2 在 step 11 完備、age 0 只有一條線索、一讀（step 20）就完備，
+    // 兩者取最大值，應回傳 20——也就是「最後一個齡完備的那一步」，而不是混齡交集消失的那一步。
+    const level = makeLevel([
+      disturbance(5, 5, 2),
+      disturbance(7, 5, 2),
+      { type: 'disturbance', position: { x: 1, y: 1 }, isDecoy: false, age: 0, data: { radius: 2 } },
+    ]);
+    const step = infoCompleteStep(level, [
+      { clueIndex: 0, step: 4 },
+      { clueIndex: 1, step: 11 },
+      { clueIndex: 2, step: 20 },
+    ]);
+    expect(step).toBe(20);
+  });
 });
 
 describe('misleadingDecoy', () => {

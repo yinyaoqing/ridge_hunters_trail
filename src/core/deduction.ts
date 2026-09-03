@@ -1,6 +1,6 @@
 import { candidates, intersect, key } from './clues';
 import { cheb, type Vec2 } from './geometry';
-import type { Clue, Level } from './types';
+import type { Clue, ClueAge, Level } from './types';
 import type { ClueRead } from './session';
 
 // 玩家目前可用來推理的線索：已判讀、且未被靜音者，維持判讀順序。
@@ -36,9 +36,11 @@ export function maxHeat(heat: Map<string, number>): number {
   return max;
 }
 
-// 資訊完備步數：依判讀順序重播真線索，交集大小第一次達到「最終交集大小」的那一步。
-// 從這一步之後，玩家再走的路都沒有帶來更精確的資訊——揭曉畫面用它指出過度行走。
-// 幌子不計入：它們不是關於目標的資訊。玩家未讀到任何真線索時回傳 null。
+// 資訊完備步數：分齡之後不能再把所有真線索交在一起——不同齡錨定在不同節點，
+// 全部交集在九成以上的關卡本來就是空的，finalSize 因此恆為 0，函式會在玩家
+// 讀到第二條不同齡的線索時就回報「資訊已完備」，揭曉畫面於是幾乎每一局
+// 都在指責玩家多走了路。改為逐齡各自計算，回傳「最後一個齡完備的那一步」——
+// 在那之後再走，每一齡的資訊都不會再更精確。
 export function infoCompleteStep(level: Level, readLog: ClueRead[]): number | null {
   const real: { clue: Clue; step: number }[] = [];
   for (const entry of readLog) {
@@ -47,14 +49,21 @@ export function infoCompleteStep(level: Level, readLog: ClueRead[]): number | nu
   }
   if (real.length === 0) return null;
 
-  const finalSize = intersect(real.map((r) => r.clue), level.mapSize).size;
-  const acc: Clue[] = [];
-  for (const r of real) {
-    acc.push(r.clue);
-    if (intersect(acc, level.mapSize).size === finalSize) return r.step;
+  let last: number | null = null;
+  for (const age of [0, 1, 2] as ClueAge[]) {
+    const group = real.filter((r) => r.clue.age === age);
+    if (group.length === 0) continue;
+    const finalSize = intersect(group.map((r) => r.clue), level.mapSize).size;
+    // 理論上最後一輪必定等於 finalSize；保底取該齡最後一次判讀的步數
+    let stepForAge = group[group.length - 1].step;
+    const acc: Clue[] = [];
+    for (const r of group) {
+      acc.push(r.clue);
+      if (intersect(acc, level.mapSize).size === finalSize) { stepForAge = r.step; break; }
+    }
+    last = last === null ? stepForAge : Math.max(last, stepForAge);
   }
-  // 理論上不可達（最後一輪必定等於 finalSize），保底回傳最後一次判讀的步數
-  return real[real.length - 1].step;
+  return last;
 }
 
 // 誤導你的那條假蹤跡：玩家已判讀的幌子中，「真的把你帶偏」的第一條（判讀順序）。

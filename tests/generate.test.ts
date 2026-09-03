@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateLevel, generateLevelFor, IRIS_RATE, PER_AGE_MAX_INTERSECTION } from '../src/core/generate';
+import { generateLevel, generateLevelFor, IRIS_RATE, perAgeMaxIntersection } from '../src/core/generate';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key, intersect } from '../src/core/clues';
@@ -33,13 +33,30 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     }
   });
 
-  it('intersection converges below cap (or hits the extra-clue safety limit)', () => {
+  it('per-age intersection converges below the tier cap (or hits the extra-clue safety limit)', () => {
+    // 舊版把全部真線索交在一起比對 p.maxIntersection：分齡之後那個交集在幾乎
+    // 每一局都是空集合（不同齡錨定不同節點），size<=cap 恆為 true——實測 1200 局
+    // 裡 0.00% 超過門檻，因為集合本身是空的。斷言因此永遠通過，等於沒在測。
+    // 改為逐齡比對 perAgeMaxIntersection(round)，這是分齡之後真正在收斂的量。
+    //
+    // 「安全上限」分支也要逐齡重寫：generate.ts 裡 clues 陣列的順序是
+    // 「前 p.clueCount 條是初始真線索」→「之後、幌子之前是收斂迴圈追加的 scent」
+    // →「最後是幌子」，所以 index >= p.clueCount 且非幌子的那些就是某一齡追加的
+    // 線索，每一齡最多追加 3 條（見 generate.ts 的 extra < 3 迴圈）。
+    // 沒收斂到門檻以下、但那一齡已經追加滿 3 條，代表迴圈確實跑到了自己的安全上限，
+    // 不是門檻設錯。
     for (const { seed, round } of cases) {
       const p = getDifficulty(round);
+      const cap = perAgeMaxIntersection(round);
       const level = generateLevel(round, mulberry32(seed));
-      const real = level.clues.filter((c) => !c.isDecoy);
-      const size = intersect(real, level.mapSize).size;
-      expect(size <= p.maxIntersection || real.length >= p.clueCount + 5).toBe(true);
+      for (const age of [0, 1, 2] as ClueAge[]) {
+        const group = level.clues.filter((c) => !c.isDecoy && c.age === age);
+        const extrasAdded = level.clues.filter(
+          (c, i) => i >= p.clueCount && !c.isDecoy && c.age === age,
+        ).length;
+        const size = intersect(group, level.mapSize).size;
+        expect(size <= cap || extrasAdded >= 3).toBe(true);
+      }
     }
   });
 
@@ -80,14 +97,18 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     expect(a).toEqual(b);
   });
 
-  it('every clue position differs from its own anchor (the waypoint of its age)', () => {
-    // 舊版比對的是全域 targetPos；線索現在錨定在自己那一齡的節點，makeClue 保證的是
-    // 「不落在自己的錨點上」，不是「不落在 targetPos 上」——不同齡的節點可能剛好同格，
-    // 此時一條錨定別齡的線索落在 targetPos 上是正常的，不該被這裡誤判成矛盾。
+  it('no clue, real or decoy, sits on any waypoint of the route', () => {
+    // 這條原本只比對「線索不落在自己那一齡的錨點上」，但那樣擋不住一條舊齡的線索
+    // 落在別齡（尤其是獵物開局所在的 W2）的節點上——session.move 在玩家踏進與
+    // 獵物相距 1 格時就進入近距離判讀，一個畫在節點上的 token 等於「走過去就贏」，
+    // 完全不需要推理。實測分齡之後第 1 局有 15.5% 的關卡出現這種免費勝利。
+    // 正確的不變量是「任何線索（真線索或幌子）都不能落在路線的任何節點上」，
+    // 由 generate.ts 的 forbidden 集合強制——這裡驗證它真的擋住了每一種情況。
     for (const { seed, round } of cases) {
       const level = generateLevel(round, mulberry32(seed));
-      for (const c of level.clues.filter((c) => !c.isDecoy)) {
-        expect(key(c.position)).not.toBe(key(level.route.waypoints[c.age]));
+      const waypointKeys = new Set(level.route.waypoints.map(key));
+      for (const c of level.clues) {
+        expect(waypointKeys.has(key(c.position))).toBe(false);
       }
     }
   });
@@ -225,10 +246,14 @@ describe('generateLevel: trailhead', () => {
     }
   });
 
-  it('picks the real clue with the lowest route cost from spawn, not merely nearest by straight-line distance (F2)', () => {
+  it('prefers the lowest route-cost real clue of age 2, falling back to the overall cheapest only when age 2 has none (F2/F5)', () => {
     // 直線距離挑選會漏掉「5 格外但隔著挖通的岩坡稜脊」比「8 格外橫跨草地」貴的情況——
-    // 改用 routeCostsFrom 在生成完成（含 ensureReachable 挖出的隘口）後的地形上重算，
-    // 斷言 trailhead 就是所有真線索裡路線成本最低者；平手時取索引最小者。
+    // 改用 routeCostsFrom 在生成完成（含 ensureReachable 挖出的隘口）後的地形上重算。
+    // 舊版斷言 trailhead 是「所有真線索裡路線成本最低者」，不分齡；但起始蹤跡是新手
+    // 打開關卡第一件讀到的資訊，該指向獵物「現在在哪」（age 2），不是兩個節點前的
+    // 舊蹤跡（age 0/1）。改為優先在 age 2 的真線索裡取成本最低者；每一齡都保證至少
+    // 一條真線索，所以這個池子在正常情況下必然非空，只有理論上的保底才會退回全體。
+    // 平手時仍取索引最小者。
     for (let seed = 1; seed <= 40; seed++) {
       for (const round of [1, 5, 9]) {
         const level = generateLevel(round, mulberry32(seed));
@@ -237,11 +262,14 @@ describe('generateLevel: trailhead', () => {
         const real = level.clues
           .map((c, i) => ({ c, i }))
           .filter(({ c }) => !c.isDecoy);
-        const minCost = Math.min(...real.map(({ c }) => costs.get(key(c.position)) ?? Infinity));
+        const fresh = real.filter(({ c }) => c.age === 2);
+        const pool = fresh.length > 0 ? fresh : real;
+        const minCost = Math.min(...pool.map(({ c }) => costs.get(key(c.position)) ?? Infinity));
         const chosenCost = costs.get(key(level.clues[level.trailheadIndex].position)) ?? Infinity;
         expect(chosenCost).toBe(minCost);
-        // 平手時取索引最小者：所有成本等於 minCost 的真線索裡，trailheadIndex 必須是最小的那個
-        const tiedIndices = real.filter(({ c }) => (costs.get(key(c.position)) ?? Infinity) === minCost)
+        if (fresh.length > 0) expect(level.clues[level.trailheadIndex].age).toBe(2);
+        // 平手時取索引最小者：所有成本等於 minCost 的候選裡，trailheadIndex 必須是最小的那個
+        const tiedIndices = pool.filter(({ c }) => (costs.get(key(c.position)) ?? Infinity) === minCost)
           .map(({ i }) => i);
         expect(level.trailheadIndex).toBe(Math.min(...tiedIndices));
       }
@@ -286,7 +314,7 @@ describe('generateLevelFor: 線索新鮮度', () => {
         const cells = intersect(group, L.mapSize);
         expect(cells.size).toBeGreaterThan(0);
         expect(cells.has(key(L.route.waypoints[age]))).toBe(true);
-        expect(cells.size).toBeLessThanOrEqual(PER_AGE_MAX_INTERSECTION);
+        expect(cells.size).toBeLessThanOrEqual(perAgeMaxIntersection(9));
       }
     }
   });
