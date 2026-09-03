@@ -1,0 +1,64 @@
+# 把關與發布。check 在任何分支上跑，deploy 只在 main 上跑並直接發布 check
+# 產出的那包 artifact——不重新建置，好讓「線上跑的東西通過了檢查」是事實而非推論。
+name: CI
+
+# 只掛 push，不掛 pull_request：兩個都掛的話，同一個 repo 內開的 PR 會跑兩次
+# 一模一樣的檢查。檢查狀態是掛在 commit 上，所以分支推上去跑的那次，PR 頁面
+# 照樣看得到結果。
+on:
+  push:
+    branches: ['**']
+
+# 預設收到最小權限；需要寫入的能力只加在 deploy job 上。
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'   # 對齊開發機的 v22.22.0
+          cache: npm
+
+      # npm ci 而非 npm install：嚴格照 package-lock.json 安裝，
+      # 讓 CI 裝到的相依與本機淨室預演時完全一致。
+      - run: npm ci
+
+      - run: npm test
+
+      # build script 本身就是 tsc --noEmit && vite build，
+      # 型別檢查已含在內，不需要另外再跑一次 tsc。
+      - run: npm run build
+
+      # 非 main 分支也會上傳。成本是幾秒鐘，換來 deploy job 完全不必碰原始碼。
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # 掛在 job 上而非 workflow 層級：要排隊的只有「寫入同一個 Pages 站點」，
+    # 若掛在 workflow 層級，所有分支的 check 也會被塞進同一個佇列互等。
+    # cancel-in-progress 為 false——部署做到一半被取消，Pages 可能停在不確定狀態。
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
