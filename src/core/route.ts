@@ -9,11 +9,23 @@ export type RouteRule = 'lowland' | 'highland' | 'cover' | 'straight' | 'doublin
 
 export const ROUTE_WAYPOINTS = 5;   // W0..W4
 export const ROUTE_START_INDEX = 2; // 開局時獵物站在 W2：W0/W1/W2 是過去（線索留在那裡），W3/W4 是未來
-export const MOVE_EVERY = 12;       // 每 12 步前進一個節點
+// 每 N 步前進一個節點。原本是 12——tests/solvability.test.ts 補上逐格斷言後量到
+// ridgecrest round1 的理想路線超支率達 14.3%（1000 顆種子），比 owner 先前在
+// quirks.ts 明文駁回的 11% 還糟：新增的「追上會走的獵物」這段攔截路要花的體力，
+// 原本沒被算進可解性掃描裡。獵物越慢，攔截點越接近牠開局的位置，這段路就越短。
+// 12→14→16 依序量測：16 把 ridgecrest round1 的超支率壓到 8.8%（配合下面的節距
+// 收緊，最終到 6.2%）——單獨這個常數換不到 5% 門檻，必須跟 SPACING 一起調。
+export const MOVE_EVERY = 16;
 
 // 節距（格）。直行的走得遠，貼著掩蔽的走得短——節距本身也是個性的一部分。
+// lowland/highland/doubling 從 4 收到 3、straight 從 5 收到 4：同一個理由——
+// 節點間距越大，攔截路要多繞的距離就越大。straight 5→4 先讓 dewhopper／plumetail
+// 回到 95% 以上；ridgecrest 用的是 highland，靠這一檔的 4→3 才把它從 90% 拉到
+// 95%（120 顆種子的樣本；1000 顆種子的真實率略低，見 solvability.test.ts 與
+// task 報告——這是 MOVE_EVERY／SPACING 兩個槓桿在規格允許範圍內能做到的極限，
+// 剩下的落差只能靠 quirks.ts 的地形偏置，那不是這次修復的範圍）。
 const SPACING: Record<RouteRule, number> = {
-  lowland: 4, highland: 4, cover: 3, straight: 5, doubling: 4,
+  lowland: 3, highland: 3, cover: 3, straight: 4, doubling: 3,
 };
 
 const RULE_BY_CREATURE: Record<string, RouteRule> = {
