@@ -5,15 +5,18 @@ import {
 import type { Clue, Level, TerrainType } from '../src/core/types';
 
 const disturbance = (x: number, y: number, radius: number, isDecoy = false): Clue =>
-  ({ type: 'disturbance', position: { x, y }, isDecoy, data: { radius } });
+  ({ type: 'disturbance', position: { x, y }, isDecoy, age: 2, data: { radius } });
 
 function makeLevel(clues: Clue[], mapSize = 12): Level {
   const terrain: TerrainType[][] = Array.from({ length: mapSize }, () =>
     Array.from({ length: mapSize }, () => 'meadow' as TerrainType));
   const elevation: number[][] = Array.from({ length: mapSize }, () =>
     Array.from({ length: mapSize }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
+  const targetPos = { x: 6, y: 5 };
+  // 這批測試不涉及路線／新鮮度，退化成五個節點都停在同一點的路線即可。
   return {
-    round: 1, mapSize, targetPos: { x: 6, y: 5 }, clues, terrain, elevation,
+    round: 1, mapSize, route: { waypoints: Array(5).fill(targetPos), rule: 'straight' },
+    targetPos, clues, terrain, elevation,
     supplies: [], creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
   };
 }

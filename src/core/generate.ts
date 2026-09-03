@@ -1,6 +1,6 @@
 import { randInt, pickWeighted, type Rng } from './rng';
 import { dist, clampToMap, angleDeg, pointOnCircle, type Vec2 } from './geometry';
-import type { Clue, ClueType, Level } from './types';
+import type { Clue, ClueAge, ClueType, Level } from './types';
 import { getDifficulty, type DifficultyParams } from './difficulty';
 import { key, intersect } from './clues';
 import { applyQuirk, elevationBiasFor } from './quirks';
@@ -9,8 +9,18 @@ import { ensureReachable } from './reach';
 import { routeCostsFrom } from './path';
 import { applyWeather, WEATHER_POOL } from './weather';
 import { CREATURES } from '../data/creatures';
+import { buildRoute, routeRuleFor, finalTarget, ROUTE_START_INDEX, type Route } from './route';
 
 export const IRIS_RATE = 0.05;
+
+// 每一齡交集的上限。刻意與 difficulty 的 maxIntersection 脫鉤：分齡之後每一齡的
+// 線索數只有全部的三分之一，沿用同一個門檻會逼生成器狂加線索，圖上到處是 token
+// 反而更難讀。這個值由 tests/solvability.test.ts 的實測校準。
+export const PER_AGE_MAX_INTERSECTION = 10;
+
+// 真線索的齡分佈：先保證每一齡各一條，其餘偏向較新的齡——新鮮的痕跡本來就比較多，
+// 而且讓玩家最常拿到的是最接近獵物現在位置的資訊。
+const AGE_WEIGHTS: [ClueAge, number][] = [[0, 1], [1, 2], [2, 3]];
 
 function randomPos(rng: Rng, size: number): Vec2 {
   return { x: randInt(rng, 0, size - 1), y: randInt(rng, 0, size - 1) };
@@ -30,7 +40,8 @@ function randomPosFarFrom(rng: Rng, size: number, from: Vec2, minDist: number): 
 // 反向錨定：線索資料一律由「夾界後的實際位置」與錨點的幾何關係計算，
 // 確保錨點（目標或幌子點）必在候選集合內。
 function makeClue(
-  type: ClueType, anchor: Vec2, p: DifficultyParams, rng: Rng, size: number, isDecoy: boolean,
+  type: ClueType, anchor: Vec2, p: DifficultyParams, rng: Rng, size: number,
+  isDecoy: boolean, age: ClueAge,
 ): Clue {
   let pos: Vec2 = anchor;
   for (let i = 0; i < 12; i++) {
@@ -46,12 +57,12 @@ function makeClue(
   const actual = dist(pos, anchor);
   switch (type) {
     case 'footprint':
-      return { type, position: pos, isDecoy, data: { direction: angleDeg(pos, anchor), angleSpread: p.footprintSpread } };
+      return { type, position: pos, isDecoy, age, data: { direction: angleDeg(pos, anchor), angleSpread: p.footprintSpread } };
     case 'disturbance':
-      return { type, position: pos, isDecoy, data: { radius: Math.max(p.disturbanceRadius, Math.ceil(actual)) } };
+      return { type, position: pos, isDecoy, age, data: { radius: Math.max(p.disturbanceRadius, Math.ceil(actual)) } };
     case 'scent': {
       const bias = (angleDeg(pos, anchor) + (rng() * 60 - 30) + 360) % 360;
-      return { type, position: pos, isDecoy, data: { distance: Math.round(actual), tolerance: p.scentTolerance, windBiasNeeded: true, biasDirection: bias } };
+      return { type, position: pos, isDecoy, age, data: { distance: Math.round(actual), tolerance: p.scentTolerance, windBiasNeeded: true, biasDirection: bias } };
     }
   }
 }
@@ -63,7 +74,12 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   const size = p2.mapSize;
   const creature = CREATURES.find((c) => c.id === creatureId)!;
   const iris = rng() < IRIS_RATE;
-  const targetPos = randomPos(rng, size);
+
+  // 地形先建：路線要沿著稜線／溪谷／掩蔽走，沒有地形就無從決定往哪走。
+  // 這也改變了 rng 的取用順序——本階段的關卡本來就與舊版不同，無需相容。
+  const { terrain, elevation } = buildTerrain(rng, size, elevationBiasFor(creatureId));
+  const route = buildRoute(rng, terrain, elevation, size, routeRuleFor(creatureId));
+  const targetPos = route.waypoints[ROUTE_START_INDEX];
 
   const ratio: [ClueType, number][] = [
     ['footprint', p2.typeRatio.footprint],
@@ -71,34 +87,46 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
     ['scent', p2.typeRatio.scent],
   ];
 
+  // 真線索：前三條各佔一齡（保證每一齡都有東西可比對），其餘依權重偏向較新的齡
   const clues: Clue[] = [];
   for (let i = 0; i < p2.clueCount; i++) {
-    clues.push(makeClue(pickWeighted(rng, ratio), targetPos, p2, rng, size, false));
+    const age: ClueAge = i < 3 ? (i as ClueAge) : pickWeighted(rng, AGE_WEIGHTS);
+    clues.push(makeClue(pickWeighted(rng, ratio), route.waypoints[age], p2, rng, size, false, age));
   }
 
-  // 可解性收斂檢查（規格書 4.2）：交集過大時追加 scent（環形收斂最快），上限 +5
-  for (let extra = 0; extra < 5; extra++) {
-    if (intersect(clues, size).size <= p2.maxIntersection) break;
-    clues.push(makeClue('scent', targetPos, p2, rng, size, false));
-  }
-
-  // 干擾線索（規格書 4.2）：decoyPos 與 targetPos 距離 >= 5
-  if (p2.decoyCount > 0) {
-    const decoyPos = randomPosFarFrom(rng, size, targetPos, 5);
-    const uniform: [ClueType, number][] = [['footprint', 1], ['disturbance', 1], ['scent', 1]];
-    for (let i = 0; i < p2.decoyCount; i++) {
-      clues.push(makeClue(pickWeighted(rng, uniform), decoyPos, p2, rng, size, true));
+  // 逐齡收斂（規格 §5.2）：全部線索的交集現在本來就是空的，舊的整體檢查已失去意義。
+  // 改為每一齡各自收斂——環形的 scent 收斂最快，故追加時固定用它。
+  for (const age of [0, 1, 2] as ClueAge[]) {
+    for (let extra = 0; extra < 3; extra++) {
+      const group = clues.filter((c) => !c.isDecoy && c.age === age);
+      if (intersect(group, size).size <= PER_AGE_MAX_INTERSECTION) break;
+      clues.push(makeClue('scent', route.waypoints[age], p2, rng, size, false, age));
     }
   }
 
-  const { terrain, elevation } = buildTerrain(rng, size, elevationBiasFor(creatureId));
-  // 目標所在格強制為該生物的偏好地形——這也順帶保證目標永遠不落在崖壁上。
-  // 同步改高程，否則 elevation 還留著雜訊原本算出來的值，跟強制後的地形對不上
-  // （見 terrain.ts 的 elevationFor）。
-  terrain[targetPos.y][targetPos.x] = creature.terrain;
-  elevation[targetPos.y][targetPos.x] = elevationFor(creature.terrain);
+  // 幌子（規格 §5.1）：指派到一個已經有真線索的齡，並且**必須真的讓那一齡的交集變空**。
+  // 造不出矛盾的幌子等於沒有作用——玩家只會退回數量投票，而分齡推理這條路就白開了。
+  // 有限次重抽後仍造不出矛盾時寧可不放：少一個幌子是安全的，放一個無效的不是。
+  if (p2.decoyCount > 0) {
+    const uniform: [ClueType, number][] = [['footprint', 1], ['disturbance', 1], ['scent', 1]];
+    for (let i = 0; i < p2.decoyCount; i++) {
+      const age = pickWeighted(rng, AGE_WEIGHTS);
+      const group = clues.filter((c) => !c.isDecoy && c.age === age);
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const decoyPos = randomPosFarFrom(rng, size, route.waypoints[age], 5);
+        const d = makeClue(pickWeighted(rng, uniform), decoyPos, p2, rng, size, true, age);
+        if (intersect([...group, d], size).size === 0) { clues.push(d); break; }
+      }
+    }
+  }
 
-  const taken = new Set([key(targetPos), ...clues.map((c) => key(c.position))]);
+  // 強制覓食地（路線終點）為該生物的偏好地形——牠最後停在哪，那裡就該是牠的地盤。
+  // 這也順帶保證終點永遠不是崖壁。
+  const forage = finalTarget(route);
+  terrain[forage.y][forage.x] = creature.terrain;
+  elevation[forage.y][forage.x] = elevationFor(creature.terrain);
+
+  const taken = new Set([...route.waypoints.map(key), ...clues.map((c) => key(c.position))]);
   const supplies: Vec2[] = [];
   for (let i = 0; i < 200 && supplies.length < p2.supplyCount; i++) {
     const s = randomPos(rng, size);
@@ -118,9 +146,10 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
     }
   }
 
-  // 物理可達性保證（見 reach.ts）：目標、所有線索、所有補給都必須從出生角走得到
+  // 物理可達性保證（見 reach.ts）：路線上的每一個節點都要走得到——獵物會停在其中
+  // 任何一個，玩家就得能追到那裡。所有線索、所有補給也都必須從出生角走得到。
   const start = startCorner(size, targetPos);
-  ensureReachable(terrain, start, [targetPos, ...clues.map((c) => c.position), ...supplies]);
+  ensureReachable(terrain, start, [...route.waypoints, ...clues.map((c) => c.position), ...supplies]);
 
   // 起始蹤跡：出生角走過去體力花費最低的真線索（F2：不能用直線距離——一條隔著挖通
   // 岩坡稜脊的線索，直線比較近但走過去可能貴得多）。純計算、不消耗 rng，且必須放在
@@ -151,7 +180,7 @@ export function generateLevelFor(round: number, rng: Rng, creatureId: string): L
   }
 
   return {
-    round, mapSize: size, targetPos, clues, terrain, elevation, supplies,
+    round, mapSize: size, route, targetPos, clues, terrain, elevation, supplies,
     creatureId: creature.id, trailheadIndex, weather, iris,
   };
 }

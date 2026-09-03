@@ -7,7 +7,7 @@ import type { Rng } from '../src/core/rng';
 
 function scentClueAt(pos: Vec2): Clue {
   return {
-    type: 'scent', position: pos, isDecoy: false,
+    type: 'scent', position: pos, isDecoy: false, age: 2,
     data: { distance: 1, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
   };
 }
@@ -29,8 +29,12 @@ function makeState(opts: Opts = {}): SessionState {
     Array.from({ length: size }, () => 'meadow' as TerrainType));
   const elevation: number[][] = Array.from({ length: size }, () =>
     Array.from({ length: size }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
+  const targetPos = opts.targetPos ?? { x: size - 1, y: size - 1 };
   const level: Level = {
-    round: 1, mapSize: size, targetPos: opts.targetPos ?? { x: size - 1, y: size - 1 },
+    round: 1, mapSize: size,
+    // 這批測試不涉及路線／新鮮度，退化成五個節點都停在同一點的路線即可。
+    route: { waypoints: Array(5).fill(targetPos), rule: 'straight' },
+    targetPos,
     clues: opts.clues ?? [], terrain, elevation, supplies: opts.supplies ?? [],
     creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
   };

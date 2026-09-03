@@ -15,10 +15,14 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
     Array.from({ length: 5 }, () => 'meadow' as TerrainType));
   const elevation: number[][] = Array.from({ length: 5 }, () =>
     Array.from({ length: 5 }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
+  const targetPos = { x: 4, y: 4 };
   const level: Level = {
-    round: 1, mapSize: 5, targetPos: { x: 4, y: 4 },
+    round: 1, mapSize: 5,
+    // 這批測試不涉及路線／新鮮度，退化成五個節點都停在同一點的路線即可。
+    route: { waypoints: Array(5).fill(targetPos), rule: 'straight' },
+    targetPos,
     clues: [{
-      type: 'scent', position: { x: 2, y: 0 }, isDecoy: false,
+      type: 'scent', position: { x: 2, y: 0 }, isDecoy: false, age: 2,
       data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
     }],
     terrain, elevation, supplies: [{ x: 1, y: 0 }], creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
@@ -254,7 +258,7 @@ describe('move: path and clue read log', () => {
     const s = makeState({ player: { x: 1, y: 0 } });
     // 關卡生成允許兩條線索落在同一格（clampToMap 夾邊界），在此手工重現該情境
     s.level.clues.push({
-      type: 'scent', position: { x: 2, y: 0 }, isDecoy: true,
+      type: 'scent', position: { x: 2, y: 0 }, isDecoy: true, age: 2,
       data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
     });
     move(s, { x: 2, y: 0 });
@@ -266,7 +270,7 @@ describe('move: path and clue read log', () => {
   it('does not re-log a shared cell on repeat visits (readLog stays idempotent)', () => {
     const s = makeState({ player: { x: 1, y: 0 } });
     s.level.clues.push({
-      type: 'scent', position: { x: 2, y: 0 }, isDecoy: true,
+      type: 'scent', position: { x: 2, y: 0 }, isDecoy: true, age: 2,
       data: { distance: 4, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
     });
     move(s, { x: 2, y: 0 });

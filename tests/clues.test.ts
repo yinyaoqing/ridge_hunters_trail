@@ -3,11 +3,11 @@ import { key, candidates, intersect } from '../src/core/clues';
 import type { Clue } from '../src/core/types';
 
 const footprint = (x: number, y: number, direction: number, angleSpread: number): Clue =>
-  ({ type: 'footprint', position: { x, y }, isDecoy: false, data: { direction, angleSpread } });
+  ({ type: 'footprint', position: { x, y }, isDecoy: false, age: 2, data: { direction, angleSpread } });
 const disturbance = (x: number, y: number, radius: number): Clue =>
-  ({ type: 'disturbance', position: { x, y }, isDecoy: false, data: { radius } });
+  ({ type: 'disturbance', position: { x, y }, isDecoy: false, age: 2, data: { radius } });
 const scent = (x: number, y: number, distance: number, tolerance: number): Clue =>
-  ({ type: 'scent', position: { x, y }, isDecoy: false, data: { distance, tolerance, windBiasNeeded: false, biasDirection: 0 } });
+  ({ type: 'scent', position: { x, y }, isDecoy: false, age: 2, data: { distance, tolerance, windBiasNeeded: false, biasDirection: 0 } });
 
 describe('key', () => {
   it('formats as x,y', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateLevel, generateLevelFor, IRIS_RATE } from '../src/core/generate';
+import { generateLevel, generateLevelFor, IRIS_RATE, PER_AGE_MAX_INTERSECTION } from '../src/core/generate';
 import { mulberry32 } from '../src/core/rng';
 import { getDifficulty } from '../src/core/difficulty';
 import { key, intersect } from '../src/core/clues';
@@ -11,7 +11,8 @@ import { applyWeather } from '../src/core/weather';
 import { reachableFrom } from '../src/core/reach';
 import { BAND_CLIFF, BAND_ROCK, BAND_THICKET } from '../src/core/terrain';
 import { routeCostsFrom } from '../src/core/path';
-import type { TerrainType } from '../src/core/types';
+import { ROUTE_WAYPOINTS, ROUTE_START_INDEX } from '../src/core/route';
+import type { TerrainType, ClueAge } from '../src/core/types';
 
 describe('generateLevel (property tests over 200 seeds)', () => {
   const cases = Array.from({ length: 200 }, (_, i) => ({
@@ -19,11 +20,16 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     round: (i % 10) + 1, // 涵蓋三個難度 tier
   }));
 
-  it('target is always inside the intersection of real clues (solvable)', () => {
+  it('每一齡的交集都包含該齡在路線上的位置（可解性保證的廣義化版本）', () => {
+    // 舊版斷言「全部線索的交集包含 targetPos」，但線索現在分齡錨定在不同的路線節點，
+    // 混齡交集不再保證包含任何單一位置——這正是本階段刻意的語意變更
+    // （見 generate.ts 的逐齡收斂註解）。廣義化後的保證改成逐齡驗證。
     for (const { seed, round } of cases) {
       const level = generateLevel(round, mulberry32(seed));
-      const real = level.clues.filter((c) => !c.isDecoy);
-      expect(intersect(real, level.mapSize).has(key(level.targetPos))).toBe(true);
+      for (const age of [0, 1, 2] as ClueAge[]) {
+        const group = level.clues.filter((c) => !c.isDecoy && c.age === age);
+        expect(intersect(group, level.mapSize).has(key(level.route.waypoints[age]))).toBe(true);
+      }
     }
   });
 
@@ -56,7 +62,10 @@ describe('generateLevel (property tests over 200 seeds)', () => {
       expect(level.terrain[0].length).toBe(p.mapSize);
       const creature = CREATURES.find((c) => c.id === level.creatureId);
       expect(creature).toBeDefined();
-      expect(level.terrain[level.targetPos.y][level.targetPos.x]).toBe(creature!.terrain);
+      // 強制生物偏好地形的格子現在是路線終點（覓食地），不再是開局位置 targetPos——
+      // 牠最後停在哪，那裡才是牠的地盤（見 generate.ts 的 forage 註解）。
+      const forage = level.route.waypoints[level.route.waypoints.length - 1];
+      expect(level.terrain[forage.y][forage.x]).toBe(creature!.terrain);
       const pq = applyQuirk(p, level.creatureId);
       expect(level.supplies.length).toBeLessThanOrEqual(pq.supplyCount);
       for (const s of level.supplies) {
@@ -71,11 +80,14 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     expect(a).toEqual(b);
   });
 
-  it('every clue position differs from its anchor evidence: no clue on top of target', () => {
+  it('every clue position differs from its own anchor (the waypoint of its age)', () => {
+    // 舊版比對的是全域 targetPos；線索現在錨定在自己那一齡的節點，makeClue 保證的是
+    // 「不落在自己的錨點上」，不是「不落在 targetPos 上」——不同齡的節點可能剛好同格，
+    // 此時一條錨定別齡的線索落在 targetPos 上是正常的，不該被這裡誤判成矛盾。
     for (const { seed, round } of cases) {
       const level = generateLevel(round, mulberry32(seed));
       for (const c of level.clues.filter((c) => !c.isDecoy)) {
-        expect(key(c.position)).not.toBe(key(level.targetPos));
+        expect(key(c.position)).not.toBe(key(level.route.waypoints[c.age]));
       }
     }
   });
@@ -234,5 +246,76 @@ describe('generateLevel: trailhead', () => {
         expect(level.trailheadIndex).toBe(Math.min(...tiedIndices));
       }
     }
+  });
+});
+
+const AGES: ClueAge[] = [0, 1, 2];
+
+describe('generateLevelFor: 線索新鮮度', () => {
+  const levels = () => {
+    const out = [];
+    for (let seed = 1; seed <= 60; seed++) {
+      out.push(generateLevelFor(9, mulberry32(seed), 'plumetail'));
+    }
+    return out;
+  };
+
+  it('每一局的路線長度固定，且獵物開局站在 W2', () => {
+    for (const L of levels()) {
+      expect(L.route.waypoints).toHaveLength(ROUTE_WAYPOINTS);
+      expect(L.targetPos).toEqual(L.route.waypoints[ROUTE_START_INDEX]);
+    }
+  });
+
+  it('每一個齡都至少有一條真線索', () => {
+    // 分組推理的前提：某一齡若一條真線索都沒有，那一組就無從比對，
+    // 幌子藏在裡面也看不出來。
+    for (const L of levels()) {
+      for (const age of AGES) {
+        expect(L.clues.filter((c) => !c.isDecoy && c.age === age).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('同齡真線索的交集非空、包含該齡節點，且不超過每齡上限', () => {
+    // 這是廣義化後的可解性保證。舊版是「所有線索的交集包含目標」，
+    // 現在是「每一齡的交集包含該齡的位置」。
+    for (const L of levels()) {
+      for (const age of AGES) {
+        const group = L.clues.filter((c) => !c.isDecoy && c.age === age);
+        const cells = intersect(group, L.mapSize);
+        expect(cells.size).toBeGreaterThan(0);
+        expect(cells.has(key(L.route.waypoints[age]))).toBe(true);
+        expect(cells.size).toBeLessThanOrEqual(PER_AGE_MAX_INTERSECTION);
+      }
+    }
+  });
+
+  it('幌子一定造成矛盾：它所在的齡，含它的交集為空；靜音它就恢復', () => {
+    // 這是「干擾第一次可以被推理排除」的實際機制。若幌子沒有讓那一組矛盾，
+    // 玩家就只能回到數量投票，而 Phase 4 的靜音功能仍然沒有明確用途。
+    let checked = 0;
+    for (const L of levels()) {
+      for (const decoy of L.clues.filter((c) => c.isDecoy)) {
+        const group = L.clues.filter((c) => c.age === decoy.age && !c.isDecoy);
+        expect(intersect([...group, decoy], L.mapSize).size).toBe(0);
+        expect(intersect(group, L.mapSize).size).toBeGreaterThan(0);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0); // 這個難度確實有幌子，測試不是空轉
+  });
+
+  it('放不出矛盾的幌子寧可不放，也不放一個沒有作用的', () => {
+    // 上一條是硬性不變量，代價是有時候幌子數會少於難度設定。這條把代價量出來，
+    // 讓它是一個已知的數字而不是一個驚喜。
+    let want = 0;
+    let got = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const L = generateLevelFor(9, mulberry32(seed), 'plumetail');
+      want += 2; // round 9 的 decoyCount
+      got += L.clues.filter((c) => c.isDecoy).length;
+    }
+    expect(got / want).toBeGreaterThan(0.8);
   });
 });
