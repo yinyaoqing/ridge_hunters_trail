@@ -184,6 +184,10 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     }
   });
 
+  // 明訂 15000ms 逾時：這一案要生成 1000 關（同檔其他案是 200 關），在 GitHub
+  // Actions 的 ubuntu-latest 上實測 2.7 秒，對著 vitest 預設的 5000ms 只剩不到
+  // 一倍餘裕。共用 runner 受鄰居影響的變異本來就有這個量級，等於是一顆還沒炸的
+  // 不穩定測試——tests/solvability.test.ts 那支就是同樣「照開發機訂上限」踩到的。
   it('iris rate over 1000 seeds is within a rough sanity band', () => {
     let irisCount = 0;
     const total = 1000;
@@ -195,7 +199,7 @@ describe('generateLevel (property tests over 200 seeds)', () => {
     expect(IRIS_RATE).toBeCloseTo(0.05);
     expect(rate).toBeGreaterThanOrEqual(0.02);
     expect(rate).toBeLessThanOrEqual(0.09);
-  });
+  }, 15000);
 });
 
 describe('generateLevel: physical reachability', () => {
