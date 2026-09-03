@@ -15,7 +15,40 @@ export const ROUTE_START_INDEX = 2; // 開局時獵物站在 W2：W0/W1/W2 是�
 // 原本沒被算進可解性掃描裡。獵物越慢，攔截點越接近牠開局的位置，這段路就越短。
 // 12→14→16 依序量測：16 把 ridgecrest round1 的超支率壓到 8.8%（配合下面的節距
 // 收緊，最終到 6.2%）——單獨這個常數換不到 5% 門檻，必須跟 SPACING 一起調。
-export const MOVE_EVERY = 16;
+//
+// 再審覆核（本次修復）：地形偏置（quirks.ts）從 0.08 下修到 0.04 之後，重新問了
+// 一次「這兩個槓桿還需要嗎」——它們的代價很大：獵物在 48.7% 的獵局裡完全沒換過
+// 節點，等於這一階要教玩家的「預測牠會在哪」有一半用不上。用 idealCost 模型
+// （tests/solvability.test.ts）在 bias=0.04 下重新掃過 1000 顆種子（seed=seed*131+round，
+// 與既有慣例一致），依規格指定的順序逐一測試：
+//
+//   MOVE_EVERY  SPACING   ridgecrest r1 超支率  ridgecrest r1 可解率  neverMoved（1500 局貪婪追擊）
+//   12          原始      4.60%                 95.40%                12.6%
+//   14          原始      4.30%                 95.70%                37.4%
+//   16          原始      3.50%                 96.50%                46.4%
+//   12          收緊      2.40%                 97.60%                14.1%
+//   14          收緊      2.40%                 97.60%                39.6%
+//   16（現況）  收緊      2.20%                 97.80%                48.7%
+//
+// 門檻是 ridgecrest r1 超支率 ≤2.33%（owner 先前核准的臨界）。只有現況
+// （MOVE_EVERY=16、SPACING 收緊）達標；MOVE_EVERY=12/14 無論節距收不收緊都超標
+// （即使收緊節距，12／14 仍是 2.40%，只差 0.07 個百分點卻仍不合格）。
+// 假設「bias 下修後兩個槓桿已經不需要了」因此不成立——兩個槓桿仍是達成
+// ridgecrest 可解性門檻的必要條件，不是舊調校留下的多餘保守值。
+// 這是本次修復做出的取捨：接受獵物在近半獵局裡不換節點（犧牲這一階的部分前提），
+// 換取 ridgecrest round1 維持在可解性門檻之內——兩者無法同時滿足，且掃描範圍內
+// 找不到第三個選項。詳細數字見 .superpowers/sdd/task-4-report.md。
+//
+// 第四次調整（task-4-report.md）：上一段的結論本身沒有錯——bias=0.04 時這兩個
+// 槓桿確實是達成 ridgecrest 可解性門檻的必要條件。但那不代表槓桿要永遠留在
+// 16／收緊：owner 這次核准的方向是反過來動 quirks.ts 的 bias（0.04→0.01），
+// 把兩個全域槓桿完全還原成 Phase 6a 之前的值。MOVE_EVERY 12、SPACING 都是
+// 原始值，這裡不是又一次「試了但沒用」的保守殘留——是量過 bias=0.01 之後，
+// 12／原始 SPACING 下 ridgecrest r1 的超支率是 2.20%（≤2.33% 達標），而
+// neverMoved 從 48.7% 打回 12.33%（1500 局貪婪追擊，與 Phase 6a 之前的
+// 12.6% 基準同一量級）。這兩個常數因此還原為 byte-for-byte 的 Phase 6a
+// 之前的值；完整的 bias 掃描表見 quirks.ts 的 elevationBiasFor 註解。
+export const MOVE_EVERY = 12;
 
 // 節距（格）。直行的走得遠，貼著掩蔽的走得短——節距本身也是個性的一部分。
 // lowland/highland/doubling 從 4 收到 3、straight 從 5 收到 4：同一個理由——
@@ -24,8 +57,11 @@ export const MOVE_EVERY = 16;
 // 95%（120 顆種子的樣本；1000 顆種子的真實率略低，見 solvability.test.ts 與
 // task 報告——這是 MOVE_EVERY／SPACING 兩個槓桿在規格允許範圍內能做到的極限，
 // 剩下的落差只能靠 quirks.ts 的地形偏置，那不是這次修復的範圍）。
+//
+// 第四次調整：上面這段收緊（4/4/3/5/4 → 3/3/3/4/3）已隨 MOVE_EVERY 一起還原——
+// 見上方常數的最新一段歷史。這裡的值回到原始的 4/4/3/5/4。
 const SPACING: Record<RouteRule, number> = {
-  lowland: 3, highland: 3, cover: 3, straight: 4, doubling: 3,
+  lowland: 4, highland: 4, cover: 3, straight: 5, doubling: 4,
 };
 
 const RULE_BY_CREATURE: Record<string, RouteRule> = {

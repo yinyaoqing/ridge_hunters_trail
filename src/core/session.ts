@@ -93,6 +93,14 @@ export interface SessionState {
   resolved: boolean;      // Result 已記帳（防場景重啟重複記錄）
   bellUsed: boolean;      // 微光鈴本局是否已使用（一局一次）
   microEvents: number;    // 微事件本局計數
+  // 逼近判定通過時，究竟是靠獵物「移動前」還是「移動後」的位置——寬容判定
+  // （見 move() 下方註解）兩者任一相距 1 格都算數，但揭曉／結算原本只看
+  // move() 結束後的 currentTarget(s)，在只靠移動前位置逼近成功的那 6.2%
+  // 局裡，畫的「牠在這裡」與判的「你差幾格」都會是玩家實際搆到的那格以外
+  // 三格多遠的另一個點——玩家在遊戲判定他抓到的那一格下注，卻被告知押錯。
+  // 記下「當初是哪個位置讓判定通過」，讓揭曉與結算都對著那格算，而不是對著
+  // 判定通過之後才又往前挪動的獵物位置算。未觸發逼近時維持 null。
+  capturePos: Vec2 | null;
 }
 
 export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): SessionState {
@@ -117,6 +125,7 @@ export function newSession(round: number, rng: Rng, mode: SessionMode = 'run'): 
     resolved: false,
     bellUsed: false,
     microEvents: 0,
+    capturePos: null, // 新局尚未觸發任何逼近判定
   };
   revealAround(s);
   // 起始蹤跡永遠可見（見 generate.ts 的 trailheadIndex 註解）
@@ -180,8 +189,16 @@ export function move(s: SessionState, to: Vec2): void {
   // 什麼都沒發生」——玩家做對了每一件事卻一無所獲，而下一階把獵物畫出來之後，
   // 他會眼睜睜看著牠從身邊消失。物理上說得通不代表讀得懂。
   const beforeMove = targetAt(s.level.route, s.steps - 1);
-  if (cheb(to, currentTarget(s)) <= 1 || cheb(to, beforeMove) <= 1) {
+  const afterMove = currentTarget(s);
+  const closeAfter = cheb(to, afterMove) <= 1;
+  const closeBefore = cheb(to, beforeMove) <= 1;
+  if (closeAfter || closeBefore) {
     s.phase = 'qte';
+    // 記下「哪一個位置讓這次逼近判定通過」，供揭曉／結算對著同一格算——
+    // 兩者都符合時優先記移動後的位置（與原本 currentTarget(s) 的行為一致，
+    // 這是絕大多數情況），只有「僅移動前的位置相距 1 格」這種寬容分支
+    // 才落到 beforeMove（F5：Fix 5 measured 6.2% of captures land here）。
+    s.capturePos = closeAfter ? afterMove : beforeMove;
     return;
   }
   if (s.stamina <= 0 || !hasAffordableMove(s)) s.phase = 'exhausted';

@@ -63,20 +63,24 @@ export function dashedLine(
 
 // 線索圖標：深色底盤＋手繪感字形（足跡/擾動漩渦/氣味波紋），取代 F/D/S 字母。
 // 真線索與干擾線索共用同一繪製（視覺完全相同）。
+// fade：新鮮度淡出係數（1＝原始強度），由 MapScene 依線索的 age 傳入；DemoScene 不分齡，
+// 沿用預設值 1 以維持既有外觀不變。舊版做法是在 token 上疊一層半透明底色圓——那層蓋在
+// 共用 graphics 上，會在熱區底色、其他線索的覆蓋層與同格供給圖示之上戳出一個深色破洞
+// （F-fade-1）。改成真正的 alpha 係數後，淡出只影響這個形狀自身的透明度，不再遮蓋別的東西。
 export function drawClueToken(
-  g: Gfx, cx: number, cy: number, radius: number, type: ClueType, pal: Palette,
+  g: Gfx, cx: number, cy: number, radius: number, type: ClueType, pal: Palette, fade = 1,
 ): void {
   const accent = type === 'scent' ? pal.glow : pal.gold;
-  g.fillStyle(pal.bg, 1).fillCircle(cx, cy, radius);
-  g.lineStyle(1.5, accent, 1).strokeCircle(cx, cy, radius);
+  g.fillStyle(pal.bg, 1 * fade).fillCircle(cx, cy, radius);
+  g.lineStyle(1.5, accent, 1 * fade).strokeCircle(cx, cy, radius);
   const s = radius / 13; // 字形以半徑 13 為基準設計
   if (type === 'footprint') {
-    g.fillStyle(accent, 1);
+    g.fillStyle(accent, 1 * fade);
     g.fillEllipse(cx - 3 * s, cy - 4 * s, 4.6 * s, 6.8 * s);
     g.fillEllipse(cx + 3 * s, cy - 4 * s, 4.6 * s, 6.8 * s);
     g.fillEllipse(cx, cy + 3.5 * s, 9.2 * s, 7.2 * s);
   } else if (type === 'disturbance') {
-    g.lineStyle(1.6 * s, accent, 1);
+    g.lineStyle(1.6 * s, accent, 1 * fade);
     g.beginPath();
     g.arc(cx, cy, 6.5 * s, Math.PI * 0.6, Math.PI * 2.2);
     g.strokePath();
@@ -85,7 +89,7 @@ export function drawClueToken(
     g.strokePath();
   } else {
     // 三條上升波紋：各以兩段半弧組成 S 形
-    g.lineStyle(1.6 * s, accent, 1);
+    g.lineStyle(1.6 * s, accent, 1 * fade);
     for (const off of [-4.5, 0, 4.5]) {
       const x = cx + off * s;
       g.beginPath();
@@ -117,9 +121,12 @@ export function drawSupply(
 // 由 MapScene 與 DemoScene 共用——示範看到的圖形必須與真實地圖逐像素相同，
 // 否則玩家在示範裡學到的形狀在真實地圖上認不出來。
 // windstone 為真時，氣味的完整距離環收窄為 240° 偏心弧（風向石效果）。
+// fade：新鮮度淡出係數，同 drawClueToken——玩家實際據以推理的是這個覆蓋層（錐形／圓域／
+// 距離環），不是 token 本身；只淡化 token 而覆蓋層維持全強度，會讓「越舊越淡」只對點有效、
+// 對點所代表的範圍無效（F-fade-2）。DemoScene 不分齡，沿用預設值 1。
 export function drawClueOverlay(
   g: Gfx, c: Clue, center: { x: number; y: number }, cell: number,
-  pal: Palette, windstone: boolean,
+  pal: Palette, windstone: boolean, fade = 1,
 ): void {
   if (c.type === 'footprint') {
     const len = cell * 5;
@@ -127,16 +134,16 @@ export function drawClueOverlay(
     const a2 = ((c.data.direction + c.data.angleSpread) * Math.PI) / 180;
     const p1 = { x: center.x + len * Math.cos(a1), y: center.y + len * Math.sin(a1) };
     const p2 = { x: center.x + len * Math.cos(a2), y: center.y + len * Math.sin(a2) };
-    g.fillStyle(pal.gold, 0.1).fillTriangle(center.x, center.y, p1.x, p1.y, p2.x, p2.y);
-    dashedLine(g, center.x, center.y, p1.x, p1.y, pal.gold, 0.55);
-    dashedLine(g, center.x, center.y, p2.x, p2.y, pal.gold, 0.55);
+    g.fillStyle(pal.gold, 0.1 * fade).fillTriangle(center.x, center.y, p1.x, p1.y, p2.x, p2.y);
+    dashedLine(g, center.x, center.y, p1.x, p1.y, pal.gold, 0.55 * fade);
+    dashedLine(g, center.x, center.y, p2.x, p2.y, pal.gold, 0.55 * fade);
   } else if (c.type === 'disturbance') {
-    g.fillStyle(pal.gold, 0.05).fillCircle(center.x, center.y, c.data.radius * cell);
-    dashedCircle(g, center.x, center.y, c.data.radius * cell, pal.gold, 0.45, 2, 6, 9);
+    g.fillStyle(pal.gold, 0.05 * fade).fillCircle(center.x, center.y, c.data.radius * cell);
+    dashedCircle(g, center.x, center.y, c.data.radius * cell, pal.gold, 0.45 * fade, 2, 6, 9);
   } else if (windstone) {
-    dashedArc(g, center.x, center.y, c.data.distance * cell, c.data.biasDirection, 240, pal.glow, 0.5, 2, 3, 8);
+    dashedArc(g, center.x, center.y, c.data.distance * cell, c.data.biasDirection, 240, pal.glow, 0.5 * fade, 2, 3, 8);
   } else {
-    dashedCircle(g, center.x, center.y, c.data.distance * cell, pal.glow, 0.5, 2, 3, 8);
+    dashedCircle(g, center.x, center.y, c.data.distance * cell, pal.glow, 0.5 * fade, 2, 3, 8);
   }
 }
 

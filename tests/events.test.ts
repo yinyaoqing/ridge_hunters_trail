@@ -47,6 +47,7 @@ function makeState(opts: Opts = {}): SessionState {
     phase: 'explore',
     steps: 0, mode: opts.mode ?? 'run', resolved: false, bellUsed: false,
     microEvents: opts.microEvents ?? 0,
+    capturePos: null,
   };
 }
 
@@ -218,6 +219,7 @@ describe('rollMicroEvent — direction tracks the quarry\'s current waypoint, no
       readClues: new Set(), marks: new Map(), path: [player], readLog: [], mutedClues: new Set(),
       seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
       phase: 'explore', steps: MOVE_EVERY, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+      capturePos: null,
     };
     const rng: Rng = () => 0.001; // chance passes; pickWeighted -> bird-startle
     const ev = rollMicroEvent(s, rng);

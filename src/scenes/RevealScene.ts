@@ -6,9 +6,12 @@ import { infoCompleteStep, misleadingDecoy } from '../core/deduction';
 import { cheb, type Vec2 } from '../core/geometry';
 import { key } from '../core/clues';
 import { CREATURES } from '../data/creatures';
-import type { I18n } from '../core/i18n';
+import type { I18n, MsgKey } from '../core/i18n';
 import type { AudioBus } from '../core/audio';
-import { cssHex, FONTS, displayFont, BRUSH_RADIUS, stripBrackets } from './paint';
+import { MOVE_EVERY, ROUTE_START_INDEX, type RouteRule } from '../core/route';
+import {
+  cssHex, FONTS, displayFont, BRUSH_RADIUS, stripBrackets, dashedLine,
+} from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
 
 // 揭曉畫面（診斷 D-01）：不論成敗都在結算前先看見真相——牠在哪、你差幾格、
@@ -25,7 +28,11 @@ export class RevealScene extends Phaser.Scene {
     const s: SessionState = this.registry.get('session');
     // 只取一次存成區域常數：獵物位置是 steps 的函式，本畫面渲染期間 steps 不會再變，
     // 重複呼叫 currentTarget(s) 沒有錯，但用同一個值能讓下面每一處讀到的都是同一刻的牠在哪。
-    const target = currentTarget(s);
+    // F5：優先採用 s.capturePos——逼近判定對「移動前／移動後」任一相距 1 格都寬容通過，
+    // 只看 currentTarget(s)（移動後）會在僅靠移動前位置逼近成功的那 6.2% 局裡，
+    // 把「牠在這裡」畫在玩家實際搆到的格子以外平均 3.18 格的地方。未觸發過逼近
+    // （理論上不會發生在已進入揭曉畫面的局，capturePos 必已寫入）時退回 currentTarget。
+    const target = s.capturePos ?? currentTarget(s);
     const i18n: I18n = this.registry.get('i18n');
     this.audio = this.registry.get('audio');
     this.audio.ambient(false); // 揭曉畫面停風聲，與結算一致
@@ -98,6 +105,17 @@ export class RevealScene extends Phaser.Scene {
       }
     }
 
+    // 覓食路線說明：規格 §7——沒有這一行，doubling／straight 對玩家而言只是隨機，
+    // 這是玩家唯一能學會物種走法的地方。跟上面幾行一樣受 hideAnswer 保護：路線本身
+    // 就是答案的一部分（等於指出目前所在的候選格），daily 未捕獲時不能洩漏。
+    // 文字區版面已有 3 行變動空間（noCall/dailyHidden、offBy/exact、decoy、infoAt 最多疊 3 行），
+    // 兩行式（reveal.route＋物種走法各一行）會把小視窗擠出下方圖例／按鈕的預算，
+    // 因此依規格容許的做法併成一行，用破折號連接。
+    if (!hideAnswer) {
+      const rule = s.level.route.rule;
+      ty = this.line(cx, ty, `${i18n.t('reveal.route')} — ${i18n.t(RULE_KEY[rule])}`, pal.paperDim, 13);
+    }
+
     // 圖例：牠在這裡／你的押注。hideAnswer 時不畫「牠在這裡」——否則圖例文字本身就洩漏答案
     const legendY = Math.min(ty + 14, h - 108);
     if (!hideAnswer) this.legend(cx - 78, legendY, i18n.t('reveal.wasHere'), pal.gold, true);
@@ -131,6 +149,59 @@ export class RevealScene extends Phaser.Scene {
         if (s.seen.has(key({ x, y }))) continue;
         g.fillStyle(0x000000, 0.45).fillRect(ox + x * cell, oy + y * cell, cell, cell);
       }
+    }
+
+    // 覓食路線：由舊到新連成一線，節點越新畫得越亮。這是玩家唯一能學會
+    // 「這個物種怎麼走」的地方——看不到路線，折返與直行對他而言只是隨機。
+    // 畫在壓暗層之後（不被未探索的暗色蓋掉）、玩家路徑／線索／押注框／真實位置之前
+    // ——這條線是新揭露的背景資訊，不能蓋掉本畫面原本就有、玩家第一眼要看的
+    // 「牠在這裡」與「你的押注」，所以必須疊在它們下面。
+    // hideAnswer 時整段不畫：五個節點等於指出目前所在的候選格，比色點洩漏更多（同 F3），
+    // 揭曉真相等於把答案遞給 daily 的重玩。
+    //
+    // F4：獵物走到哪個節點就停在那裡，不會五個節點都走完——原本不分青紅皂白把全部五個
+    // 節點畫成同一套「越新越亮」，最新（最亮）的那個節點在 69%（978 局實測 620+302／978）
+    // 的補獲局裡其實是牠從沒去過的地方，跟旁邊那圈「牠在這裡」的金環對不上，同一張小
+    // 地圖上兩個東西各說各話。獵物現在的位置（capturePos ?? currentTarget）對應的節點
+    // 索引，由 steps／MOVE_EVERY 反推出來——與 targetAt() 內部算法一致，只是這裡要的
+    // 是索引本身而非座標，用來分段：已走過的（含牠現在所在的那一段）維持原本實線＋
+    // 漸亮；還沒走到的部分換一套明顯更淡、改虛線的畫法，讀起來是「牠正要往那邊去」，
+    // 不是「牠去過那邊」。
+    if (!hideAnswer) {
+      const w = L.route.waypoints;
+      // F7：分割點必須跟金環讀同一個來源，否則兩者會各說各話——F5 的寬容判定
+      // 讓 capturePos 有時落在「移動前」那個節點，此時用 steps／MOVE_EVERY
+      // 反推出的節點索引會比金環實際畫的位置多走一格：路線畫成已走過、實線、
+      // 最亮，金環卻停在前一個節點，同一張小地圖上兩者互相矛盾（實測 7.03%
+      // 的補獲局如此，其中 100% 的金環節點不是「最新最亮的實心節點」）。
+      // 改成直接在 waypoints 裡找 target（金環畫的那個座標）的索引：
+      // target 恆為 capturePos ?? currentTarget(s)，兩者都是 targetAt() 的回傳值，
+      // 而 targetAt() 保證回傳 waypoints 陣列裡的某一個元素，因此這裡找得到。
+      // findIndex 找不到（理論上不會發生，只作為未來改動的保險）時才退回舊算法。
+      const targetIdx = w.findIndex((p) => p.x === target.x && p.y === target.y);
+      const reachedIdx = targetIdx >= 0
+        ? targetIdx
+        : Math.min(ROUTE_START_INDEX + Math.floor(s.steps / MOVE_EVERY), w.length - 1);
+      for (let i = 1; i < w.length; i++) {
+        const a = px(w[i - 1]);
+        const b = px(w[i]);
+        if (i <= reachedIdx) {
+          g.lineStyle(2, pal.glow, 0.25 + 0.15 * i);
+          g.lineBetween(a.x, a.y, b.x, b.y);
+        } else {
+          dashedLine(g, a.x, a.y, b.x, b.y, pal.glow, 0.16, 1.5, 3, 6);
+        }
+      }
+      w.forEach((p, i) => {
+        const q = px(p);
+        if (i <= reachedIdx) {
+          g.fillStyle(pal.glow, 0.3 + 0.17 * i).fillCircle(q.x, q.y, cell * 0.16);
+        } else {
+          // 未走到的節點：空心、固定淡透明度，不隨索引漸亮——漸亮這件事本身在暗示
+          // 「越新越接近現在」，套用在牠根本沒走到的節點上會誤導成牠正在接近那裡。
+          g.lineStyle(1.2, pal.glow, 0.22).strokeCircle(q.x, q.y, cell * 0.13);
+        }
+      });
     }
 
     // 玩家路徑：連續折線，讓玩家看見自己繞了多遠
@@ -214,3 +285,10 @@ export class RevealScene extends Phaser.Scene {
       .on('pointerup', () => { txt.setScale(1); this.audio.unlock(); this.audio.play('click'); onClick(); });
   }
 }
+
+// 走法字串鍵映射：同 MapScene WEATHER_KEY／ResultScene QUALITY_KEY 手法，
+// 避免模板字面型別（`rule.${RouteRule}`）無法收斂為 MsgKey 聯集
+const RULE_KEY: Record<RouteRule, MsgKey> = {
+  lowland: 'rule.lowland', highland: 'rule.highland', cover: 'rule.cover',
+  straight: 'rule.straight', doubling: 'rule.doubling',
+};

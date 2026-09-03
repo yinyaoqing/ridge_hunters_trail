@@ -1,7 +1,7 @@
 import type { Locale } from './types';
 
 export type MsgKey =
-  | 'hud.round' | 'hud.stamina' | 'hud.hint' | 'hud.mark'
+  | 'hud.round' | 'hud.stamina' | 'hud.step' | 'hud.hint' | 'hud.mark'
   | 'qte.title' | 'qte.instruction' | 'qte.progress'
   | 'result.recorded'
   | 'result.escaped.title' | 'result.escaped.body'
@@ -38,12 +38,16 @@ export type MsgKey =
   | 'demo.s1' | 'demo.s2' | 'demo.s3' | 'demo.s4' | 'demo.s5' | 'demo.s6' | 'demo.s7'
   | 'demo.s8' | 'demo.s9' | 'demo.s10' | 'demo.s11' | 'demo.s12' | 'demo.s13' | 'demo.s14'
   | 'demo.hint.exclude' | 'demo.hint.mute' | 'demo.hint.wager'
-  | 'btn.demo' | 'btn.next' | 'btn.prev';
+  | 'btn.demo' | 'btn.next' | 'btn.prev'
+  | 'age.fresh' | 'age.night' | 'age.older' | 'age.all'
+  | 'reveal.route'
+  | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
     'hud.round': 'Round {n}',
     'hud.stamina': 'Stamina {n}',
+    'hud.step': 'Step {n}',
     'hud.hint': 'Move: click/arrow keys · Look: space · Mark: Shift+click',
     'hud.mark': 'Mark',
     'qte.title': 'Close Encounter',
@@ -106,8 +110,14 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'comm.done': 'Done',
     'comm.reward': '+{n} field notes',
     'tut.move': 'See that marker? Walk over and read it.',
-    'tut.read': 'A clue! The creature is somewhere it points to.',
-    'tut.cross': 'Two clues overlap — the truth hides where both agree.',
+    // F3（owner 核准改字）：獵物現在會沿路線走，「牠就在這指向的範圍裡」只在讀到的
+    // 剛好是最新齡線索時為真（實測僅 37.5%）。改成過去式——線索永遠精確錨定在
+    // 「牠留下痕跡當下」所在的節點，這句話因此不論齡別都恆真，不再暗示「現在」。
+    'tut.read': 'A clue! It shows where the creature was, not where it is now.',
+    // 同理改過去式：同齡交集在幾何上保證含該齡節點（checkTutStep1to2 只餵同齡真線索），
+    // 但那是「牠當時」所在，不是「牠現在」所在——舊句「真相藏在交集之處」用現在式
+    // 暗示交集等於現在的位置，只有 38.1% 為真。
+    'tut.cross': "Two clues of the same freshness agree — that's where the creature was at that moment.",
     'tut.qte': 'You are close. Get ready to tap in rhythm!',
     'score.gain': '+{n} pts',
     'score.pot': 'Unbanked {n}',
@@ -132,7 +142,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'reveal.dailyHidden': "Today's trail keeps its secret — everyone is hunting the same map.",
     'btn.continue': '[ Continue ]',
     'help.marks': 'Mark a cell again and again to cycle it: ruled out, maybe, my call. Your call sets your record quality.',
-    'help.layer': 'Layer shades each cell by how many read clues agree. Mark a clue you already read to mute it.',
+    'help.layer': 'Layer shades each cell by how many read clues of one freshness agree — the chip beside it picks which. Mark a clue you already read to mute it.',
     'help.reveal': 'Every hunt ends by revealing where it really was and how close your call landed.',
     'hud.survey': 'Look',
     'hud.surveyCost': '-{n} to look around',
@@ -167,10 +177,21 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '[ Walkthrough ]',
     'btn.next': '[ Next ]',
     'btn.prev': '[ Back ]',
+    'age.fresh': 'Morning',
+    'age.night': 'Night',
+    'age.older': 'Older',
+    'age.all': 'All',
+    'reveal.route': 'It was moving. The trail below is where it walked, oldest to newest.',
+    'rule.lowland': 'Follows the valley floor',
+    'rule.highland': 'Keeps to the ridgeline',
+    'rule.cover': 'Hugs the thickets',
+    'rule.straight': 'Travels in a straight line',
+    'rule.doubling': 'Doubles back on itself',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
     'hud.stamina': '體力 {n}',
+    'hud.step': '步數 {n}',
     'hud.hint': '移動：點擊/方向鍵 · 眺望：空白鍵 · 標記：Shift+點擊',
     'hud.mark': '標記',
     'qte.title': '近距離判讀',
@@ -233,8 +254,11 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'comm.done': '已完成',
     'comm.reward': '觀察筆記 +{n}',
     'tut.move': '看到那個記號了嗎？走過去判讀。',
-    'tut.read': '線索！牠就在這指向的範圍裡。',
-    'tut.cross': '兩條線索重疊——真相藏在交集之處。',
+    // 與英文版同一次改字（見 en 區塊註解）：線索永遠錨定在牠留下痕跡當下所在的節點，
+    // 改成過去式後不論齡別都恆真，不再暗示「現在」。
+    'tut.read': '線索！這是牠留下痕跡當下的位置，不是牠現在的位置。',
+    // 同齡交集保證含該齡節點，但那是牠「當時」所在，不是「現在」所在——改過去式。
+    'tut.cross': '兩條齡別相同的線索重疊——那是牠當時所在的位置。',
     'tut.qte': '很近了，準備節奏點擊！',
     'score.gain': '得分 +{n}',
     'score.pot': '待入袋 {n}',
@@ -259,7 +283,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'reveal.dailyHidden': '今日行蹤不揭曉——全球同題，答案得自己找。',
     'btn.continue': '［繼續］',
     'help.marks': '反覆標記同一格可循環：排除、存疑、押注。押注格決定你的記錄品質。',
-    'help.layer': '「圖層」依符合的已判讀線索數為格子上色；標記已判讀的線索可將它靜音。',
+    'help.layer': '「圖層」依符合選定齡別的已判讀線索數上色，chip 選哪一齡；標記已判讀線索可靜音。',
     'help.reveal': '每一局結束都會揭曉牠實際在哪，以及你的押注差了幾格。',
     'hud.survey': '眺望',
     'hud.surveyCost': '眺望 -{n}',
@@ -294,6 +318,16 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '［看示範］',
     'btn.next': '［下一步］',
     'btn.prev': '［上一步］',
+    'age.fresh': '今晨',
+    'age.night': '昨夜',
+    'age.older': '更早',
+    'age.all': '全部',
+    'reveal.route': '牠一直在移動。下面這條就是牠走過的路，由舊到新。',
+    'rule.lowland': '沿溪谷低處走',
+    'rule.highland': '沿稜線高處走',
+    'rule.cover': '貼著密叢走',
+    'rule.straight': '一路直行',
+    'rule.doubling': '走出去再折返',
   },
 };
 
