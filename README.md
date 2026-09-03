@@ -13,6 +13,13 @@ that evade you simply slip away.
 - `npm run build` — production build to `dist/`
 - Placing art assets (creature sprites, terrain tiles) — see `docs/ASSETS.md`
 
+## Play
+
+<https://yinyaoqing.github.io/ridge_hunters_trail/>
+
+Every push to `main` runs the tests and the type check, then publishes the
+build that passed them. See `.github/workflows/ci.yml`.
+
 ## Design docs
 
 - `docs/Ridge_Hunters_Trail_Game_Design_Spec.md` — game design spec v1.0

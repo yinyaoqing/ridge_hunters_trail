@@ -1,5 +1,6 @@
 import type { Vec2 } from './geometry';
 import type { Weather } from './weather';
+import type { Route } from './route';
 
 export type TerrainType = 'meadow' | 'mist' | 'thicket' | 'rock' | 'cliff';
 
@@ -28,17 +29,21 @@ export interface ScentData {
   biasDirection: number;  // 目標方位提示（±30°），風向石持有時渲染為偏心弧
 }
 
+// 線索的新鮮度＝它錨定在覓食路線的哪一個節點。0 最舊、2 最新（獵物開局所在）。
+// 同齡線索的交集必定包含該齡位置——舊的「所有線索交集包含目標」是這條的特例。
+export type ClueAge = 0 | 1 | 2;
+
 export type Clue =
-  | { type: 'footprint'; position: Vec2; isDecoy: boolean; data: FootprintData }
-  | { type: 'disturbance'; position: Vec2; isDecoy: boolean; data: DisturbanceData }
-  | { type: 'scent'; position: Vec2; isDecoy: boolean; data: ScentData };
+  | { type: 'footprint'; position: Vec2; isDecoy: boolean; age: ClueAge; data: FootprintData }
+  | { type: 'disturbance'; position: Vec2; isDecoy: boolean; age: ClueAge; data: DisturbanceData }
+  | { type: 'scent'; position: Vec2; isDecoy: boolean; age: ClueAge; data: ScentData };
 
 export type ClueType = Clue['type'];
 
 export interface Level {
   round: number;
   mapSize: number;
-  targetPos: Vec2;
+  route: Route;             // 覓食路線；獵物依步數沿它移動（見 core/route.ts）
   clues: Clue[];
   terrain: TerrainType[][]; // terrain[y][x]
   elevation: number[][];    // elevation[y][x]，0..1；地形由它推導，視野加成也讀它

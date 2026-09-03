@@ -32,11 +32,13 @@ export const DEMO_SCENT_DISTANCE = 6;
 // 動這四條線索的任何一個數字之前，先跑測試。
 export const DEMO_CLUES: readonly Clue[] = [
   {
-    type: 'footprint', position: { x: 2, y: 7 }, isDecoy: false,
+    // age: 2——示範關卡是單一固定目標（無路線），全部線索都錨定在同一個「現在」的位置，
+    // 對應到有路線的關卡裡最新的一齡。
+    type: 'footprint', position: { x: 2, y: 7 }, isDecoy: false, age: 2,
     data: { direction: 309, angleSpread: 25 }, // 309° = round(angleDeg((2,7) → 目標))
   },
   {
-    type: 'scent', position: { x: 8, y: 8 }, isDecoy: false,
+    type: 'scent', position: { x: 8, y: 8 }, isDecoy: false, age: 2,
     // biasDirection 只在持有風向石時才會被畫成偏心弧；示範沒有道具系統，
     // 這裡仍填真實方位（252° = round(angleDeg((8,8) → 目標))），
     // 免得日後若接上道具還得回頭補一個假值
@@ -46,11 +48,11 @@ export const DEMO_CLUES: readonly Clue[] = [
     },
   },
   {
-    type: 'footprint', position: { x: 3, y: 4 }, isDecoy: true,
+    type: 'footprint', position: { x: 3, y: 4 }, isDecoy: true, age: 2,
     data: { direction: 225, angleSpread: 25 }, // 朝西北，與真相的東北恰好相背
   },
   {
-    type: 'disturbance', position: { x: 6, y: 0 }, isDecoy: false,
+    type: 'disturbance', position: { x: 6, y: 0 }, isDecoy: false, age: 2,
     data: { radius: 2 },
   },
 ];

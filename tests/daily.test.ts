@@ -3,6 +3,7 @@ import {
   dailyKey, dailySeed, createDailySession, createDailySessionFromKey, createStreak, daysBetween,
   DAILY_ROUND, FREEZE_EVERY, FREEZE_CAP,
 } from '../src/core/daily';
+import { ROUTE_START_INDEX } from '../src/core/route';
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial));
@@ -27,7 +28,7 @@ describe('daily seed', () => {
     expect(a.mode).toBe('daily');
     expect(a.round).toBe(DAILY_ROUND);
     const c = createDailySession(new Date(Date.UTC(2026, 8, 1)));
-    expect(c.level.targetPos).not.toEqual(a.level.targetPos);
+    expect(c.level.route.waypoints[ROUTE_START_INDEX]).not.toEqual(a.level.route.waypoints[ROUTE_START_INDEX]);
   });
 });
 

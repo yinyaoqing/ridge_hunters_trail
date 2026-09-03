@@ -4,10 +4,11 @@ import type { SessionState, SessionMode } from '../src/core/session';
 import { cheb, angleDeg, type Vec2 } from '../src/core/geometry';
 import type { Clue, Level, TerrainType } from '../src/core/types';
 import type { Rng } from '../src/core/rng';
+import { ROUTE_START_INDEX, MOVE_EVERY } from '../src/core/route';
 
 function scentClueAt(pos: Vec2): Clue {
   return {
-    type: 'scent', position: pos, isDecoy: false,
+    type: 'scent', position: pos, isDecoy: false, age: 2,
     data: { distance: 1, tolerance: 1, windBiasNeeded: false, biasDirection: 0 },
   };
 }
@@ -18,7 +19,7 @@ interface Opts {
   microEvents?: number;
   clues?: Clue[];
   supplies?: Vec2[];
-  targetPos?: Vec2;
+  target?: Vec2;
   mapSize?: number;
 }
 
@@ -29,8 +30,11 @@ function makeState(opts: Opts = {}): SessionState {
     Array.from({ length: size }, () => 'meadow' as TerrainType));
   const elevation: number[][] = Array.from({ length: size }, () =>
     Array.from({ length: size }, () => 0.2)); // 低地：與 meadow 一致，視野不加成
+  const target = opts.target ?? { x: size - 1, y: size - 1 };
   const level: Level = {
-    round: 1, mapSize: size, targetPos: opts.targetPos ?? { x: size - 1, y: size - 1 },
+    round: 1, mapSize: size,
+    // 這批測試不涉及獵物移動，退化成五個節點都停在同一點的路線即可。
+    route: { waypoints: Array(5).fill(target), rule: 'straight' },
     clues: opts.clues ?? [], terrain, elevation, supplies: opts.supplies ?? [],
     creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
   };
@@ -39,7 +43,7 @@ function makeState(opts: Opts = {}): SessionState {
     round: 1, level, player, stamina: 10,
     readClues: new Set(),
     marks: new Map(), path: [player], readLog: [], mutedClues: new Set(),
-    seen: new Set(), surveyed: new Set(),
+    seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
     phase: 'explore',
     steps: 0, mode: opts.mode ?? 'run', resolved: false, bellUsed: false,
     microEvents: opts.microEvents ?? 0,
@@ -91,18 +95,18 @@ describe('rollMicroEvent — cap', () => {
 describe('rollMicroEvent — proximity gate', () => {
   it('excludes rolling when within chebyshev distance 2 of target', () => {
     const s = makeState({ player: { x: 13, y: 13 } }); // cheb to (14,14) = 1
-    expect(cheb(s.player, s.level.targetPos)).toBe(1);
+    expect(cheb(s.player, s.level.route.waypoints[ROUTE_START_INDEX])).toBe(1);
     expect(rollMicroEvent(s, () => 0.001)).toBeNull();
     expect(s.microEvents).toBe(0);
   });
   it('excludes exactly at chebyshev distance 2', () => {
     const s = makeState({ player: { x: 12, y: 12 } }); // cheb to (14,14) = 2
-    expect(cheb(s.player, s.level.targetPos)).toBe(2);
+    expect(cheb(s.player, s.level.route.waypoints[ROUTE_START_INDEX])).toBe(2);
     expect(rollMicroEvent(s, () => 0.001)).toBeNull();
   });
   it('allows rolling at chebyshev distance 3', () => {
     const s = makeState({ player: { x: 11, y: 11 } }); // cheb to (14,14) = 3
-    expect(cheb(s.player, s.level.targetPos)).toBe(3);
+    expect(cheb(s.player, s.level.route.waypoints[ROUTE_START_INDEX])).toBe(3);
     expect(rollMicroEvent(s, () => 0.001)).not.toBeNull();
   });
 });
@@ -141,13 +145,13 @@ describe('rollMicroEvent — bird-startle / old-trail direction', () => {
     const s = makeState({ player: { x: 5, y: 5 } });
     const rng: Rng = () => 0.001; // chance passes; pickWeighted -> bird-startle
     const ev = rollMicroEvent(s, rng);
-    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg({ x: 5, y: 5 }, s.level.targetPos) });
+    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg({ x: 5, y: 5 }, s.level.route.waypoints[ROUTE_START_INDEX]) });
   });
   it('old-trail direction points from player to target', () => {
     const s = makeState({ player: { x: 5, y: 5 } });
     const { rng } = seqRng([0.01, 0.9]); // chance passes; pickWeighted -> old-trail
     const ev = rollMicroEvent(s, rng);
-    expect(ev).toEqual({ kind: 'old-trail', direction: angleDeg({ x: 5, y: 5 }, s.level.targetPos) });
+    expect(ev).toEqual({ kind: 'old-trail', direction: angleDeg({ x: 5, y: 5 }, s.level.route.waypoints[ROUTE_START_INDEX]) });
   });
 });
 
@@ -180,8 +184,43 @@ describe('rollMicroEvent — bonus-supply', () => {
     const s = makeState({ player, supplies: ringCells });
     const { rng } = seqRng([0.01, 0.5]); // chance passes; pickWeighted -> bonus-supply
     const ev = rollMicroEvent(s, rng);
-    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg(player, s.level.targetPos) });
+    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg(player, s.level.route.waypoints[ROUTE_START_INDEX]) });
     expect(s.microEvents).toBe(1);
     expect(s.level.supplies.length).toBe(ringCells.length); // 未新增補給
+  });
+});
+
+describe('rollMicroEvent — direction tracks the quarry\'s current waypoint, not its starting one', () => {
+  it('bird-startle points at the route\'s current waypoint once steps has advanced past MOVE_EVERY', () => {
+    // 這份檔案其餘案例的路線五個節點全部相同、steps 又恆為 0，就算 events.ts
+    // 誤讀 waypoints[ROUTE_START_INDEX]（起始節點）而不是「現在」的節點，這些
+    // 斷言照樣會通過——對「方向隨步數走」這件事完全沒有涵蓋。這裡刻意讓節點
+    // 不同、steps 前進超過一個 MOVE_EVERY 週期，驗證方向真的指向現在的節點。
+    const size = 15;
+    const terrain: TerrainType[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 'meadow' as TerrainType));
+    const elevation: number[][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 0.2));
+    const startWaypoint: Vec2 = { x: 0, y: 0 };     // W2：開局節點，誤讀時會指向這裡
+    const currentWaypoint: Vec2 = { x: 14, y: 14 }; // W3：steps = MOVE_EVERY 之後該指向這裡
+    const level: Level = {
+      round: 1, mapSize: size,
+      route: {
+        waypoints: [startWaypoint, startWaypoint, startWaypoint, currentWaypoint, currentWaypoint],
+        rule: 'straight',
+      },
+      clues: [], terrain, elevation, supplies: [],
+      creatureId: 'mistfawn', trailheadIndex: 0, weather: 'clear', iris: false,
+    };
+    const player: Vec2 = { x: 5, y: 5 };
+    const s: SessionState = {
+      round: 1, level, player, stamina: 10,
+      readClues: new Set(), marks: new Map(), path: [player], readLog: [], mutedClues: new Set(),
+      seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
+      phase: 'explore', steps: MOVE_EVERY, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+    };
+    const rng: Rng = () => 0.001; // chance passes; pickWeighted -> bird-startle
+    const ev = rollMicroEvent(s, rng);
+    expect(ev).toEqual({ kind: 'bird-startle', direction: angleDeg(player, currentWaypoint) });
   });
 });

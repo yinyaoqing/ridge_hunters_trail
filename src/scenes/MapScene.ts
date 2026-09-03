@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
+import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, currentTarget, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
 import { visionRadius, SURVEY_COST, SURVEY_BONUS } from '../core/vision';
 import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
 import { getDifficulty } from '../core/difficulty';
@@ -1114,7 +1114,7 @@ export class MapScene extends Phaser.Scene {
         }
         // 引導 step2→3：進逼目標範圍（cheb<=2）先於實際 QTE 觸發距離（cheb<=1）示警，
         // 涵蓋玩家跳步略過 step1/2 的情境（任何 0..2 步驟命中都直接進 step3）
-        if (this.tutStep >= 0 && this.tutStep <= 2 && cheb(s.player, s.level.targetPos) <= 2) {
+        if (this.tutStep >= 0 && this.tutStep <= 2 && cheb(s.player, currentTarget(s)) <= 2) {
           this.tutStep = 3;
           this.showTut('tut.qte');
         }

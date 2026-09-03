@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { SessionState } from '../core/session';
+import { currentTarget, type SessionState } from '../core/session';
 import { getPalette, type Palette } from '../core/palette';
 import { wagerKey, parseKey } from '../core/marks';
 import { infoCompleteStep, misleadingDecoy } from '../core/deduction';
@@ -23,6 +23,9 @@ export class RevealScene extends Phaser.Scene {
 
   create() {
     const s: SessionState = this.registry.get('session');
+    // 只取一次存成區域常數：獵物位置是 steps 的函式，本畫面渲染期間 steps 不會再變，
+    // 重複呼叫 currentTarget(s) 沒有錯，但用同一個值能讓下面每一處讀到的都是同一刻的牠在哪。
+    const target = currentTarget(s);
     const i18n: I18n = this.registry.get('i18n');
     this.audio = this.registry.get('audio');
     this.audio.ambient(false); // 揭曉畫面停風聲，與結算一致
@@ -57,7 +60,7 @@ export class RevealScene extends Phaser.Scene {
     const span = cell * size;
     const ox = Math.floor(cx - span / 2);
     const oy = mapTop;
-    this.drawMinimap(s, ox, oy, cell, hideAnswer);
+    this.drawMinimap(s, ox, oy, cell, hideAnswer, target);
 
     // 文字區：距離、假蹤跡、資訊完備步數，三行由上而下堆疊（缺項自動不佔位）
     const wk = wagerKey(s.marks);
@@ -75,13 +78,13 @@ export class RevealScene extends Phaser.Scene {
       // 用一行說明取代距離／假蹤跡行，否則畫面看起來像壞掉（F3）
       ty = this.line(cx, ty, i18n.t('reveal.dailyHidden'), pal.paperDim, 14);
     } else if (wager !== null) {
-      const off = cheb(wager, s.level.targetPos);
+      const off = cheb(wager, target);
       const msg = off === 0 ? i18n.t('reveal.exact') : i18n.t('reveal.offBy', { n: off });
       ty = this.line(cx, ty, msg, off === 0 ? pal.gold : pal.paper, 17);
     }
 
     if (!hideAnswer) {
-      const decoy = misleadingDecoy(s.level, s.readLog, wager);
+      const decoy = misleadingDecoy(s.level, s.readLog, wager, target);
       if (decoy) ty = this.line(cx, ty, i18n.t('reveal.decoy'), pal.mark, 14);
     }
 
@@ -106,7 +109,9 @@ export class RevealScene extends Phaser.Scene {
 
   // 小地圖：地形底色 → 玩家路徑 → 已判讀線索（幌子在此才揭穿）→ 押注格 → 真實位置
   // hideAnswer 時（F3）真假線索一律畫成金色、且不畫真實位置，避免顏色差異或色點洩漏答案
-  private drawMinimap(s: SessionState, ox: number, oy: number, cell: number, hideAnswer: boolean) {
+  private drawMinimap(
+    s: SessionState, ox: number, oy: number, cell: number, hideAnswer: boolean, target: Vec2,
+  ) {
     const pal = this.pal;
     const L = s.level;
     const g = this.add.graphics();
@@ -159,7 +164,7 @@ export class RevealScene extends Phaser.Scene {
 
     // 真實位置：生物色實心點＋金色脈動環
     const creature = CREATURES.find((c) => c.id === L.creatureId)!;
-    const t = px(L.targetPos);
+    const t = px(target);
     g.fillStyle(creature.color, 1).fillCircle(t.x, t.y, Math.max(3, cell * 0.34));
     const ring = this.add.graphics();
     ring.lineStyle(2, pal.gold, 1).strokeCircle(t.x, t.y, Math.max(6, cell * 0.7));
