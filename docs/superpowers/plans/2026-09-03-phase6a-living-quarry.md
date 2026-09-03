@@ -933,26 +933,30 @@ import type { Level } from '../src/core/types';
 // 這正是這一階要求玩家做的預測，成本估算若不含這一項就是在騙自己。
 function idealCost(L: Level): number {
   const start = startCorner(L.mapSize, L.route.waypoints[ROUTE_START_INDEX]);
-  const legCost = (from: { x: number; y: number }, to: { x: number; y: number }): number => {
-    const c = routeCostsFrom(L.terrain, from).get(key(to));
-    return c === undefined ? Infinity : c;
-  };
   const real = L.clues.filter((c) => !c.isDecoy);
   const trailhead = L.clues[L.trailheadIndex].position;
+
+  // routeCostsFrom 是一次 Dijkstra，回傳「從該點到全圖每一格」的成本表。
+  // 每個起點只算一次並重用——放進迴圈裡逐條線索重算，會讓這支掃描慢上一個數量級。
+  const fromStart = routeCostsFrom(L.terrain, start);
+  const fromTrailhead = routeCostsFrom(L.terrain, trailhead);
+  const at = (table: Map<string, number>, to: { x: number; y: number }): number =>
+    table.get(key(to)) ?? Infinity;
+
   // 第二條線索取「離起始蹤跡最近的另一條真線索」——玩家的合理選擇
   let second = trailhead;
   let bestSecond = Infinity;
   for (const c of real) {
     if (key(c.position) === key(trailhead)) continue;
-    const cost = legCost(trailhead, c.position);
+    const cost = at(fromTrailhead, c.position);
     if (cost < bestSecond) { bestSecond = cost; second = c.position; }
   }
-  const legA = legCost(start, trailhead);
+  const legA = at(fromStart, trailhead);
   const legB = bestSecond;
   // 走到這裡已經花了多少步？以「每一步平均 1.6 點」回推（terrain 成本 1/2/4 的加權均值）
   const stepsSoFar = Math.round((legA + legB) / 1.6);
   const intercept = targetAt(L.route, stepsSoFar);
-  return legA + legB + legCost(second, intercept);
+  return legA + legB + at(routeCostsFrom(L.terrain, second), intercept);
 }
 
 describe('可解性掃描（規格 §8）', () => {
