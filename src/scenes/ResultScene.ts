@@ -137,7 +137,14 @@ export class ResultScene extends Phaser.Scene {
     // h<700 視窗已很擁擠，解鎖卡收窄為僅標題行——卡片間距縮小，降低與按鈕重疊的機率；
     // 版面本身已改由下方 flowY 排定，這裡只留下「畫不畫副標」與「區塊多高」兩個決定
     const compactCards = h < 700;
-    const cardStep = compactCards ? 22 : 40;
+    // 肖像在矮視窗縮小，沿用道具卡同一個斷點。實際畫出來的硬範圍是
+    // cy-92（虛線環）到 cy+96.4（剪影後備貼圖 208x176 縮放 1.05 畫在 cy+4），
+    // 合計 188.4px——舊版宣告 150，等於對版面謊報了近 40px，flowY 因此把標題
+    // 排得比實際能容納的還近，滿載的補獲畫面在矮視窗會讓金色虛線環穿過生物名稱。
+    // 但誠實地宣告 194 又會讓「兩張道具卡＋三則委託」的滿載組合在 600px 高的視窗
+    // 溢出、把次鈕推出畫面，所以矮視窗連同繪製一起縮到 0.68。
+    const portraitScale = compactCards ? 0.68 : 1;
+    const portraitH = compactCards ? 132 : 194;
     // run 且失手時，未入袋的 score.lost 軟著陸訊息併入同一疊層（視為多一個 flowY 區塊）
     const lastLoss = (this.registry.get('lastLoss') as number | undefined) ?? 0;
     const showLoss = !caught && s.mode === 'run' && lastLoss > 0;
@@ -179,16 +186,21 @@ export class ResultScene extends Phaser.Scene {
     const slot: Record<string, number> = {};
     const add = (name: string, b: FlowBlock) => { slot[name] = blocks.length; blocks.push(b); };
 
-    if (caught) add('portrait', { h: 150, gap: 24, maxGap: 60 });
+    if (caught) add('portrait', { h: portraitH, gap: 24, maxGap: 60 });
     add('title', { h: 38, gap: caught ? 20 : 56, maxGap: 96 });
     add('dots', { h: 14, gap: 18, minGap: 10 });
     add('divider', { h: 6, gap: 18, minGap: 10 });
     add('body', { h: bodyH, gap: 22, minGap: 12 });
-    showTools.forEach((_, i) => add(`tool${i}`, { h: cardStep - 8, gap: 14, minGap: 8 }));
+    // 非精簡時卡片是「名稱 ＋ 其下 16px 的說明」，實際範圍 y-8.75 到 y+23，
+    // 中心在 y+7.1；精簡時只有名稱，中心就在 y。cardStep 是舊版累加版面的步進值，
+    // 拿它減 8 當高度只是巧合，改為直接寫出量到的高度。
+    showTools.forEach((_, i) => add(`tool${i}`, { h: compactCards ? 18 : 32, gap: 14, minGap: 8 }));
     lastComms.forEach((_, i) => add(`comm${i}`, { h: commStep - 6, gap: 10, minGap: 6 }));
     if (showLoss) add('loss', { h: 30, gap: 14, minGap: 8 });
     if (showScoreGain) add('gain', { h: 40, gap: 16, minGap: 10 });
-    if (!caught) add('notes', { h: 58, gap: 18, minGap: 10 });
+    // 真實高度 61.25：計數行（補間後停在 y-6）到研究度說明（y+40）的完整範圍，
+    // 其中心在 y+15.9，因此下方傳入的錨點要往上退約 16 才能與區塊對齊
+    if (!caught) add('notes', { h: 62, gap: 18, minGap: 10 });
     if (s.mode === 'daily') add('streak', { h: 16, gap: 18, minGap: 10 });
     add('primary', { h: 52, gap: 26, minGap: 16 });
     add('secondary', { h: 48, gap: 14, minGap: 12 });
@@ -198,8 +210,12 @@ export class ResultScene extends Phaser.Scene {
     const at = (name: string): number => ys[slot[name]];
 
     if (caught) {
-      this.drawCreaturePortrait(cx, at('portrait'), creature.id, s.level.iris ? pal.iris : creature.color, s.level.iris);
-      if (quality) this.stampQuality(cx + 128, at('portrait') + 56, quality, i18n);
+      this.drawCreaturePortrait(
+        cx, at('portrait'), creature.id, s.level.iris ? pal.iris : creature.color, s.level.iris, portraitScale);
+      // 蓋印隨肖像等比移位，否則縮小後它會浮在肖像外面
+      if (quality) {
+        this.stampQuality(cx + 128 * portraitScale, at('portrait') + 56 * portraitScale, quality, i18n);
+      }
     }
 
     this.add.text(cx, at('title'), title, {
@@ -226,7 +242,7 @@ export class ResultScene extends Phaser.Scene {
     // 道具解鎖卡（至多同幀 2 枚）：caught 排在圖鑑點列/分隔線下方；
     // !caught 疊在筆記掉落區之上——確切位置全數改由 flowY 決定
     showTools.forEach((id, i) => {
-      this.renderToolCard(cx, at(`tool${i}`), id, i18n, compactCards);
+      this.renderToolCard(cx, at(`tool${i}`) - (compactCards ? 0 : 7), id, i18n, compactCards);
     });
     // 委託完成行接在道具卡之後（同一堆疊區塊，道具卡在上、委託行在下）
     lastComms.forEach((idx, i) => {
@@ -252,10 +268,11 @@ export class ResultScene extends Phaser.Scene {
         wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
       }).setOrigin(0.5);
     }
-    // showNotesDrop 的 y 是它第一行文字的中心，其下 18–26px 是進度條、+40 是研究度文字，
-    // 整塊高約 58px，因此傳入 at('notes') - 20 讓整塊以 flowY 給的中心對齊。不改
-    // showNotesDrop 內部的相對位移——那組數字本身沒有問題，出事的是整塊被放得太低
-    if (!caught) this.showNotesDrop(cx, at('notes') - 20, creature.id, notes, codex, i18n);
+    // showNotesDrop 的 y 是它第一行文字的中心，真實範圍是 y-14.75（計數行補間後的
+    // 落點）到 y+46.5（研究度說明），中心在 y+15.9，因此傳入 at('notes') - 16
+    // 讓整塊以 flowY 給的中心對齊。不改 showNotesDrop 內部的相對位移——那組數字
+    // 本身沒有問題，出事的是整塊被放得太低
+    if (!caught) this.showNotesDrop(cx, at('notes') - 16, creature.id, notes, codex, i18n);
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
     // 座標全數改由 flowY 決定，不再需要各自的 Math.min(…, h-96) 之類夾限
@@ -317,11 +334,11 @@ export class ResultScene extends Phaser.Scene {
       });
       this.button(cx, ySecondary, 250, 48, stripBrackets(i18n.t('btn.camp')), false,
         () => fadeToScene(this, 'Camp'));
-      // 示範入口：剛失敗、最想知道「我到底該怎麼想」的那一刻。
-      // 放在次鈕「之下」而非主鈕之上——主鈕上方被觀察筆記區佔滿。做成文字連結而非
-      // 第三顆按鈕，是因為本畫面的按鈕列預算裡沒有再加一列的空間。
-      // flowY 會在空間不足時誠實地把區塊排到 bottom 之外，此處據此決定畫不畫：
-      // 矮視窗下若連結會落到畫面外，寧可整個不畫——營地工具列與說明頁仍然進得去。
+      // 示範入口：剛失敗、最想知道「我到底該怎麼想」的那一刻。做成文字連結而非
+      // 第三顆按鈕，是因為本畫面的按鈕列已經沒有再加一列的預算。
+      // 點擊區高 36 而非 32：英文字串在 420px 寬會折成兩行，36 才涵蓋得住；
+      // 因此這裡用半高 18 判斷它是否還在畫面內，放不下就整個不畫——
+      // 少一個入口，好過一個被裁掉一半的入口。
       const demoLinkY = at('demo');
       if (demoLinkY + 18 <= h) {
         this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
@@ -470,8 +487,10 @@ export class ResultScene extends Phaser.Scene {
 
   // color：一般為生物色，異彩變種時呼叫端傳入 pal.iris（driving 輻射光暈與虛線環）；
   // iris 旗標另外決定是否對剪影疊染 setTint（非異彩時剪影維持原始貼圖明暗，不作全染）
-  private drawCreaturePortrait(cx: number, cy: number, creatureId: string, color: number, iris: boolean) {
-    const size = 250;
+  private drawCreaturePortrait(
+    cx: number, cy: number, creatureId: string, color: number, iris: boolean, scale: number,
+  ) {
+    const size = 250 * scale;
     if (this.textures.exists(GLOW_KEY)) this.textures.remove(GLOW_KEY);
     const tex = this.textures.createCanvas(GLOW_KEY, size, size);
     if (tex) {
@@ -486,15 +505,15 @@ export class ResultScene extends Phaser.Scene {
       this.add.image(cx, cy, GLOW_KEY);
     }
     const ring = this.add.graphics();
-    dashedCircle(ring, cx, cy, 92, color, 0.35, 1.4, 2, 8);
+    dashedCircle(ring, cx, cy, 92 * scale, color, 0.35, 1.4, 2, 8);
     const texKey = creatureTexKey(this, creatureId);
     if (this.textures.exists(texKey)) {
-      const sil = this.add.image(cx, cy + 4, texKey).setScale(creatureScale(texKey, 1.05));
+      const sil = this.add.image(cx, cy + 4 * scale, texKey).setScale(creatureScale(texKey, 1.05 * scale));
       // setTint（非 tintFill）疊染異彩色，保留貼圖原始形狀明暗
       if (iris) sil.setTint(color);
       addGlowIfWebGL(this, sil, this.pal.glow);
     } else {
-      this.add.circle(cx, cy, 60, color);
+      this.add.circle(cx, cy, 60 * scale, color);
     }
 
     // 補獲慶祝孢子：一次性 explode，texture 依生物上色（key 帶 id 避免跨生物撞色沿用舊材質）
