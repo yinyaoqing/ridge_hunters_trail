@@ -120,6 +120,24 @@ describe('buildRoute: 每條規則真的表現出它宣稱的偏好', () => {
     expect(meanLateTurn('straight')).toBeLessThan(45);
     expect(meanLateTurn('doubling')).toBeGreaterThan(90);
   });
+
+  it('第一步的方向不會集中在單一方位', () => {
+    // 回歸測試。起始朝向若不隨機，straight／doubling 的第一段評分會在 16 個候選之間
+    // 完全平手，挑選迴圈的嚴格大於比較讓 candidates[0]（正東）勝出——實測曾有 91%
+    // 的路線第一步朝正東，而「維持原方向」對 straight 是穩定不動點，
+    // 於是整條路線退化成一條水平線，三隻生物的線索幾何因此偏向單一方位。
+    for (const rule of ['straight', 'doubling'] as RouteRule[]) {
+      const buckets = new Map<number, number>();
+      for (let seed = 1; seed <= 200; seed++) {
+        const w = routeFor(seed, rule).route.waypoints;
+        const b = Math.round(angleDeg(w[0], w[1]) / 45) % 8;
+        buckets.set(b, (buckets.get(b) ?? 0) + 1);
+      }
+      // 八個方位，均勻分佈是 0.125。0.4 是寬鬆的門檻——它抓的是「九成集中在一個方位」
+      // 這種退化，而不是要求方位完美均勻（地形本來就會讓某些方向比較好走）。
+      expect(Math.max(...buckets.values()) / 200).toBeLessThan(0.4);
+    }
+  });
 });
 
 describe('targetAt', () => {
