@@ -16,7 +16,7 @@
 |---|---|
 | `npx tsc --noEmit` | exit 0，零錯誤 |
 | `npx vitest run` | 37 檔 / 445 測試全過，8.02 秒 |
-| 已追蹤測試檔 | 35 支（另 2 支 `tests/_scratch_*.test.ts` 未追蹤，CI 看不到） |
+| 已追蹤測試檔 | 35 支（另有數支未追蹤的調參探針，CI 看不到） |
 | build 產物路徑 | `dist/index.html` 引用 `./assets/index-*.js`，已是相對路徑 |
 | 素材 | `public/assets/**.png` 已進版控，CI 不需執行 `scripts/build-assets.mjs` |
 | 存檔相容性 | 鍵值已是 `rht.*.v1/v2` 分模組版號，codex 有 v1→v2 遷移 |
@@ -125,8 +125,10 @@ concurrency:
    紅燈出現在這裡，而不是在往線上推的時候。
 2. **工作區收尾。** Phase 6a 的調參改動尚未提交（撰寫時是 `src/core/quirks.ts`、
    `tests/solvability.test.ts`、`tests/terrain.test.ts`，執行時以 `git status`
-   為準），合併前要逐檔決定提交或丟棄。`tests/_scratch_*.test.ts` 維持不追蹤
-   ——它們是調參數用的探針（會印統計數字、跑 1000 seed 掃描），不屬於 CI。
+   為準），合併前要逐檔決定提交或丟棄。`tests/` 底下**未追蹤**的檔案維持原狀
+   ——它們是調參數用的探針（會印統計數字、跑上千 seed 掃描），不屬於 CI。
+   判準是 git 的追蹤狀態而非檔名：觀察到的命名有 `_scratch_*` 也有 `_zz_probe*`，
+   靠樣式比對遲早會漏掉一支。
 3. **GitHub 端的兩個設定必須做在合併之前**，見 §5。這一點違反直覺，所以拆出來說：
    - **改預設分支**要在**開 PR 之前**。GitHub 開 PR 時 base 會預設成 repo 的
      預設分支，而那個指標現在指著 8/31 的文件分支——不先修，PR 會默默開錯目標。

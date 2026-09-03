@@ -15,7 +15,10 @@
 - **不得改動 `vite.config.ts`。** `base: './'` 產出的相對路徑正是 Pages 子路徑所需（規格 §1）。
 - **不得把 `dist/` 加入版控。** 它已在 `.gitignore`，artifact 走 Actions 通道。
 - **不得為了讓 CI 變綠而修改或刪除既有測試。** 若淨室預演失敗，停下來回報。
-- `tests/_scratch_*.test.ts` 維持**不追蹤**——那是調參數用的探針，不進 CI。
+- **`tests/` 底下任何未追蹤的檔案一律維持未追蹤，不要 `git add`。** 那些是 owner
+  調參數用的探針（觀察過的命名有 `_scratch_*`、`_zz_probe*`，**命名不固定，不要
+  靠檔名樣式判斷**——以「git 是否已追蹤」為準）。它們會印統計數字、跑上千 seed
+  的掃描，不屬於 CI。已追蹤的測試檔恆為 **35** 支。
 - 註解一律繁體中文，寫「**為什麼**」。YAML 註解同此規則。
 - 指令一律**在前景**執行，一次一個。**不要開背景等待——你不會被喚回。**
 - 每個 Task 結束時 commit，訊息結尾加：
@@ -69,13 +72,13 @@ git clone --depth 1 --branch feat/phase6a-living-quarry "file://c:/Users/yinya/g
 
 Expected: `Cloning into ...` 後成功結束，exit 0。
 
-- [ ] **Step 2: 確認淨室裡看不到 scratch 測試**
+- [ ] **Step 2: 確認淨室裡看不到調參探針**
 
 ```bash
 ls "<CI_DIR>/tests" | grep -c "test.ts"
 ```
 
-Expected: `35`。若不是 35，表示有測試檔沒被提交（或 scratch 檔被誤提交），**停下來回報**。
+Expected: `35`。少於 35 表示有測試檔沒被提交；多於 35 表示探針被誤提交進版控。兩種都**停下來回報**。
 
 - [ ] **Step 3: 在淨室裡安裝相依**
 
@@ -273,7 +276,12 @@ Expected:
 git status --short
 ```
 
-撰寫本計畫時的狀態是：`src/core/quirks.ts`、`tests/solvability.test.ts`、`tests/terrain.test.ts` 三個已修改檔案，加上未追蹤的 `tests/_scratch_behavior.test.ts`。**執行當下實際清單可能不同**——以指令輸出為準，不要照抄這裡的檔名。
+**執行當下的清單幾乎一定與本計畫撰寫時不同**——owner 在平行調 Phase 6a 的參數，這份清單分鐘級在變。以指令輸出為準，不要照抄任何檔名。
+
+只有兩種可能：
+
+- **只剩未追蹤的探針**（沒有 `M` 開頭的行）→ 工作區已乾淨，跳到 Step 6。
+- **還有已修改未提交的檔案** → 繼續 Step 2。
 
 - [ ] **Step 2: [OWNER] 逐檔決定去留**
 
@@ -283,7 +291,8 @@ git status --short
 git diff <每一個已修改的檔案>
 ```
 
-`tests/_scratch_*.test.ts` **一律維持不追蹤**，不需要詢問，也不要 `git add`。
+`tests/` 底下**未追蹤**的檔案一律維持原狀，不需要詢問，也不要 `git add`。判準是
+git 的追蹤狀態，不是檔名——探針的命名不固定。
 
 - [ ] **Step 3: 提交 owner 決定保留的改動**
 
@@ -323,7 +332,7 @@ Expected: 無輸出，exit 0。
 git status --short
 ```
 
-Expected: 只剩 `?? tests/_scratch_*.test.ts` 之類的未追蹤探針，**沒有任何 `M` 開頭的行**。若還有已修改未提交的檔案，回到 Step 2。
+Expected: 只剩 `??` 開頭的未追蹤探針，**沒有任何 `M` 開頭的行**。若還有已修改未提交的檔案，回到 Step 2。
 
 - [ ] **Step 7: 推上收尾的 commit**
 
