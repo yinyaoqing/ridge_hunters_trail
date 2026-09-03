@@ -58,6 +58,11 @@ export class MapScene extends Phaser.Scene {
   private weatherG!: Phaser.GameObjects.Graphics; // 天氣徽章圖形（roundText 右側，每次 updateHud 依文字寬度重新定位）
   private weatherText?: Phaser.GameObjects.Text; // compact（<560）不建立，僅顯示圖形
   private stamLabel!: Phaser.GameObjects.Text;
+  // 步數讀出（Fix 6，owner 核准新增）：與 stamLabel 同款樣式與規則，兩種版面都建立
+  // （不像 weatherText 只在 !compact 才建）——compact 版面一樣要能預測獵物走到第幾個
+  // 節點，甚至更需要這個數字。固定建立也順便避開 F3 那一類「欄位存活、物件已銷毀」
+  // 的殘留風險，不必再進 create() 的重置區塊。
+  private stepLabel!: Phaser.GameObjects.Text;
   private hintText?: Phaser.GameObjects.Text;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private pal!: Palette;
@@ -166,6 +171,13 @@ export class MapScene extends Phaser.Scene {
     // 的 scene.restart() 若沒清掉它，之後的 pointerup 會拿舊時間戳算 held，可能超過 350ms
     // 門檻，把一次輕點誤判成長按的標記手勢——與這個重置區塊本身要防的其他殘留同一類 bug。
     this.pressAt = null;
+    // titleRight 只在 buildHud 的 !compact 分支量測、賦值。resize 觸發的 restart 沿用
+    // 同一個 Scene 實例，欄位值會存活；若某次 resize 從 ≥560px 跌到 <560px，這次
+    // buildHud 走 compact 分支、根本不建副標題，titleRight 卻仍留著上一個寬度量到的
+    // 舊值。updateHud 的體力標籤用它夾左界（Math.max(bx, this.titleRight + 12)），
+    // 殘留的非零舊值會把 compact 版面的標籤硬推到 chip 列上——這正是這個重置區塊
+    // 本身要防的那一類殘留欄位，屬性不同、成因相同，理當歸位在此。
+    this.titleRight = 0;
     // heatAge 故意不在此歸位：它是玩家的選擇（同 heatOn），不是指向已銷毀物件的殘留
     // 參照。chip 標籤每次 buildHud／updateHud 都會照 heatAge 現值重繪，不存在「標籤與
     // 選擇不同步」的風險——resize 觸發的 restart 不該把玩家剛選的「全部」密度視圖丟掉。
@@ -260,14 +272,24 @@ export class MapScene extends Phaser.Scene {
     this.showTut('tut.move');
   }
 
-  // 引導 step1→2：讀滿 2 條線索後計算交集格並閃色提示；在 3 秒延遲與後續移動中都會檢查
+  // 引導 step1→2：讀滿 2 條「同一齡」線索後計算交集格並閃色提示；在 3 秒延遲與後續移動中都會檢查。
+  // 只在單一齡別內求交集，絕不跨齡：不同齡的線索錨定在獵物「當時」所在的不同節點上，
+  // 跨齡交集在幾何上沒有意義（同一格未必是任一時刻牠真正在的地方）——這正是本分支
+  // 用「線索分齡＋新鮮度圖層」取代的舊推理方式，新手教學若還教這一套，等於親自
+  // 示範一次被本分支淘汰的錯誤推理。實測 1000+ 局跨齡版本 9.6% 閃出空交集、
+  // 只有 29.7% 命中牠真正所在的格；同齡版本交集必然非空且必含該齡節點。
   private checkTutStep1to2(s: SessionState) {
     if (this.tutStep !== 1 || s.readClues.size < 2) return;
-    this.tutStep = 2;
-    // 防禦性——round1 現無 decoy，但交集計算本應僅用真線索，避免未來若 round1 引入
-    // 幌子線索時誤把它算進交集
     const readReal = s.level.clues.filter((c) => !c.isDecoy && s.readClues.has(key(c.position)));
-    const cells = intersect(readReal, s.level.mapSize);
+    if (readReal.length < 2) return;
+    // 取玩家已讀線索中最新的齡別，只用該齡的線索求交集
+    const freshestAge = Math.max(...readReal.map((c) => c.age));
+    const sameAge = readReal.filter((c) => c.age === freshestAge);
+    // 還不到兩條同齡線索：這一步教不了真話，寧可先不推進，等玩家讀到第二條
+    // 同齡線索時（doMove 每次新讀都會再呼叫本函式）再算一次
+    if (sameAge.length < 2) return;
+    this.tutStep = 2;
+    const cells = intersect(sameAge, s.level.mapSize);
     const cs = this.cell;
     const g = this.add.graphics();
     for (const ck of cells) {
@@ -625,6 +647,12 @@ export class MapScene extends Phaser.Scene {
     this.stamLabel = this.add.text(w / 2, 8, '', {
       fontFamily: FONTS.body, fontSize: '10.5px', color: cssHex(pal.paperDim),
     }).setOrigin(0.5, 0).setLetterSpacing(2);
+    // 步數讀出：字型／字級／色系／letterSpacing 全部沿用體力標籤，位置由 updateHud
+    // 依天氣徽章量到的實際右緣重新計算（同 drawWeatherBadge 依 roundText 寬度重定位
+    // 的做法），這裡只建立空殼
+    this.stepLabel = this.add.text(0, 0, '', {
+      fontFamily: FONTS.body, fontSize: '10.5px', color: cssHex(pal.paperDim),
+    }).setOrigin(0, 0.5).setLetterSpacing(2);
     this.hudG = this.add.graphics();
 
     // 操作提示（三行右對齊，hud.hint 加入眺望動詞後從兩行變三行）：熟練玩家
@@ -1203,6 +1231,17 @@ export class MapScene extends Phaser.Scene {
           }
           if (this.tutStep === 0) {
             this.tutStep = 1;
+            // Fix 1 附帶檢查：tut.read「牠就在這指向的範圍裡」嚴格來說只對「當下讀到的
+            // 那條線索剛好是最新齡（age===2，即獵物開局所在的 W2）」為真——age 0/1 的線索
+            // 錨定在獵物「當時」所在的更早節點，讀到的那一刻牠可能早已沿路線往前走了。
+            // 這裡讀到的第一條線索是引導起點高亮的 trailhead（見 startTutStep0）：
+            // generate.ts 優先挑最新齡的真線索當 trailhead，只有該局完全沒有最新齡真線索時
+            // 才退回「隨便一條最便宜的」——實測 3000 局 round1 種子 trailhead age 皆為 2
+            // （見 _scratch_trailhead_age.ts，量完即刪），round1 tier 的可解性掃描保證每齡
+            // 至少有解，這句話在「玩家照引導走」時因此幾乎必為真；唯一仍會踩空的情境是玩家
+            // 不理會高亮、自行先走去讀別條線索（可能踩到較舊齡別）。無法只靠既有字串修正
+            // 這個殘餘情境——沒有能同時涵蓋「較舊齡別」語意的替代 key，任務也要求不得為此
+            // 新增 i18n key；因此按規格保留原字串，此為已知限制，已回報於 final-fix-report.md。
             this.showTut('tut.read');
             this.time.delayedCall(3000, () => this.checkTutStep1to2(s));
           } else if (this.tutStep === 1) {
@@ -1456,6 +1495,22 @@ export class MapScene extends Phaser.Scene {
     this.roundText.setText(i18n.t('hud.round', { n: s.round }));
     this.drawWeatherBadge(s);
     this.stamLabel.setText(`${i18n.t('hud.stamina', { n: s.stamina })} / ${budget}`.toUpperCase());
+    // 步數讀出（Fix 6）：緊接天氣徽章之後，同一列。天氣徽章的實際右緣要看 weatherText
+    // 存不存在（compact 版面只有圖形沒有文字，見 buildHud）——weatherText 存在時量測
+    // 它畫出來的實際寬度（同 legend／stamLabel 一路沿用的「量實際畫出來的，不猜」原則）；
+    // 只有圖形沒有文字時，圖形本身是 drawWeatherGlyph 畫在 bx+6 為圓心、半徑 ≤6 的
+    // 固定小圖示（見該函式），右緣即 bx+12，這裡量的是同一個 bx（roundText 右緣 +12）。
+    const weatherBx = this.roundText.x + this.roundText.width + 12;
+    const weatherRight = this.weatherText ? this.weatherText.x + this.weatherText.width : weatherBx + 12;
+    this.stepLabel.setText(i18n.t('hud.step', { n: s.steps }).toUpperCase());
+    this.stepLabel.setPosition(weatherRight + 14, this.roundText.y + this.roundText.height / 2);
+    // 步數讀出這一列（y 約 11–25，見 roundText 字高）與 chip 列同一段垂直範圍
+    // （chipY=13 到 43）重疊，寬視窗夠寬時量到的右緣自然落在 chipRowLeft 之內，
+    // 但這裡仍主動夾一次右緣：不夾的話，未來若局數／天氣文字變長（例如三位數局數、
+    // 更長的天氣字串），步數讀出會被推進 chip 列——量到才夾，不是猜多寬才夠。
+    // 放不進去時毫不猶豫地整個藏起來，而不是硬擠：蓋住 chip 上的文字比看不到步數更糟。
+    const stepRight = this.stepLabel.x + this.stepLabel.width;
+    this.stepLabel.setVisible(stepRight <= this.chipRowLeft - 8);
     this.hintText?.setText(i18n.t('hud.hint').split(' · ').join('\n'));
     if (this.markChipG) this.drawMarkChip(this.markChipX, this.markChipY, 60, 30);
     if (this.bellChipG) this.drawBellChip(this.bellChipX, this.bellChipY, 60, 30);
@@ -1472,16 +1527,13 @@ export class MapScene extends Phaser.Scene {
     const centered = this.scale.width / 2 + 105 <= this.chipRowLeft - 8;
     const barLeft = !centered;
     const bx = barLeft ? 50 : w / 2 - 105;
-    // F6：Math.max(90, ...) 這個下限本身會壓過 Math.min 的夾限——當 chipRowLeft - 8 - bx < 90，
-    // 也就是 chipRowLeft < 148（bx=50 時），體力條寬度仍被撐到 90，右緣就超出 chipRowLeft - 8，
-    // 8px 間距保證在此失效。這是既有缺陷，本次任務未動這個下限本身——新鮮度 chip 縮寬
-    // （84→60，見 ageChipW 宣告處）後門檻隨之下修：持有微光鈴時 chipRowLeft = w - 504
-    // （非 compact）／w - 424（compact，w<560，上限 w=559 只算得 135，永遠到不了 148）——
-    // 門檻要到 w ≥ 652（非 compact）才達標；不持鈴則 w - 436／w - 356，門檻在 w ≥ 584
-    // （compact 內 w∈[504,560) 會先短暫達標，跨進非 compact 因語言 chip 冒出來又掉回門檻
-    // 之下，直到 584 才回穩）。驗收要求的八個寬度中只有 560 落在失效區間（無鈴 124、
-    // 有鈴 56，都 <148）；660 以上（無論有無鈴）皆已跨過門檻，保證成立。
-    const bw = barLeft ? Math.max(90, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
+    // F6（本次修復關閉）：原本 Math.max(90, ...) 這個下限會壓過 Math.min 的夾限——當
+    // chipRowLeft - 8 - bx < 90 時，體力條寬度仍被撐到 90，右緣就超出 chipRowLeft - 8，
+    // 8px 安全間距保證在此失效（560px 持鈴時甚至撐出 84px，蓋過整排 chip）。90 這個下限
+    // 只是「看起來還算是一條進度條」的美觀取捨，不是功能需求；改成能有多少可用寬度就用
+    // 多少（上限仍是 210，下限退到 6px——仍看得出是一條進度條，只是很窄），可用空間比
+    // 這個還窄時就讓它窄，而不是硬撐出一個會蓋住 chip 的寬度。
+    const bw = barLeft ? Math.max(6, Math.min(210, this.chipRowLeft - 8 - bx)) : 210;
     const bh = barLeft ? 10 : 12;
     const by = barLeft ? 46 : 27;
     if (barLeft) {
@@ -1491,11 +1543,35 @@ export class MapScene extends Phaser.Scene {
       // 標籤挪不到別的列；唯一挪得動的方向是水平——把標籤起點移到副標題實際量到的右緣
       // （this.titleRight，來自 buildHud 對它的量測，不是猜的寬度）之後，兩者 x 範圍
       // 就不再重疊，不必再靠 y 錯開，也不會受字型或語系改變副標題寬度而重新撞上。
+      //
+      // Fix 2：上面這段只夾了左界，從未檢查量到的實際寬度會不會把右緣推進 chip 列——
+      // chip 是後蓋的，會直接畫在體力讀數上面。這裡量 setPosition 之後的實際
+      // this.stamLabel.width，右緣超出 chipRowLeft-8（體力條本身的安全線）時，
+      // 放棄「貼副標題右側」，改回置中疊在體力條正上方（與非 barLeft 版面同一招，
+      // 只是 y 仍用 30 而非 8——那一列本來就沒有副標題要閃，改置中不會撞字）。
       this.stamLabel.setOrigin(0, 0);
-      this.stamLabel.setPosition(Math.max(bx, this.titleRight + 12), 30);
+      const idealX = Math.max(bx, this.titleRight + 12);
+      this.stamLabel.setPosition(idealX, 30);
+      if (idealX + this.stamLabel.width > this.chipRowLeft - 8) {
+        this.stamLabel.setOrigin(0.5, 0);
+        // 置中的錨點理論上是體力條中心，但體力條本身在極窄視窗下也可能被夾得比標籤還窄
+        // （見上面 bw 的夾限）；再對置中後的位置夾一次右緣（與左緣對稱夾一次，避免超出
+        // 畫面左側），兩害相權取其輕——貼齊 chip 列安全線，好過蓋住 chip。
+        const half = this.stamLabel.width / 2;
+        const centerX = Math.min(bx + bw / 2, this.chipRowLeft - 8 - half);
+        this.stamLabel.setPosition(Math.max(half, centerX), 30);
+      }
+      // Fix 2 收尾（實測補漏）：560px 持鈴時 chipRowLeft 被 8 顆 chip 推到 56，比體力條
+      // 起點 bx=50 還窄——上面兩段夾限的兩端在這裡互相矛盾：Math.max(half, centerX) 為了不
+      // 讓標籤切出畫面左緣而保底在 half，但 half 本身已經超出 chipRowLeft-8 這條安全線，
+      // 沒有任何座標能同時滿足這兩個條件。跟下面的步數讀出（stepLabel）同一招：量出來的
+      // 實際右緣若還是蓋到安全線，就整段藏起來，好過硬擠著蓋住 chip 上的文字。
+      const labelRight = this.stamLabel.x + this.stamLabel.width * (1 - this.stamLabel.originX);
+      this.stamLabel.setVisible(labelRight <= this.chipRowLeft - 8);
     } else {
       this.stamLabel.setOrigin(0.5, 0);
       this.stamLabel.setPosition(w / 2, 8);
+      this.stamLabel.setVisible(true); // 非 barLeft 版面的 centered 門檻已保證留有 105px 半版可用，不會撞 chip
     }
     this.hudG.clear();
     this.hudG.fillStyle(0x0d1310, 1).fillRoundedRect(bx, by, bw, bh, BRUSH_RADIUS);

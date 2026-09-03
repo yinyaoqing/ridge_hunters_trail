@@ -35,6 +35,7 @@ function makeState(overrides: Partial<SessionState> = {}): SessionState {
     seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
     phase: 'explore',
     steps: 0, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+    capturePos: null,
     ...overrides,
   };
 }
@@ -86,6 +87,9 @@ describe('move', () => {
     const s = makeState({ player: { x: 3, y: 3 } });
     move(s, { x: 3, y: 4 }); // cheb((3,4),(4,4)) = 1
     expect(s.phase).toBe('qte');
+    // F5：一般情況（獵物沒有在這一步跳節點）下，移動後的位置本身就滿足逼近判定，
+    // capturePos 記的是這個、跟 currentTarget(s) 一致——這是絕大多數 capture 的分支。
+    expect(s.capturePos).toEqual({ x: 4, y: 4 });
   });
   it('exhausts when stamina hits zero away from target', () => {
     const s = makeState({ stamina: 1 });
@@ -158,6 +162,7 @@ describe('steps / mode / resolved', () => {
     expect(s.mode).toBe('run');
     expect(s.resolved).toBe(false);
     expect(s.microEvents).toBe(0);
+    expect(s.capturePos).toBeNull(); // F5：新局尚未觸發任何逼近判定
   });
   it('mode can be set to daily', () => {
     expect(newSession(5, mulberry32(1), 'daily').mode).toBe('daily');
@@ -530,9 +535,13 @@ describe('move: forgiving capture across a waypoint swap (F1 owner decision)', (
       readClues: new Set(), marks: new Map(), path: [{ x: 0, y: 0 }], readLog: [],
       mutedClues: new Set(), seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
       phase: 'explore', steps: MOVE_EVERY - 1, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+      capturePos: null,
     };
     move(s, { x: 1, y: 1 });
     expect(s.phase).toBe('qte');
+    // F5：這一步只靠獵物「移動前」的節點 (2,2) 逼近成功——移動後它已跳到 (9,9)，
+    // 揭曉／結算必須對著玩家實際搆到的 (2,2) 評分，不是對著跳走後的 (9,9)。
+    expect(s.capturePos).toEqual({ x: 2, y: 2 });
   });
 });
 
@@ -555,6 +564,7 @@ describe('isTargetVisible: survey bonus reveals the quarry too (F2 owner decisio
       readClues: new Set(), marks: new Map(), path: [{ x: 0, y: 0 }], readLog: [],
       mutedClues: new Set(), seen: new Set(), surveyed: new Set(), surveyBonusHere: false,
       phase: 'explore', steps: 0, mode: 'run', resolved: false, bellUsed: false, microEvents: 0,
+      capturePos: null,
     };
   }
 

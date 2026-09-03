@@ -1,7 +1,7 @@
 import type { Locale } from './types';
 
 export type MsgKey =
-  | 'hud.round' | 'hud.stamina' | 'hud.hint' | 'hud.mark'
+  | 'hud.round' | 'hud.stamina' | 'hud.step' | 'hud.hint' | 'hud.mark'
   | 'qte.title' | 'qte.instruction' | 'qte.progress'
   | 'result.recorded'
   | 'result.escaped.title' | 'result.escaped.body'
@@ -47,6 +47,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
     'hud.round': 'Round {n}',
     'hud.stamina': 'Stamina {n}',
+    'hud.step': 'Step {n}',
     'hud.hint': 'Move: click/arrow keys · Look: space · Mark: Shift+click',
     'hud.mark': 'Mark',
     'qte.title': 'Close Encounter',
@@ -184,6 +185,7 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   'zh-TW': {
     'hud.round': '第 {n} 局',
     'hud.stamina': '體力 {n}',
+    'hud.step': '步數 {n}',
     'hud.hint': '移動：點擊/方向鍵 · 眺望：空白鍵 · 標記：Shift+點擊',
     'hud.mark': '標記',
     'qte.title': '近距離判讀',
