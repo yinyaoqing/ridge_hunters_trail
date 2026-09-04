@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, currentTarget, isTargetVisible, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
 import { visionRadius, SURVEY_COST, SURVEY_BONUS } from '../core/vision';
-import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
+import { unmutedReadClues, heatMap, maxHeat, distinctReadAges } from '../core/deduction';
+import { coachOnce, type CoachId, type CoachStore } from '../core/coach';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { TERRAIN_TYPES } from '../core/types';
@@ -94,6 +95,7 @@ export class MapScene extends Phaser.Scene {
   private tools!: ToolStore;
   // 互動式新手引導：-1=未啟動/已結束，0..3=引導步驟（見 startTutStep0 起各步驟方法）
   private tutStep = -1;
+  private coach!: CoachStore;
   private tutText?: Phaser.GameObjects.Text;
   private tutBg?: Phaser.GameObjects.Graphics;
 
@@ -198,6 +200,7 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.pal.bg);
     this.audio = this.registry.get('audio');
     this.tools = this.registry.get('tools');
+    this.coach = this.registry.get('coach');
     this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
     this.registry.set('lastComms', []); // 同上，清空委託完成行狀態
     this.registry.remove('lastGain'); // 同上，清空押注押分暫存（score.gain 顯示用）
@@ -329,6 +332,18 @@ export class MapScene extends Phaser.Scene {
     this.tutBg?.destroy();
     this.tutText = undefined;
     this.tutBg = undefined;
+  }
+
+  // 首見教學提示：與新手引導共用底部橫條，但兩者絕不同時存在——
+  // showTut 共用同一個 Text/Graphics 物件，引導期間再寫進去會把 tut.* 的文案蓋掉。
+  // 引導本身只跑第 1 局的前幾步，讓它先講完是正確的優先序。
+  private coachTip(id: CoachId, key: MsgKey): void {
+    if (this.tutStep >= 0) return;
+    coachOnce(this.coach, id, () => {
+      this.showTut(key);
+      // 提示不阻擋操作，也不需要玩家關掉——8 秒後自行淡出，讓畫面回到乾淨狀態
+      this.time.delayedCall(8000, () => this.hideTut());
+    });
   }
 
   // 引導完成：與玩法說明共用旗標寫入邏輯（? chip 之後仍可手動開啟 Help）
@@ -1228,6 +1243,7 @@ export class MapScene extends Phaser.Scene {
         if (gotSupply) {
           floatText(this, dest.x, dest.y - cs, `+${getDifficulty(s.round).supplyRestore}`, cssHex(this.pal.supply));
           this.audio.play('pickup');
+          this.coachTip('supply', 'coach.supply');
         }
         if (s.readClues.size > readBefore) {
           const clue = s.level.clues.find((c) => key(c.position) === key(to));
@@ -1252,6 +1268,11 @@ export class MapScene extends Phaser.Scene {
             this.time.delayedCall(3000, () => this.checkTutStep1to2(s));
           } else if (this.tutStep === 1) {
             this.checkTutStep1to2(s);
+          }
+          // 齡別提示：讀到第二種齡別的那一刻才有意義——在那之前所有線索同齡，
+          // 切新鮮度 chip 看不出任何差別。
+          if (distinctReadAges(s.level, s.readLog) >= 2) {
+            this.coachTip('age.second', 'coach.age');
           }
         }
         // 引導 step2→3：進逼目標範圍（cheb<=2）先於實際 QTE 觸發距離（cheb<=1）示警，
@@ -1320,6 +1341,7 @@ export class MapScene extends Phaser.Scene {
       }
       this.audio.play('reveal');
       floatText(this, player.x, player.y - cs * 0.5, '!', cssHex(pal.mark));
+      this.coachTip('event.startle', 'coach.event.startle');
       return;
     }
 
@@ -1331,6 +1353,7 @@ export class MapScene extends Phaser.Scene {
       this.redraw(); // 補畫：讓 rollMicroEvent 剛寫入的新補給格立即可見
       floatText(this, center.x, center.y - cs * 0.5, '+', cssHex(pal.supply));
       this.audio.play('pickup');
+      this.coachTip('event.supply', 'coach.event.supply');
       return;
     }
 
@@ -1339,6 +1362,7 @@ export class MapScene extends Phaser.Scene {
       this.playEventCone(player, ev.direction, 60, cs * 5, pal.gold, 0.2, 5000, true);
     }
     this.audio.play('reveal');
+    this.coachTip('event.oldtrail', 'coach.event.oldtrail');
   }
 
   // 微事件錐形演出：複製 playReveal 的容器縮放淡出技法（scale 0.3→1、alpha→0）；
