@@ -144,6 +144,37 @@ export class HelpScene extends Phaser.Scene {
       }
     };
 
+    // 覓食路線：三個由淡到濃的節點連成一條折線，末端箭頭指向「牠要去的地方」
+    const drawRouteGlyph = (gy: number) => {
+      const pts = [[rowX - 16, gy + 6], [rowX - 4, gy - 4], [rowX + 8, gy + 2]];
+      icons.lineStyle(1.6, pal.gold, 0.8);
+      icons.lineBetween(pts[0][0], pts[0][1], pts[1][0], pts[1][1]);
+      icons.lineBetween(pts[1][0], pts[1][1], pts[2][0], pts[2][1]);
+      icons.lineStyle(1.4, pal.gold, 0.4);
+      icons.lineBetween(pts[2][0], pts[2][1], rowX + 18, gy - 5);
+      pts.forEach(([px, py], i) => {
+        icons.fillStyle(pal.gold, 0.3 + i * 0.35).fillCircle(px, py, 3);
+      });
+    };
+
+    // 新鮮度：三格由淡到濃，最濃的加一圈外框代表「目前選中這一齡」
+    const drawAgeGlyph = (gy: number) => {
+      const sq = 9;
+      let x = rowX - 16;
+      for (const a of [0.2, 0.45, 0.9]) {
+        icons.fillStyle(pal.gold, a).fillRect(x, gy - sq / 2, sq, sq);
+        x += sq + 3;
+      }
+      icons.lineStyle(1.2, pal.paper, 0.9).strokeRect(rowX - 16 + (sq + 3) * 2, gy - sq / 2 - 2, sq + 4, sq + 4);
+    };
+
+    // 分數：三枚由小到大的金點，代表倍率疊高
+    const drawScoreGlyph = (gy: number) => {
+      icons.fillStyle(pal.gold, 0.5).fillCircle(rowX - 14, gy, 2.5);
+      icons.fillStyle(pal.gold, 0.75).fillCircle(rowX, gy, 4);
+      icons.fillStyle(pal.gold, 1).fillCircle(rowX + 16, gy, 5.5);
+    };
+
     // 13 列已超出固定面板的版面預算，比照 CodexScene 改為可捲動列表，
     // 並依用途分成四組（各有金色標題列），組內列距維持 44px。
     type HelpRow = { key: Parameters<I18n['t']>[0]; icon: (y: number) => void };
@@ -175,6 +206,17 @@ export class HelpScene extends Phaser.Scene {
               }
             },
           },
+          { key: 'help.quarry', icon: (y) => drawRouteGlyph(y) },
+          { key: 'help.habit', icon: (y) => drawRouteGlyph(y) },
+          { key: 'help.events', icon: (y) => {
+            icons.lineStyle(1.6, pal.mark, 0.9);
+            icons.lineBetween(rowX, y - 8, rowX, y + 2);
+            icons.fillStyle(pal.mark, 0.9).fillCircle(rowX, y + 7, 1.6);
+          } },
+          { key: 'help.wx.clear', icon: (y) => drawWeatherGlyph(rowX, y, 'clear') },
+          { key: 'help.wx.mist', icon: (y) => drawWeatherGlyph(rowX, y, 'mist') },
+          { key: 'help.wx.wind', icon: (y) => drawWeatherGlyph(rowX, y, 'wind') },
+          { key: 'help.wx.drizzle', icon: (y) => drawWeatherGlyph(rowX, y, 'drizzle') },
         ],
       },
       {
@@ -217,6 +259,19 @@ export class HelpScene extends Phaser.Scene {
               icons.lineStyle(2, pal.gold, 1).strokeCircle(rowX, y, 10);
             },
           },
+          { key: 'help.age', icon: (y) => drawAgeGlyph(y) },
+          { key: 'help.mute', icon: (y) => {
+            drawClueToken(icons, rowX, y, 15, 'scent', pal);
+            icons.lineStyle(2, pal.paperDim, 0.8).lineBetween(rowX - 14, y + 12, rowX + 14, y - 12);
+          } },
+          { key: 'help.infoAt', icon: (y) => {
+            icons.lineStyle(1.4, pal.paperDim, 0.85).lineBetween(rowX - 16, y + 6, rowX + 16, y + 6);
+            icons.fillStyle(pal.gold, 1).fillCircle(rowX - 2, y + 6, 3.5);
+          } },
+          { key: 'help.quirk', icon: (y) => {
+            icons.lineStyle(1.4, pal.paperDim, 0.9).strokeCircle(rowX - 8, y, 5);
+            icons.lineStyle(1.4, pal.paperDim, 0.9).strokeCircle(rowX + 8, y, 9);
+          } },
         ],
       },
       {
@@ -264,6 +319,10 @@ export class HelpScene extends Phaser.Scene {
               icons.fillStyle(pal.gold, 1).fillCircle(rowX + 14, y - 6, 3);
             },
           },
+          { key: 'help.supply', icon: (y) => {
+            drawSupply(icons, rowX - 10, y, 34, 0, pal);
+            drawSupply(icons, rowX + 10, y, 34, 1, pal);
+          } },
         ],
       },
       {
@@ -281,6 +340,40 @@ export class HelpScene extends Phaser.Scene {
               icons.fillStyle(pal.paper, 1).fillCircle(rowX, y, 2.5);
             },
           },
+          { key: 'help.score', icon: (y) => drawScoreGlyph(y) },
+          { key: 'help.iris', icon: (y) => {
+            icons.fillStyle(pal.iris, 1).fillCircle(rowX, y, 5);
+            icons.lineStyle(1.4, pal.iris, 0.5).strokeCircle(rowX, y, 10);
+          } },
+          { key: 'help.progress', icon: (y) => {
+            let x = rowX - 18;
+            for (const sz of [7, 10, 13]) {
+              icons.lineStyle(1.2, pal.paperDim, 0.85).strokeRect(x, y - sz / 2, sz, sz);
+              x += sz + 4;
+            }
+          } },
+          { key: 'help.tools', icon: (y) => {
+            icons.lineStyle(1.5, pal.gold, 0.9).strokeCircle(rowX - 8, y, 5);
+            icons.lineStyle(1.5, pal.gold, 0.9);
+            icons.beginPath();
+            icons.arc(rowX + 8, y, 6, Math.PI, Math.PI * 2);
+            icons.strokePath();
+            icons.fillStyle(pal.gold, 1).fillCircle(rowX + 8, y + 3, 1.8);
+          } },
+          { key: 'help.codex', icon: (y) => {
+            icons.lineStyle(1.4, pal.paperDim, 0.9).strokeRect(rowX - 10, y - 8, 20, 16);
+            icons.lineBetween(rowX, y - 8, rowX, y + 8);
+          } },
+          { key: 'help.commission', icon: (y) => {
+            for (let i = 0; i < 3; i++) {
+              icons.lineStyle(1.3, pal.paperDim, 0.85).lineBetween(rowX - 12, y - 5 + i * 5, rowX + 12, y - 5 + i * 5);
+            }
+          } },
+          { key: 'help.daily', icon: (y) => {
+            icons.lineStyle(1.4, pal.supply, 0.9).strokeCircle(rowX, y, 8);
+            icons.lineStyle(1.4, pal.supply, 0.9).lineBetween(rowX, y - 4, rowX, y);
+            icons.lineBetween(rowX, y, rowX + 4, y + 2);
+          } },
         ],
       },
     ];
