@@ -9,6 +9,7 @@ import { createAudio } from './core/audio';
 import { createTools } from './core/tools';
 import { createCommissionStore } from './core/commissions';
 import { createScoreStore } from './core/score';
+import { createCoach } from './core/coach';
 import { BootScene } from './scenes/BootScene';
 import { CampScene } from './scenes/CampScene';
 import { MapScene } from './scenes/MapScene';
@@ -52,6 +53,7 @@ function launch(): void {
         game.registry.set('tools', createTools(storage));
         game.registry.set('commissions', createCommissionStore(storage));
         game.registry.set('score', createScoreStore(storage));
+        game.registry.set('coach', createCoach(storage));
         // Safari 舊版無 window.AudioContext，退回 webkitAudioContext 前綴；
         // 皆缺席時 factory 內 throw，createAudio 會靜默降級為無聲
         game.registry.set('audio', createAudio(storage, () => new (
