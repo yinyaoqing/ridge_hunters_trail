@@ -98,8 +98,11 @@ export class HelpScene extends Phaser.Scene {
 
     // 示範入口：說明頁只能「告訴」，示範才能「示範」。放在列表之上、簡介之下，
     // 是進入這個畫面的人第一眼會看到的可點擊物件。上下兩顆：第一課教推理四步驟，
-    // 第二課教會走的獵物（新鮮度）；各高 32、間距 8，比舊版單顆多吃 40px，
+    // 第二課教會走的獵物（新鮮度）；各高 32、視覺間距 16（中心距 48），比舊版單顆多吃 48px，
     // 下面的 listTop／viewH 已跟著往下 48px 讓出版面。
+    // 中心距刻意是 48 而非視覺上剛好的 40：命中區高 44（手機最小可點高度，不可再縮），
+    // 中心距 40 時兩顆的命中區會重疊 4px，而那 4px 落在看起來是空白的視覺間隙裡——
+    // 兩顆同為 DEPTH_CHROME，後加的第二顆贏得平手，於是點「空白」會靜默開啟第二課。
     const dbw = 210;
     const demoButtons: { key: Parameters<I18n['t']>[0]; scriptId: DemoScriptId }[] = [
       { key: 'btn.demo', scriptId: 'deduction' },
