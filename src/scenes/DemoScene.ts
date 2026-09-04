@@ -11,6 +11,7 @@ import {
 } from '../core/demo';
 import {
   cssHex, FONTS, displayFont, drawClueToken, drawClueOverlay, drawMark, stripBrackets, BRUSH_RADIUS,
+  AGE_FADE,
 } from './paint';
 
 type DemoFrom = 'Camp' | 'Map' | 'Result';
@@ -287,16 +288,22 @@ export class DemoScene extends Phaser.Scene {
     // 線索覆蓋層（未靜音者）。overlay 為 'none' 時不畫任何範圍圈——那代表「線索的
     // 記號已經在地圖上，但玩家還沒走過去判讀它」，正是真實遊戲裡「看到標記」與
     // 「走到標記旁才解出範圍」的差別；記號本身仍要畫（見下方 token 迴圈，不受此限）。
+    //
+    // AGE_FADE[clues[i].age]（S2）：新鮮度淡出改由這裡的線索資料自己的 age 決定，
+    // 與 MapScene 同一套係數、同一套 drawClueToken／drawClueOverlay，不再固定套用預設值 1
+    // ——教「新鮮度」的第二課如果連淡出都不畫，等於漏教玩家在真實地圖上唯一會看到的
+    // 新鮮度視覺線索。第一課（DEMO_CLUES）全部固定 age:2，AGE_FADE[2]===1，
+    // 於是這個改動對第一課是純粹的 no-op（見 tests/demo.test.ts 的回歸測試）。
     if (step.overlay !== 'none') {
       for (const i of step.clues) {
         if (step.muted.includes(i)) continue;
-        drawClueOverlay(g, clues[i], this.px(clues[i].position), cs, pal, false);
+        drawClueOverlay(g, clues[i], this.px(clues[i].position), cs, pal, false, AGE_FADE[clues[i].age]);
       }
     }
     const tokenR = Math.max(8, cs * 0.34);
     for (const i of step.clues) {
       const p = this.px(clues[i].position);
-      drawClueToken(g, p.x, p.y, tokenR, clues[i].type, pal);
+      drawClueToken(g, p.x, p.y, tokenR, clues[i].type, pal, AGE_FADE[clues[i].age]);
       if (step.muted.includes(i)) {
         // 靜音斜槓：與 MapScene 及 ♪ chip 同一套語彙
         g.lineStyle(2, pal.paperDim, 0.95);

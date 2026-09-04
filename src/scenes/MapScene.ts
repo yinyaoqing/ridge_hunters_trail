@@ -19,7 +19,7 @@ import type { ToolStore } from '../core/tools';
 import type { RunState } from '../core/runstate';
 import {
   cssHex, cssRgba, dashedLine, drawClueToken, drawSupply,
-  drawClueOverlay, drawMark,
+  drawClueOverlay, drawMark, AGE_FADE,
   BRUSH_RADIUS, FONTS, displayFont, terrainTexImage,
 } from './paint';
 import {
@@ -29,11 +29,6 @@ import {
 
 const HUD_HEIGHT = 56;
 const BG_KEY = 'map-bg';
-
-// 線索新鮮度→alpha 係數，依 c.age（0=更早／1=昨夜／2=今晨）索引。1 為原始強度（最新一齡
-// 不淡化）；兩個較舊的係數挑得讓差異一眼可辨，但仍讀得出形狀——0.68 已明顯比滿強度淡，
-// 0.4 是更早蹤跡的下限，再更低會讓錐形／圓域的虛線邊在較暗色板下糊成看不出輪廓。
-const AGE_FADE: readonly [number, number, number] = [0.4, 0.68, 1];
 
 export class MapScene extends Phaser.Scene {
   private g!: Phaser.GameObjects.Graphics;

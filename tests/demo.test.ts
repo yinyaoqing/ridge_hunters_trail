@@ -40,6 +40,15 @@ describe('demo level', () => {
     // 第 10 步的旁白是「往交集區走過去」。玩家若停在交集區外，那句話就是假的。
     expect(DEMO_PAIR.has(key(DEMO_MID))).toBe(true);
   });
+
+  // S2：DemoScene 現在會把每條線索的 age 換成新鮮度淡出係數（paint.ts 的 AGE_FADE，
+  // AGE_FADE[2] === 1 即原始強度、無淡化）傳給 drawClueToken／drawClueOverlay。
+  // 第一課承諾「pixel-identical」，這條測試釘住那個承諾的前提條件——只要全部線索
+  // 仍固定在 age 2，這個改動對第一課就必然是 no-op（場景層本身不可測，見全域規範，
+  // 因此只驗證這裡：資料仍是原本註解宣稱的樣子）。
+  it('keeps every clue on age 2, so the freshness fade added in S2 is a no-op here', () => {
+    for (const c of DEMO_CLUES) expect(c.age).toBe(2);
+  });
 });
 
 describe('demo level: chapter 2 — the overlap is the answer', () => {
