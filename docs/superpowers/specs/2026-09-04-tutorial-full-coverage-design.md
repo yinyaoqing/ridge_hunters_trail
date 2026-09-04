@@ -101,8 +101,7 @@ src/core/demo.ts       泛化為 DemoScript，兩份腳本       ← 現有腳�
 src/scenes/DemoScene   init({ scriptId, from }) 選腳本
 src/scenes/HelpScene   rows: flat → sections 分組
 src/scenes/MapScene    JIT 掛點：隨機事件、補給、齡別、道具
-src/scenes/ResultScene JIT 掛點：Bank/Push、iris
-src/scenes/RevealScene JIT 掛點：路線揭曉、品質門檻、infoAt
+src/scenes/ResultScene JIT 掛點：Bank/Push、iris、路線揭曉、品質門檻、infoAt
 src/scenes/CampScene   JIT 掛點：委託、每日挑戰
 src/scenes/CodexScene  JIT 掛點：研究點
 ```
@@ -130,8 +129,9 @@ export function coachOnce(coach: CoachStore, id: CoachId, show: () => void): boo
 ```
 
 單一 `rht.seen.v1` JSON key，比照 `tools.ts` 的 load/save 慣例：讀寫失敗一律
-靜默退回記憶體備援，不讓 storage 例外冒到場景層。建立於 `BootScene`，放進
-registry 供各場景取用（同 `tools`／`storage`／`i18n` 的既有慣例）。
+靜默退回記憶體備援，不讓 storage 例外冒到場景層。於 `main.ts` 的 `preBoot`
+callback 建立並放進 registry（`tools`／`codex`／`score` 等 store 全部在此建立，
+`BootScene` 只負責載素材）。
 
 掛點的寫法一律是一行：
 
@@ -193,8 +193,20 @@ const sections: { titleKey: MsgKey; rows: HelpRow[] }[] = [
 
 - **地圖內**：沿用 `MapScene.showTut()` 的底部橫條（已存在、`depth 80/81`、全程不攔輸入）。
   引導期間（`tutStep >= 0`）不觸發 JIT，避免兩套文案互相覆蓋同一個 Text 物件。
-- **Result／Reveal／Camp／Codex**：一行 `paperDim` 說明文字，併入各場景既有的
+- **Result／Camp／Codex**：一行 `paperDim` 說明文字，併入各場景既有的
   `flowY` 疊層流（`ResultScene` 已有此機制處理 `score.gain`／`score.lost` 等可選區塊）。
+
+**`RevealScene` 不掛 JIT。** 它的文字區已經到版面預算上限——原始碼註解載明該區
+只有 3 行變動空間（`noCall`／`dailyHidden`、`offBy`／`exact`、`decoy`、`infoAt`
+最多疊 3 行），且 `reveal.route` 當初就是因此被迫從兩行併成一行；`legendY` 的
+`Math.min(ty + 14, h - 108)` 已有既知的重疊風險。再塞三則教學文案會在小視窗把
+圖例與按鈕推出畫面。
+
+因此 `reveal.route`／`quality`／`reveal.infoAt` 三則改掛在 **`ResultScene`** 的
+`flowY` 疊層——`btn.continue` 從 Reveal 直接進 Result，玩家仍是在看完揭曉的下一屏
+讀到解釋，而 `flowY` 的 `gap`／`minGap` 會自行壓縮吸收多出來的一行。三則同時
+成立時只顯示優先度最高的一則（`reveal.route` > `quality` > `reveal.infoAt`），
+未顯示者不標記為已見，留到下一局再教。
 
 ---
 
@@ -202,16 +214,16 @@ const sections: { titleKey: MsgKey; rows: HelpRow[] }[] = [
 
 | # | 機制 | Help | Demo | JIT 首見 |
 |---|---|---|---|---|
-| 1 | 獵物會移動 + 5 種習性 | `help.quarry`、`help.habit` | **新課三章** | `reveal.route`：首次揭曉看到路線 |
+| 1 | 獵物會移動 + 5 種習性 | `help.quarry`、`help.habit` | **新課三章** | `reveal.route`：首次揭曉看到路線後，於 Result 說明 |
 | 2 | 線索齡別 + 新鮮度 chip | `help.age` | 新課第 2 章 | `age.second`：首次讀到第二種齡別，指向 chip |
 | 3 | Bank / Push 分數 | `help.score` | — | `bankpush`：Result 首次出現兩顆按鈕 |
 | 4 | iris 異彩 | `help.iris` | — | `iris`：首次**記錄到**時（不在進場爆雷） |
 | 5 | **行走隨機事件** ×3 | `help.events` | — | `event.startle`／`event.supply`／`event.oldtrail` 三個獨立旗標 |
 | 6 | 補給 | 從 `help.stamina` 拆出 `help.supply` | 新課帶一顆 | `supply`：首次撿到 |
-| 7 | 品質門檻 | 修 `help.marks` 寫明 0 格金／≤2 銀 | — | `quality`：Reveal 首次 |
+| 7 | 品質門檻 | 修 `help.marks` 寫明 0 格金／≤2 銀 | — | `quality`：首次揭曉看到距離後，於 Result 說明 |
 | 8 | 靜音語意 | 從 `help.layer` 拆出 `help.mute` | 第一課 s9 已教 | — |
 | 9 | 天氣四種 | `help.weather` 展開成 4 子項 | — | — |
-| 10 | `reveal.infoAt` | `help.infoAt` | — | `reveal.infoAt`：Reveal 首次 |
+| 10 | `reveal.infoAt` | `help.infoAt` | — | `reveal.infoAt`：首次出現該行後，於 Result 說明 |
 | 11 | 生物個性 quirks | `help.quirk` | — | — |
 | 12 | 局數難度遞增 | `help.progress` | — | — |
 | 13 | 道具 ×2 | `help.tool.windstone`／`help.tool.glowbell` | — | `tool.*`：首次持有進獵局，指 HUD bell chip |
@@ -278,7 +290,7 @@ Help 由 13 列 → **約 26 列分四組**。天氣的 4 個子項沿用既有�
 
 | 期 | 內容 | 為什麼是這個順序 |
 |---|---|---|
-| **P1** | `coach.ts` ＋ 隨機事件三則 ＋ 補給 ＋ Bank/Push ＋ iris ＋ 品質門檻 ＋ infoAt 的 JIT | 基礎設施先落地；這一期結束玩家走路時就真的會被教到，且不動任何既有結構 |
+| **P1** | `coach.ts` ＋ 隨機事件三則 ＋ 補給 的 JIT（`MapScene`）；Bank/Push ＋ iris ＋ 路線 ＋ 品質門檻 ＋ infoAt 的 JIT（`ResultScene`） | 基礎設施先落地；這一期結束玩家走路時就真的會被教到，且不動任何既有結構 |
 | **P2** | `HelpScene` 分組重構 ＋ 表中全部 Help 欄新列 | 查閱面補完。純加列與版面重排，風險與 P1 隔離 |
 | **P3** | `DemoScript` 泛化 ＋「會走的獵物」新課 | 唯一需要動既有腳本結構的一期，單獨成期以便回歸驗證 |
 | **P4** | 元進程 JIT（道具／圖鑑／委託／每日） | 跨 Camp／Codex 場景收尾，依賴 P1 的 `coach` |
