@@ -79,8 +79,18 @@ export class CampScene extends Phaser.Scene {
     // 需另掛一次性 keydown 才能解鎖（keydown 同為瀏覽器認可的有效手勢）
     this.input.keyboard?.once('keydown', () => this.audio.unlock());
     this.input.once('pointerdown', () => this.audio.unlock());
-    // Help/Demo 關閉後刷新語言；設 pendingPreserveCoachPick，理由同 restartOnResize 那一行
-    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+    // Help/Demo 關閉後刷新語言；設 pendingPreserveCoachPick，理由同 restartOnResize 那一行。
+    //
+    // once 而非 on，這一點是必要的而非潔癖：Phaser 只在 destroy 時清空 scene 的事件發射器
+    // （Systems.shutdown 只 off 掉四個 TRANSITION_*），而 this.events 是 scene 實例層級、
+    // 每次 restart 都存活。用 on 的話 listener 數會隨每次 create 累加，關一次 Help 就排出
+    // N 次 restart——而 SceneManager.processQueue 會在同一幀跑完整批，只有最後一次會被畫出來。
+    // 其中只有第一次的 init 讀得到 pendingPreserveCoachPick，其餘會重新挑選：第二次挑到
+    // 下一則提示、markSeen 之後就被同一幀的下一次 shutdown 抹掉，玩家一格畫面都沒看到，
+    // 旗標卻已經燒掉——正是這整組 memo 要防的那件事。listener 累加本身早於本分支，
+    // 但 memo 讓它從「多畫幾次」變成「教學內容永久遺失」。
+    // 本 handler 自己會 restart，restart 會重跑 create 並重新註冊，因此 once 與原意等價。
+    this.events.once(Phaser.Scenes.Events.RESUME, () => {
       this.pendingPreserveCoachPick = true;
       this.scene.restart();
     });

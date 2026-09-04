@@ -267,6 +267,12 @@ export class MapScene extends Phaser.Scene {
     this.input.keyboard?.once('keydown', () => this.audio.unlock());
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
+    // off 再 on：Phaser 只在 destroy 時清空 scene 的事件發射器，shutdown 不會，而
+    // this.events 每次 restart 都存活——不先移除的話 listener 數會隨 create 累加，
+    // 關一次 Help 就重畫 N 次。這裡刻意不用 once：本 handler 不會 restart 場景，
+    // 用 once 會讓它在第一次關閉 Help 之後就永久失效（與 CampScene 那個會 restart
+    // 的 RESUME handler 不同，那邊 once 才是對的）。
+    this.events.off(Phaser.Scenes.Events.RESUME);
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.clearHover(); this.redraw(); });
     this.redraw();
     restartOnResize(this);
