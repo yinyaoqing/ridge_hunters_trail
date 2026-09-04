@@ -12,7 +12,7 @@ import {
   dailyCommissions, COMMISSION_REWARD_NOTES, type Commission, type CommissionStore,
 } from '../core/commissions';
 import type { ScoreStore } from '../core/score';
-import { coachOnce, type CoachId, type CoachStore } from '../core/coach';
+import type { CoachId, CoachStore } from '../core/coach';
 import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, guardLowFps, PARTICLE_CAPS,
@@ -22,9 +22,22 @@ import { flowY, type FlowBlock } from '../core/layout';
 export class CampScene extends Phaser.Scene {
   private pal!: Palette;
   private audio!: AudioBus;
+  // 首見提示的挑選結果，記在場景實例上（B2）：undefined＝這次造訪還沒決定過，
+  // null／[id,key]＝已經決定（含「這次沒有候選」的 null）。scene.restart() 沿用同一個
+  // Scene 實例，欄位值會存活——只要呼叫端在「同一次造訪內的重啟」（靜音／語言切換、
+  // Help／Demo 關閉、resize）都經由 init() 帶入 preserveCoachPick:true，這個欄位就不會被
+  // 清空，campCandidates 也就不會在 coach.seen 被前一輪標記之後，於同一次造訪內改挑下一個
+  // 候選——那正是舊版的 bug：一次意圖之外的重啟會把下一則提示也一併燒掉，玩家卻從未
+  // 真正看過它。只有在真正離開營地、之後再重新 start('Camp') 的造訪，才會拿到全新的欄位
+  // （init() 沒收到旗標即歸零），依當時的 coach.seen 狀態重新挑一次。
+  private coachPick: [CoachId, MsgKey] | null | undefined = undefined;
 
   constructor() {
     super('Camp');
+  }
+
+  init(data: { preserveCoachPick?: boolean }) {
+    if (!data?.preserveCoachPick) this.coachPick = undefined;
   }
 
   create() {
@@ -49,14 +62,15 @@ export class CampScene extends Phaser.Scene {
     // 一旦跨過 UTC 午夜就會用錯日期的委託/分享 dateKey（見 F2）
     this.registry.remove('dailyKey');
     fadeIn(this);
-    restartOnResize(this);
+    restartOnResize(this, { preserveCoachPick: true });
     // F1 audio unlock hook：任何首次指標按下即視為使用者手勢，解除 AudioContext 靜音鎖
     // （unlock() 冪等，MapScene 亦掛同款 hook，兩邊皆可安全觸發）
     // 鍵盤 hook：MapScene 支援方向鍵移動，純鍵盤玩家永遠不會觸發 pointerdown，
     // 需另掛一次性 keydown 才能解鎖（keydown 同為瀏覽器認可的有效手勢）
     this.input.keyboard?.once('keydown', () => this.audio.unlock());
     this.input.once('pointerdown', () => this.audio.unlock());
-    this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart()); // Help 關閉後刷新語言
+    // Help/Demo 關閉後刷新語言；帶 preserveCoachPick，理由同 restartOnResize 那一行
+    this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart({ preserveCoachPick: true }));
 
     this.drawRidges(w, h);
 
@@ -103,11 +117,16 @@ export class CampScene extends Phaser.Scene {
 
     // 營地教學：委託／每日首見，一次只教一則——與 ResultScene 同款做法。候選未被選中者
     // 保持未標記（coach.seen 不受影響），下次符合條件時仍會被重新列入候選。
+    // 挑選只在這次造訪第一次 create() 時做一次（見 this.coachPick 欄位註解與 init()）；
+    // 同一次造訪內的後續重啟一律沿用同一個結果，不重新評估 coach.seen。
     const coach: CoachStore = this.registry.get('coach');
-    const campCandidates: [CoachId, MsgKey][] = [];
-    if (!dailyDone) campCandidates.push(['daily', 'coach.daily']);
-    if (doneCount < 3) campCandidates.push(['commission', 'coach.commission']);
-    const campPick = campCandidates.find(([id]) => !coach.seen(id)) ?? null;
+    if (this.coachPick === undefined) {
+      const campCandidates: [CoachId, MsgKey][] = [];
+      if (!dailyDone) campCandidates.push(['daily', 'coach.daily']);
+      if (doneCount < 3) campCandidates.push(['commission', 'coach.commission']);
+      this.coachPick = campCandidates.find(([id]) => !coach.seen(id)) ?? null;
+    }
+    const campPick = this.coachPick;
 
     const showRows = h >= 692; // 委託板是否展開成三列（矮視窗收合為單行）
     const blocks: FlowBlock[] = [
@@ -193,12 +212,14 @@ export class CampScene extends Phaser.Scene {
     // 這裡的消費必須嚴格對齊——只有 campPick 非 null 時才會呼叫 ys[bi++]。
     if (campPick) {
       const [id, msgKey] = campPick;
-      coachOnce(coach, id, () => {
-        this.add.text(cx, ys[bi++], i18n.t(msgKey), {
-          fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
-          wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
-        }).setOrigin(0.5);
-      });
+      // markSeen 冪等：這次造訪第一次顯示時才真的寫入，同一次造訪內的重啟重繪
+      // 只是重覆一次已經寫過的值，不會被 coachOnce 的「已見過就跳過顯示」擋下來
+      // ——那正是舊版的 bug（見 this.coachPick 欄位註解）。
+      coach.markSeen(id);
+      this.add.text(cx, ys[bi++], i18n.t(msgKey), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+        wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+      }).setOrigin(0.5);
     }
 
     // 小工具列：靜音＋說明＋示範＋語言（四鈕置中排列）。
@@ -218,7 +239,8 @@ export class CampScene extends Phaser.Scene {
       .on('pointerdown', () => {
         this.audio.unlock(); // 保險：確保這次手勢也算數（與 create() 的全域 hook 冪等共存）
         this.audio.toggle();
-        this.scene.restart(); // 較簡單一致：與語言鈕相同，用 restart 取代局部重繪
+        // 較簡單一致：與語言鈕相同，用 restart 取代局部重繪；preserveCoachPick 理由同上
+        this.scene.restart({ preserveCoachPick: true });
       });
     this.add.text(xHelp, by, '?', {
       fontFamily: FONTS.display, fontSize: '18px', color: cssHex(pal.gold),
@@ -247,7 +269,7 @@ export class CampScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
-        this.scene.restart();
+        this.scene.restart({ preserveCoachPick: true }); // 理由同上：語言切換不算離開營地
       });
 
     // 營火最後畫：它的位置取決於工具列落在哪裡（見 drawCampfire）。

@@ -1,12 +1,16 @@
 import Phaser from 'phaser';
 import { FONTS } from './paint';
 
-// resize 後 debounce 重啟場景：所有狀態都在 registry，重啟即重排
-export function restartOnResize(scene: Phaser.Scene): void {
+// resize 後 debounce 重啟場景：所有狀態都在 registry，重啟即重排。
+// data（選用）會原樣轉交給 restart() 傳給下一次 init()——場景若需要分辨
+// 「這次重啟是不是同一次造訪」（例如 coach 首見提示不該因為 resize 而被跳過或錯位，
+// 見 CampScene/ResultScene/CodexScene 的 preserveCoachPick），就靠這個管道傳旗標，
+// 不必另外監聽 resize 事件自己重複一份 debounce 邏輯。
+export function restartOnResize(scene: Phaser.Scene, data?: object): void {
   let timer: Phaser.Time.TimerEvent | null = null;
   const handler = () => {
     timer?.remove();
-    timer = scene.time.delayedCall(150, () => scene.scene.restart());
+    timer = scene.time.delayedCall(150, () => scene.scene.restart(data));
   };
   scene.scale.on(Phaser.Scale.Events.RESIZE, handler);
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () =>

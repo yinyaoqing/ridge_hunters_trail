@@ -10,8 +10,9 @@ import { catchScore, MULTIPLIERS, type ScoreStore } from '../core/score';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
 import type { I18n, MsgKey } from '../core/i18n';
-import { coachOnce, type CoachId, type CoachStore } from '../core/coach';
-import { infoCompleteStep } from '../core/deduction';
+import type { CoachId, CoachStore } from '../core/coach';
+import { infoCompleteStep, distinctReadAges } from '../core/deduction';
+import type { DemoScriptId } from '../core/demo';
 import { dailyKey, createDailySessionFromKey, type StreakStore } from '../core/daily';
 import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
@@ -35,9 +36,18 @@ export class ResultScene extends Phaser.Scene {
   private pal!: Palette;
   private audio!: AudioBus;
   private choiceMade = false;
+  // 首見提示的挑選結果，記在場景實例上（B2，同 CampScene.coachPick 的做法與理由）：
+  // undefined＝這次造訪還沒決定過，null／[id,key]＝已經決定。resize 觸發的 restart
+  // 經由 restartOnResize 帶入 preserveCoachPick，不會清掉這個欄位，因此不會在同一次
+  // 造訪內因為 coach.seen 被上一輪標記過而改挑下一個候選、把它也一併燒掉。
+  private coachPick: [CoachId, MsgKey] | null | undefined = undefined;
 
   constructor() {
     super('Result');
+  }
+
+  init(data: { preserveCoachPick?: boolean }) {
+    if (!data?.preserveCoachPick) this.coachPick = undefined;
   }
 
   create() {
@@ -135,7 +145,7 @@ export class ResultScene extends Phaser.Scene {
     const pal = this.pal;
     this.cameras.main.setBackgroundColor(pal.bg);
     fadeIn(this);
-    restartOnResize(this);
+    restartOnResize(this, { preserveCoachPick: true });
     const cx = this.scale.width / 2;
     const h = this.scale.height;
     const showTools = (this.registry.get('lastUnlocks') as ToolId[] | undefined) ?? [];
@@ -194,13 +204,20 @@ export class ResultScene extends Phaser.Scene {
     const wagerCell = wagerKey(s.marks);
     const routeReady = caught;
     const infoStep = infoCompleteStep(s.level, s.readLog);
-    const candidates: [CoachId, MsgKey][] = [];
-    if (caught && s.level.iris) candidates.push(['iris', 'coach.iris']);
-    if (routeReady) candidates.push(['reveal.route', 'coach.route']);
-    if (wagerCell !== null) candidates.push(['quality', 'coach.quality']);
-    if (caught && s.mode === 'run') candidates.push(['bankpush', 'coach.bankpush']);
-    if (infoStep !== null && s.steps > infoStep) candidates.push(['reveal.infoAt', 'coach.infoAt']);
-    const coachPick = candidates.find(([id]) => !coach.seen(id)) ?? null;
+    // 挑選只在這次造訪第一次 create() 時做一次（見 this.coachPick 欄位註解與 init()）；
+    // 同一次造訪內的後續重啟（resize）一律沿用同一個結果，不重新評估 coach.seen——
+    // 否則上一輪標記過的候選會在重啟後被濾掉，換下一個候選頂上，那個候選卻從未
+    // 真正被玩家看過就已經被標記為已見（B2）。
+    if (this.coachPick === undefined) {
+      const candidates: [CoachId, MsgKey][] = [];
+      if (caught && s.level.iris) candidates.push(['iris', 'coach.iris']);
+      if (routeReady) candidates.push(['reveal.route', 'coach.route']);
+      if (wagerCell !== null) candidates.push(['quality', 'coach.quality']);
+      if (caught && s.mode === 'run') candidates.push(['bankpush', 'coach.bankpush']);
+      if (infoStep !== null && s.steps > infoStep) candidates.push(['reveal.infoAt', 'coach.infoAt']);
+      this.coachPick = candidates.find(([id]) => !coach.seen(id)) ?? null;
+    }
+    const coachPick = this.coachPick;
 
     const blocks: FlowBlock[] = [];
     const slot: Record<string, number> = {};
@@ -313,12 +330,13 @@ export class ResultScene extends Phaser.Scene {
 
     if (coachPick) {
       const [coachId, coachKey] = coachPick;
-      coachOnce(coach, coachId, () => {
-        this.add.text(cx, at('coach'), i18n.t(coachKey), {
-          fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
-          wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
-        }).setOrigin(0.5);
-      });
+      // markSeen 冪等：理由同 CampScene 的同款寫法（見 this.coachPick 欄位註解）——
+      // 這次造訪第一次顯示時才真的寫入，同一次造訪內的重啟重繪只是重覆同一個已寫過的值。
+      coach.markSeen(coachId);
+      this.add.text(cx, at('coach'), i18n.t(coachKey), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+        wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+      }).setOrigin(0.5);
     }
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地

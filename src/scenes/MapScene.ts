@@ -95,9 +95,10 @@ export class MapScene extends Phaser.Scene {
   private tutBg?: Phaser.GameObjects.Graphics;
   // 首見提示佇列：showTut 只有一組 Text/Graphics 可用，同一刻若有第二則提示要排，
   // 不能覆蓋掉還在展示中的第一則——覆蓋會讓被蓋掉那則從未被玩家看見，卻已經 markSeen，
-  // 之後永遠不會再教（見 task-4-report.md）。coachActive 記著「正在展示中」的那個 id，
-  // 用來擋重覆排隊；coachQueue 存尚未展示、因此也尚未 markSeen 的候補提示。
-  private coachActive: CoachId | null = null;
+  // 之後永遠不會再教（見 task-4-report.md）。coachActive 記著「正在展示中」的那一則
+  // （id 與其 MsgKey，B2：resize 觸發的 restart 之後要用同一把 key 重新畫出來，
+  // 不能只留 id 卻無字可畫）；coachQueue 存尚未展示、因此也尚未 markSeen 的候補提示。
+  private coachActive: { id: CoachId; key: MsgKey } | null = null;
   private coachQueue: { id: CoachId; key: MsgKey }[] = [];
 
   // 候選熱區圖層（診斷 B-01）：預設開啟，玩家可用 HUD chip 關掉以看清底圖
@@ -171,10 +172,15 @@ export class MapScene extends Phaser.Scene {
     this.tutBg = undefined;
     // coachActive/coachQueue 同一批殘留欄位：舊 Scene 實例上任何正在展示或候補中的首見
     // 提示，其 delayedCall 已隨場景 shutdown 被銷毀（Phaser Clock#shutdown 會清空該場景
-    // 全部 timer），不會再有 advanceCoachQueue 補上場——但欄位值本身會存活，若不歸零，
-    // 候補佇列裡「尚未展示、因此也尚未 markSeen」的提示會被誤判成還在排隊，永遠等不到
-    // 補顯示的那次呼叫，形同資料卡死；歸零後它們就單純被捨棄、下次觸發時機再重新排隊，
-    // 因為未曾展示，也就從未 markSeen，不會有「教過但沒看到」的問題。
+    // 全部 timer），不會再有 advanceCoachQueue 補上場——但欄位值本身會存活。
+    // coachQueue 裡的候補「尚未展示、因此也尚未 markSeen」，歸零後單純被捨棄、下次觸發
+    // 時機再重新排隊即可，不會有「教過但沒看到」的問題。
+    // coachActive 不同（B2）：它是已經在展示中、已經 markSeen 過的那一則——直接歸零等於
+    // 把它整個丟掉，玩家卻只看了一個 resize 之前的片刻（手機收合網址列即觸發，見
+    // restartOnResize 的呼叫端），之後 coach.seen(id) 恆真，永遠不會再補顯示，形同「標記
+    // 但沒看到」。因此先記下來，等這次 create() 把畫面重建完畢後再用同一把 key 補畫回去
+    // （見下方 resumeCoach 的呼叫），而不是任它隨場景重置消失。
+    const resumeCoach = this.coachActive;
     this.coachActive = null;
     this.coachQueue = [];
     this.bellChipG = undefined;
@@ -254,6 +260,12 @@ export class MapScene extends Phaser.Scene {
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.clearHover(); this.redraw(); });
     this.redraw();
     restartOnResize(this);
+    // 補畫被 resize 中斷的首見提示（B2）：用 showCoachTip 而非 coachTip——它已經
+    // markSeen 過，不需要也不該再走一次「是否已見過」的判斷，只需要把畫面重建回來、
+    // 並重新給滿 8 秒展示時間。放在道具首見之前：它是被打斷的舊提示，理當比
+    // 這次 create() 才新湊到的候選優先，若道具首見也想顯示，coachTip 內建的
+    // 佇列機制會自動讓它排在後面（見 coachTip 對 this.coachActive 的判斷）。
+    if (this.tutStep < 0 && resumeCoach) this.showCoachTip(resumeCoach.id, resumeCoach.key);
     // 道具首見：持有中且進到獵局時教一次。解鎖 toast 只說了「解鎖了」，
     // 沒說它在這一局怎麼用——輝鈴尤其，玩家不會知道 HUD 上多出來的 chip 能點。
     // 用 else if 而非兩個 if：coachTip 共用同一個底部橫條，同一幀寫兩次只有後者看得到，
@@ -366,7 +378,7 @@ export class MapScene extends Phaser.Scene {
     if (this.tutStep >= 0) return;
     if (this.coach.seen(id)) return;
     // 已經在展示中或已排隊等展示——同一個 id 不必也不該重覆進佇列
-    if (this.coachActive === id || this.coachQueue.some((q) => q.id === id)) return;
+    if (this.coachActive?.id === id || this.coachQueue.some((q) => q.id === id)) return;
     if (this.coachActive === null) {
       this.showCoachTip(id, key);
     } else {
@@ -375,8 +387,10 @@ export class MapScene extends Phaser.Scene {
   }
 
   // 實際展示一則首見提示：markSeen 放在這裡（而非請求時）才能保證「標記＝玩家看過」。
+  // 也是 resize 中斷後補畫的入口（B2，見 create() 對 resumeCoach 的呼叫）——
+  // coach.markSeen 冪等，補畫時重覆呼叫不是問題。
   private showCoachTip(id: CoachId, key: MsgKey): void {
-    this.coachActive = id;
+    this.coachActive = { id, key };
     this.coach.markSeen(id);
     this.showTut(key);
     // 每則提示各自擁有完整 8 秒展示時間——時間到才淡出並讓下一則候補提示（若有）補上，

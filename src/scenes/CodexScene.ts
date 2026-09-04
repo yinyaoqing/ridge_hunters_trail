@@ -12,7 +12,7 @@ import {
   creatureScale,
 } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
-import { coachOnce, type CoachStore } from '../core/coach';
+import type { CoachStore } from '../core/coach';
 
 const ROW_H = 96;
 
@@ -21,9 +21,19 @@ export class CodexScene extends Phaser.Scene {
   private minY = 0;
   private listTop = 112;
   private listBottom = 0;
+  // 首見提示是否要顯示，記在場景實例上（B2，同 CampScene.coachPick 的做法與理由）：
+  // undefined＝這次造訪還沒決定過。resize 觸發的 restart 經由 restartOnResize 帶入
+  // preserveCoachPick，不會清掉這個欄位，因此不會在同一次造訪內把提示的顯示與否
+  // 重新評估一次——這裡只有單一 id，重新評估的後果是「顯示一瞬間就被判定已見、
+  // 之後永遠不再出現」，同樣違反「標記＝玩家看過」的不變量。
+  private showCoachHint: boolean | undefined = undefined;
 
   constructor() {
     super('Codex');
+  }
+
+  init(data: { preserveCoachPick?: boolean }) {
+    if (!data?.preserveCoachPick) this.showCoachHint = undefined;
   }
 
   create() {
@@ -37,7 +47,7 @@ export class CodexScene extends Phaser.Scene {
     const cx = w / 2;
     this.cameras.main.setBackgroundColor(pal.bg);
     fadeIn(this);
-    restartOnResize(this);
+    restartOnResize(this, { preserveCoachPick: true });
 
     this.add.text(cx, 42, i18n.t('codex.title'), {
       fontFamily: displayFont(loc), fontSize: '30px', color: cssHex(pal.paper),
@@ -78,12 +88,15 @@ export class CodexScene extends Phaser.Scene {
     // 上緣落在 h-67；用 origin(0.5, 1) 底部錨定於 h-77（上緣再退 10px 淨空），文字
     // 不論折成幾行都只會往上長，底緣固定不變——不會壓到返回鈕，且不必依版面高度另行判斷。
     const coach: CoachStore = this.registry.get('coach');
-    coachOnce(coach, 'codex', () => {
+    if (this.showCoachHint === undefined) this.showCoachHint = !coach.seen('codex');
+    if (this.showCoachHint) {
+      // markSeen 冪等：理由同 CampScene 的同款寫法（見 this.showCoachHint 欄位註解）。
+      coach.markSeen('codex');
       this.add.text(cx, h - 77, i18n.t('coach.codex'), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
         wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
       }).setOrigin(0.5, 1).setDepth(90);
-    });
+    }
   }
 
   private scrollBy(dy: number) {
