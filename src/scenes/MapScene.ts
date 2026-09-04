@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, currentTarget, isTargetVisible, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
 import { visionRadius, SURVEY_COST, SURVEY_BONUS } from '../core/vision';
-import { unmutedReadClues, heatMap, maxHeat } from '../core/deduction';
+import { unmutedReadClues, heatMap, maxHeat, distinctReadAges } from '../core/deduction';
+import type { CoachId, CoachStore } from '../core/coach';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { TERRAIN_TYPES } from '../core/types';
@@ -18,7 +19,7 @@ import type { ToolStore } from '../core/tools';
 import type { RunState } from '../core/runstate';
 import {
   cssHex, cssRgba, dashedLine, drawClueToken, drawSupply,
-  drawClueOverlay, drawMark,
+  drawClueOverlay, drawMark, AGE_FADE,
   BRUSH_RADIUS, FONTS, displayFont, terrainTexImage,
 } from './paint';
 import {
@@ -28,11 +29,6 @@ import {
 
 const HUD_HEIGHT = 56;
 const BG_KEY = 'map-bg';
-
-// 線索新鮮度→alpha 係數，依 c.age（0=更早／1=昨夜／2=今晨）索引。1 為原始強度（最新一齡
-// 不淡化）；兩個較舊的係數挑得讓差異一眼可辨，但仍讀得出形狀——0.68 已明顯比滿強度淡，
-// 0.4 是更早蹤跡的下限，再更低會讓錐形／圓域的虛線邊在較暗色板下糊成看不出輪廓。
-const AGE_FADE: readonly [number, number, number] = [0.4, 0.68, 1];
 
 export class MapScene extends Phaser.Scene {
   private g!: Phaser.GameObjects.Graphics;
@@ -90,12 +86,28 @@ export class MapScene extends Phaser.Scene {
                             // （貼體力條那一列）文字比體力條本身高，置中會微幅探出體力條
                             // 上緣，這個值讓它知道副標題底下留了多少空間可以探，見 updateHud
   private skipFirstRunHelp = false;
+  // 「下一次 restart 是否要帶 skipFirstRunHelp」的旗標。刻意不透過 scene.restart(data) 傳遞
+  // ——Phaser 的 Systems#start 只在 data 為 truthy 時才覆寫 settings.data，往後任何一次不帶
+  // data 的 scene.start('Map')（fadeToScene 等一般轉場皆是如此）都會讓 init() 繼續讀到這次
+  // 留下的舊 data，skipFirstRunHelp 因此會永久卡在 true。改用場景自己持有、自己在 init()
+  // 讀完立刻歸零的實例欄位（同 CampScene.pendingPreserveCoachPick），語言 chip 在呼叫
+  // scene.restart() 之前把它設成 true；resize 觸發的 restartOnResize(this) 不帶回呼，
+  // 因此不會把它設成 true，維持與舊版相同的「resize 不算語言切換」語意。
+  private pendingSkipFirstRunHelp = false;
   private audio!: AudioBus;
   private tools!: ToolStore;
   // 互動式新手引導：-1=未啟動/已結束，0..3=引導步驟（見 startTutStep0 起各步驟方法）
   private tutStep = -1;
+  private coach!: CoachStore;
   private tutText?: Phaser.GameObjects.Text;
   private tutBg?: Phaser.GameObjects.Graphics;
+  // 首見提示佇列：showTut 只有一組 Text/Graphics 可用，同一刻若有第二則提示要排，
+  // 不能覆蓋掉還在展示中的第一則——覆蓋會讓被蓋掉那則從未被玩家看見，卻已經 markSeen，
+  // 之後永遠不會再教（見 task-4-report.md）。coachActive 記著「正在展示中」的那一則
+  // （id 與其 MsgKey，B2：resize 觸發的 restart 之後要用同一把 key 重新畫出來，
+  // 不能只留 id 卻無字可畫）；coachQueue 存尚未展示、因此也尚未 markSeen 的候補提示。
+  private coachActive: { id: CoachId; key: MsgKey } | null = null;
+  private coachQueue: { id: CoachId; key: MsgKey }[] = [];
 
   // 候選熱區圖層（診斷 B-01）：預設開啟，玩家可用 HUD chip 關掉以看清底圖
   private heatOn = true;
@@ -131,10 +143,12 @@ export class MapScene extends Phaser.Scene {
     super('Map');
   }
 
-  // 語言切換造成的 restart 會帶入此旗標，避免在儲存降級（無法記憶 rht.help.v1）的
-  // 情境下，每次切換語言都重新觸發 maybeShowFirstRunHelp 彈出玩法說明並暫停地圖
-  init(data: { skipFirstRunHelp?: boolean }) {
-    this.skipFirstRunHelp = data?.skipFirstRunHelp === true;
+  // 語言切換造成的 restart 會把 pendingSkipFirstRunHelp 設成 true，避免在儲存降級
+  // （無法記憶 rht.help.v1）的情境下，每次切換語言都重新觸發 maybeShowFirstRunHelp
+  // 彈出玩法說明並暫停地圖。
+  init() {
+    this.skipFirstRunHelp = this.pendingSkipFirstRunHelp;
+    this.pendingSkipFirstRunHelp = false;
   }
 
   create() {
@@ -166,6 +180,19 @@ export class MapScene extends Phaser.Scene {
     this.hintText = undefined;
     this.tutText = undefined;
     this.tutBg = undefined;
+    // coachActive/coachQueue 同一批殘留欄位：舊 Scene 實例上任何正在展示或候補中的首見
+    // 提示，其 delayedCall 已隨場景 shutdown 被銷毀（Phaser Clock#shutdown 會清空該場景
+    // 全部 timer），不會再有 advanceCoachQueue 補上場——但欄位值本身會存活。
+    // coachQueue 裡的候補「尚未展示、因此也尚未 markSeen」，歸零後單純被捨棄、下次觸發
+    // 時機再重新排隊即可，不會有「教過但沒看到」的問題。
+    // coachActive 不同（B2）：它是已經在展示中、已經 markSeen 過的那一則——直接歸零等於
+    // 把它整個丟掉，玩家卻只看了一個 resize 之前的片刻（手機收合網址列即觸發，見
+    // restartOnResize 的呼叫端），之後 coach.seen(id) 恆真，永遠不會再補顯示，形同「標記
+    // 但沒看到」。因此先記下來，等這次 create() 把畫面重建完畢後再用同一把 key 補畫回去
+    // （見下方 resumeCoach 的呼叫），而不是任它隨場景重置消失。
+    const resumeCoach = this.coachActive;
+    this.coachActive = null;
+    this.coachQueue = [];
     this.bellChipG = undefined;
     this.bellChipText = undefined;
     this.lowTween = undefined;
@@ -198,6 +225,7 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.pal.bg);
     this.audio = this.registry.get('audio');
     this.tools = this.registry.get('tools');
+    this.coach = this.registry.get('coach');
     this.registry.set('lastUnlocks', []); // 離開 Result 後清空解鎖卡狀態，避免下次 resize/重入殘留
     this.registry.set('lastComms', []); // 同上，清空委託完成行狀態
     this.registry.remove('lastGain'); // 同上，清空押注押分暫存（score.gain 顯示用）
@@ -239,9 +267,27 @@ export class MapScene extends Phaser.Scene {
     this.input.keyboard?.once('keydown', () => this.audio.unlock());
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
+    // off 再 on：Phaser 只在 destroy 時清空 scene 的事件發射器，shutdown 不會，而
+    // this.events 每次 restart 都存活——不先移除的話 listener 數會隨 create 累加，
+    // 關一次 Help 就重畫 N 次。這裡刻意不用 once：本 handler 不會 restart 場景，
+    // 用 once 會讓它在第一次關閉 Help 之後就永久失效（與 CampScene 那個會 restart
+    // 的 RESUME handler 不同，那邊 once 才是對的）。
+    this.events.off(Phaser.Scenes.Events.RESUME);
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.clearHover(); this.redraw(); });
     this.redraw();
     restartOnResize(this);
+    // 補畫被 resize 中斷的首見提示（B2）：用 showCoachTip 而非 coachTip——它已經
+    // markSeen 過，不需要也不該再走一次「是否已見過」的判斷，只需要把畫面重建回來、
+    // 並重新給滿 8 秒展示時間。放在道具首見之前：它是被打斷的舊提示，理當比
+    // 這次 create() 才新湊到的候選優先，若道具首見也想顯示，coachTip 內建的
+    // 佇列機制會自動讓它排在後面（見 coachTip 對 this.coachActive 的判斷）。
+    if (this.tutStep < 0 && resumeCoach) this.showCoachTip(resumeCoach.id, resumeCoach.key);
+    // 道具首見：持有中且進到獵局時教一次。解鎖 toast 只說了「解鎖了」，
+    // 沒說它在這一局怎麼用——輝鈴尤其，玩家不會知道 HUD 上多出來的 chip 能點。
+    // 用 else if 而非兩個 if：coachTip 共用同一個底部橫條，同一幀寫兩次只有後者看得到，
+    // 前者卻已被標記為已見，等於永久漏教。兩者都持有時風向石先教，輝鈴留到下一局。
+    if (this.tools.has('windstone')) this.coachTip('tool.windstone', 'coach.tool.windstone');
+    else if (this.tools.has('glowbell')) this.coachTip('tool.glowbell', 'coach.tool.glowbell');
     fadeIn(this);
     if (this.tutStep === 0) this.startTutStep0(s);
     else this.maybeShowFirstRunHelp(); // 引導進行中時跳過彈窗，改由 ? chip 手動開啟
@@ -305,21 +351,39 @@ export class MapScene extends Phaser.Scene {
     this.showTut('tut.cross');
   }
 
-  // 引導文字：底部置中，共用單一 Text/Graphics（切換文案時重繪底條），全程不攔截輸入
+  // 引導文字：底部置中，共用單一 Text/Graphics（切換文案時重繪底條），全程不攔截輸入。
+  // B3：這個橫條原本是為 tut.* 系列訂的（最長 84 字元、單行即可），沒有 wordWrap。
+  // 首見提示（coach.*）借用同一個橫條，但長得多——en 版 coach.age 122 字元、
+  // coach.tool.windstone 115 字元，13px Karla 下量得單行寬約 790px，超過 720×780 的
+  // 內嵌目標寬度，更是手機 390px 視窗的兩倍，會被畫面裁掉一半。wordWrap 寬度取
+  // 「螢幕寬度扣掉兩側各 32px 留白」與「340px 閱讀行寬上限」兩者較小值：桌機/內嵌
+  // （寬 ≥404px）都會頂到 340 這個上限，讓一行字維持好讀的寬度而不是被拉成一整排；
+  // 390px 手機則會收到 390-64=326px，仍在留白之內。bh 已經是 tutText.height + 12，
+  // wrap 後 height 會隨行數增加，這裡不必另外處理；bg 的 y 用 tutText 中心對齊，
+  // 兩到三行時橫條會跟著往上長高，底邊固定貼在 y=h-24 這條基準線上下對稱，不會探出螢幕
+  // ——螢幕最低高度遠大於三行橫條的高度（約 13*1.2*3+12≈59px），沒有頂到頂部的風險。
   private showTut(msgKey: MsgKey) {
     const pal = this.pal;
     if (!this.tutText) {
       this.tutBg = this.add.graphics().setDepth(80);
+      const wrapWidth = Math.min(340, this.scale.width - 64);
       this.tutText = this.add.text(0, 0, '', {
         fontFamily: FONTS.body, fontSize: '13px', color: cssHex(pal.paper),
+        wordWrap: { width: wrapWidth, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
       }).setOrigin(0.5).setDepth(81);
     }
     this.tutText.setText(this.i18n().t(msgKey));
     const w = this.scale.width;
-    const y = this.scale.height - 24;
-    this.tutText.setPosition(w / 2, y);
+    const h = this.scale.height;
+    // setText 必須先跑過，wordWrap 才會把行數／實際高度定下來，bh 才量得準——
+    // 這也是為什麼下面的夾限要在 setText 之後才算，不能沿用建立時的舊高度。
     const bw = this.tutText.width + 24;
     const bh = this.tutText.height + 12;
+    // 兩到三行時把中心點往上夾，讓底緣永遠不超出螢幕下緣再留 4px——單行訊息完全不受
+    // 影響（h-24 本來就比夾限值小，Math.min 選不到它），維持原本的視覺位置不變；
+    // 只有 wordWrap 真的折成多行時，橫條才會往上長而不是把底部裁出畫面外（B3）。
+    const y = Math.min(h - 24, h - 4 - bh / 2);
+    this.tutText.setPosition(w / 2, y);
     this.tutBg!.clear().fillStyle(pal.panel, 0.88)
       .fillRoundedRect(w / 2 - bw / 2, y - bh / 2, bw, bh, BRUSH_RADIUS);
   }
@@ -329,6 +393,50 @@ export class MapScene extends Phaser.Scene {
     this.tutBg?.destroy();
     this.tutText = undefined;
     this.tutBg = undefined;
+  }
+
+  // 首見教學提示：與新手引導共用底部橫條，但兩者絕不同時存在——
+  // showTut 共用同一個 Text/Graphics 物件，引導期間再寫進去會把 tut.* 的文案蓋掉。
+  // 引導本身只跑第 1 局的前幾步，讓它先講完是正確的優先序——引導期間請求的提示直接
+  // 捨棄、不進佇列：因為還沒展示就丟掉，coach 那邊也就從未 markSeen，之後任何一次
+  // 再命中同一個時機都還會照常重新請求，不會被這次的捨棄永久吃掉（見任務報告）。
+  //
+  // 佇列設計：doMove 的 onComplete 裡，同一步移動可能同時湊到 supply 與 age.second
+  // 兩則首見提示（撿到補給、又剛好讀滿第二種齡別）。showTut/hideTut 只有一組共用
+  // Text/Graphics，若兩則提示都「先標記再顯示」，第二則會在同一 tick 內把第一則蓋掉，
+  // 而第一則先前已經 markSeen——玩家其實完全沒看到它，卻再也不會被教一次。
+  // 修法是「排隊，不覆蓋」：不是展示中就先進 coachQueue 候補，且只在真正呼叫 showTut
+  // 的那一刻才 markSeen，確保「已標記＝已展示過」這個不變量成立。
+  private coachTip(id: CoachId, key: MsgKey): void {
+    if (this.tutStep >= 0) return;
+    if (this.coach.seen(id)) return;
+    // 已經在展示中或已排隊等展示——同一個 id 不必也不該重覆進佇列
+    if (this.coachActive?.id === id || this.coachQueue.some((q) => q.id === id)) return;
+    if (this.coachActive === null) {
+      this.showCoachTip(id, key);
+    } else {
+      this.coachQueue.push({ id, key });
+    }
+  }
+
+  // 實際展示一則首見提示：markSeen 放在這裡（而非請求時）才能保證「標記＝玩家看過」。
+  // 也是 resize 中斷後補畫的入口（B2，見 create() 對 resumeCoach 的呼叫）——
+  // coach.markSeen 冪等，補畫時重覆呼叫不是問題。
+  private showCoachTip(id: CoachId, key: MsgKey): void {
+    this.coachActive = { id, key };
+    this.coach.markSeen(id);
+    this.showTut(key);
+    // 每則提示各自擁有完整 8 秒展示時間——時間到才淡出並讓下一則候補提示（若有）補上，
+    // 而不是所有候補共用同一段 8 秒倒數。
+    this.time.delayedCall(8000, () => this.advanceCoachQueue());
+  }
+
+  // 目前這則的 8 秒到了：淡出、清狀態，若佇列還有候補就接著展示下一則。
+  private advanceCoachQueue(): void {
+    this.hideTut();
+    this.coachActive = null;
+    const next = this.coachQueue.shift();
+    if (next) this.showCoachTip(next.id, next.key);
   }
 
   // 引導完成：與玩法說明共用旗標寫入邏輯（? chip 之後仍可手動開啟 Help）
@@ -692,8 +800,9 @@ export class MapScene extends Phaser.Scene {
           i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
           // roundText 的展示字體隨語系而異且僅在 create() 時設定，
           // 用 restart（既有的 resize 重建機制）取代 redraw 以確保字體刷新；
-          // 帶入 skipFirstRunHelp 避免儲存降級時每次切語言都重新彈出玩法說明
-          this.scene.restart({ skipFirstRunHelp: true });
+          // 設 pendingSkipFirstRunHelp 避免儲存降級時每次切語言都重新彈出玩法說明
+          this.pendingSkipFirstRunHelp = true;
+          this.scene.restart();
         });
     }
     chip.strokeRoundedRect(xHelp, chipY, 32, chipH, { tl: 5, tr: 9, br: 4, bl: 8 });
@@ -1228,6 +1337,7 @@ export class MapScene extends Phaser.Scene {
         if (gotSupply) {
           floatText(this, dest.x, dest.y - cs, `+${getDifficulty(s.round).supplyRestore}`, cssHex(this.pal.supply));
           this.audio.play('pickup');
+          this.coachTip('supply', 'coach.supply');
         }
         if (s.readClues.size > readBefore) {
           const clue = s.level.clues.find((c) => key(c.position) === key(to));
@@ -1252,6 +1362,11 @@ export class MapScene extends Phaser.Scene {
             this.time.delayedCall(3000, () => this.checkTutStep1to2(s));
           } else if (this.tutStep === 1) {
             this.checkTutStep1to2(s);
+          }
+          // 齡別提示：讀到第二種齡別的那一刻才有意義——在那之前所有線索同齡，
+          // 切新鮮度 chip 看不出任何差別。
+          if (distinctReadAges(s.level, s.readLog) >= 2) {
+            this.coachTip('age.second', 'coach.age');
           }
         }
         // 引導 step2→3：進逼目標範圍（cheb<=2）先於實際 QTE 觸發距離（cheb<=1）示警，
@@ -1320,6 +1435,7 @@ export class MapScene extends Phaser.Scene {
       }
       this.audio.play('reveal');
       floatText(this, player.x, player.y - cs * 0.5, '!', cssHex(pal.mark));
+      this.coachTip('event.startle', 'coach.event.startle');
       return;
     }
 
@@ -1331,6 +1447,7 @@ export class MapScene extends Phaser.Scene {
       this.redraw(); // 補畫：讓 rollMicroEvent 剛寫入的新補給格立即可見
       floatText(this, center.x, center.y - cs * 0.5, '+', cssHex(pal.supply));
       this.audio.play('pickup');
+      this.coachTip('event.supply', 'coach.event.supply');
       return;
     }
 
@@ -1339,6 +1456,7 @@ export class MapScene extends Phaser.Scene {
       this.playEventCone(player, ev.direction, 60, cs * 5, pal.gold, 0.2, 5000, true);
     }
     this.audio.play('reveal');
+    this.coachTip('event.oldtrail', 'coach.event.oldtrail');
   }
 
   // 微事件錐形演出：複製 playReveal 的容器縮放淡出技法（scale 0.3→1、alpha→0）；

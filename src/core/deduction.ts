@@ -88,3 +88,15 @@ export function misleadingDecoy(
   }
   return null;
 }
+
+// 玩家讀到的線索橫跨幾種齡別。齡別教學的觸發條件是「讀到第二種齡」——
+// 在那之前玩家看到的線索全部同齡，新鮮度 chip 切了也沒差別，講了等於沒講。
+// 幌子照樣計入：玩家在揭曉之前無從分辨，牠對玩家而言就是一條有齡別的線索。
+export function distinctReadAges(level: Level, readLog: ClueRead[]): number {
+  const ages = new Set<ClueAge>();
+  for (const entry of readLog) {
+    const clue = level.clues[entry.clueIndex];
+    if (clue) ages.add(clue.age);
+  }
+  return ages.size;
+}

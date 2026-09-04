@@ -12,6 +12,7 @@ import {
   creatureScale,
 } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
+import type { CoachStore } from '../core/coach';
 
 const ROW_H = 96;
 
@@ -20,9 +21,25 @@ export class CodexScene extends Phaser.Scene {
   private minY = 0;
   private listTop = 112;
   private listBottom = 0;
+  // 首見提示是否要顯示，記在場景實例上（B2，同 CampScene.coachPick 的做法與理由）：
+  // undefined＝這次造訪還沒決定過。resize 觸發的 restart 經由 restartOnResize 的
+  // beforeRestart 回呼把 pendingPreserveCoachPick 設成 true，不會清掉這個欄位，因此不會
+  // 在同一次造訪內把提示的顯示與否重新評估一次——這裡只有單一 id，重新評估的後果是
+  // 「顯示一瞬間就被判定已見、之後永遠不再出現」，同樣違反「標記＝玩家看過」的不變量。
+  private showCoachHint: boolean | undefined = undefined;
+  // 同 CampScene.pendingPreserveCoachPick：不透過 scene.restart(data) 傳遞，避免 Phaser 的
+  // settings.data 在下一次不帶 data 的 scene.start('Codex') 繼續讀到舊值，讓這個旗標永久
+  // 卡在「保留」，圖鑑首見提示從此再也不會在真正的新一次造訪重新判斷。
+  private pendingPreserveCoachPick = false;
 
   constructor() {
     super('Codex');
+  }
+
+  init() {
+    const preserve = this.pendingPreserveCoachPick;
+    this.pendingPreserveCoachPick = false;
+    if (!preserve) this.showCoachHint = undefined;
   }
 
   create() {
@@ -36,7 +53,7 @@ export class CodexScene extends Phaser.Scene {
     const cx = w / 2;
     this.cameras.main.setBackgroundColor(pal.bg);
     fadeIn(this);
-    restartOnResize(this);
+    restartOnResize(this, () => { this.pendingPreserveCoachPick = true; });
 
     this.add.text(cx, 42, i18n.t('codex.title'), {
       fontFamily: displayFont(loc), fontSize: '30px', color: cssHex(pal.paper),
@@ -72,6 +89,20 @@ export class CodexScene extends Phaser.Scene {
     this.input.on('pointerup', () => { dragY = null; });
 
     this.backButton(cx, h - 44, pal, i18n);
+
+    // 研究首見：底部說明退到返回鈕之上。backButton 以 (cx, h-44) 為中心、高 46，
+    // 上緣落在 h-67；用 origin(0.5, 1) 底部錨定於 h-77（上緣再退 10px 淨空），文字
+    // 不論折成幾行都只會往上長，底緣固定不變——不會壓到返回鈕，且不必依版面高度另行判斷。
+    const coach: CoachStore = this.registry.get('coach');
+    if (this.showCoachHint === undefined) this.showCoachHint = !coach.seen('codex');
+    if (this.showCoachHint) {
+      // markSeen 冪等：理由同 CampScene 的同款寫法（見 this.showCoachHint 欄位註解）。
+      coach.markSeen('codex');
+      this.add.text(cx, h - 77, i18n.t('coach.codex'), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+        wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+      }).setOrigin(0.5, 1).setDepth(90);
+    }
   }
 
   private scrollBy(dy: number) {

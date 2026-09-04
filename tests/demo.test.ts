@@ -3,7 +3,8 @@ import { candidates, intersect, key } from '../src/core/clues';
 import { heatMap, maxHeat } from '../src/core/deduction';
 import {
   DEMO_SIZE, DEMO_START, DEMO_TARGET, DEMO_MID, DEMO_CLUES, DECOY_INDEX, DEMO_PAIR,
-  DEMO_STEPS, type DemoStep, demoUnseen, checkCellAction, checkMuteAction,
+  DEMO_STEPS, type DemoStep, demoUnseen, checkCellAction, checkMuteAction, DEDUCTION_SCRIPT,
+  QUARRY_SCRIPT,
 } from '../src/core/demo';
 import { STRINGS } from '../src/core/i18n';
 import { parseKey } from '../src/core/marks';
@@ -39,6 +40,15 @@ describe('demo level', () => {
   it('parks the mid-walk position inside the two-clue overlap', () => {
     // 第 10 步的旁白是「往交集區走過去」。玩家若停在交集區外，那句話就是假的。
     expect(DEMO_PAIR.has(key(DEMO_MID))).toBe(true);
+  });
+
+  // S2：DemoScene 現在會把每條線索的 age 換成新鮮度淡出係數（paint.ts 的 AGE_FADE，
+  // AGE_FADE[2] === 1 即原始強度、無淡化）傳給 drawClueToken／drawClueOverlay。
+  // 第一課承諾「pixel-identical」，這條測試釘住那個承諾的前提條件——只要全部線索
+  // 仍固定在 age 2，這個改動對第一課就必然是 no-op（場景層本身不可測，見全域規範，
+  // 因此只驗證這裡：資料仍是原本註解宣稱的樣子）。
+  it('keeps every clue on age 2, so the freshness fade added in S2 is a no-op here', () => {
+    for (const c of DEMO_CLUES) expect(c.age).toBe(2);
   });
 });
 
@@ -253,5 +263,65 @@ describe('checkMuteAction', () => {
       if (i === DECOY_INDEX) continue;
       expect(checkMuteAction(i)).toBe('demo.hint.mute');
     }
+  });
+});
+
+describe('DEDUCTION_SCRIPT', () => {
+  it('wraps the deduction lesson without changing it', () => {
+    expect(DEDUCTION_SCRIPT.id).toBe('deduction');
+    expect(DEDUCTION_SCRIPT.size).toBe(DEMO_SIZE);
+    expect(DEDUCTION_SCRIPT.start).toEqual(DEMO_START);
+    expect(DEDUCTION_SCRIPT.target).toEqual(DEMO_TARGET);
+    expect(DEDUCTION_SCRIPT.clues).toBe(DEMO_CLUES);
+    expect(DEDUCTION_SCRIPT.steps).toBe(DEMO_STEPS);
+    expect(DEDUCTION_SCRIPT.pair).toBe(DEMO_PAIR);
+  });
+
+  it('routes its checks to the same functions', () => {
+    expect(DEDUCTION_SCRIPT.checkCell('exclude', { x: 0, y: 0 }))
+      .toBe(checkCellAction('exclude', { x: 0, y: 0 }));
+    expect(DEDUCTION_SCRIPT.checkClue(DECOY_INDEX)).toBe(checkMuteAction(DECOY_INDEX));
+  });
+
+  it('leaves every deduction step on no particular age', () => {
+    for (const step of DEDUCTION_SCRIPT.steps) {
+      expect(step.heatAge ?? null).toBeNull();
+    }
+  });
+});
+
+// B1：DemoScene 曾以一張模組層級的表把 1..4 寫死對應到 demo.ch1..4，兩套腳本共用一份
+// 標題，導致第二課的第 6–8 步顯示「THE ODD ONE OUT IS LYING」——那是第一課第三章的標題，
+// 內容跟「牠在走」的旁白直接矛盾。章節標題現在是每個腳本自己的資料（chapterKeys），
+// 這裡驗證：①索引數量剛好覆蓋腳本實際用到的章節、不多不少；②每個索引都指向一個
+// 兩語系皆非空字串的 MsgKey；③兩套腳本不會意外共用同一把標題鍵（若共用，代表又把
+// 第一課的表格複製貼上到第二課，而不是各自寫自己的文案）。
+describe('demo script chapter headings (B1)', () => {
+  const scripts = [
+    { name: 'DEDUCTION_SCRIPT', script: DEDUCTION_SCRIPT },
+    { name: 'QUARRY_SCRIPT', script: QUARRY_SCRIPT },
+  ];
+
+  it.each(scripts)('$name has exactly one heading per chapter its steps use', ({ script }) => {
+    const chapters = new Set(script.steps.map((s) => s.chapter));
+    expect(script.chapterKeys).toHaveLength(chapters.size);
+    for (const c of chapters) {
+      expect(c).toBeGreaterThanOrEqual(1);
+      expect(c).toBeLessThanOrEqual(script.chapterKeys.length);
+    }
+  });
+
+  it.each(scripts)('$name gives every chapter heading a non-empty string in both locales', ({ script }) => {
+    for (const msgKey of script.chapterKeys) {
+      for (const loc of ['en', 'zh-TW'] as const) {
+        expect(STRINGS[loc][msgKey].length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('does not let the two lessons share a chapter heading key', () => {
+    const a = new Set(DEDUCTION_SCRIPT.chapterKeys);
+    const b = new Set(QUARRY_SCRIPT.chapterKeys);
+    for (const k of a) expect(b.has(k)).toBe(false);
   });
 });

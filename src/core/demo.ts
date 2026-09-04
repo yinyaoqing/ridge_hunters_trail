@@ -64,7 +64,7 @@ export const DEMO_PAIR: Set<string> = intersect([DEMO_CLUES[0], DEMO_CLUES[1]], 
 // 三個動手點。它們各自對應遊戲裡最容易被完全錯過的功能：
 // 排除標記、線索靜音、押注。靜音尤其——它目前只存在於說明頁一行字裡，
 // 沒人教就永遠不會有人用。
-export type DemoAction = 'exclude' | 'mute' | 'wager';
+export type DemoAction = 'exclude' | 'mute' | 'wager' | 'pick-age';
 
 export interface DemoStep {
   chapter: 1 | 2 | 3 | 4;
@@ -75,6 +75,9 @@ export interface DemoStep {
   clues: readonly number[];   // 本步已判讀的線索索引
   muted: readonly number[];   // 本步已靜音的線索索引（必為 clues 的子集）
   overlay: 'none' | 'heat' | 'intersect';
+  // 本步的新鮮度 chip 選擇（null = 全部齡別）。第一課全部為 undefined，
+  // 渲染時視同 null，逐格結果與加這個欄位之前完全相同。
+  heatAge?: 0 | 1 | 2 | null;
   seen: 'near' | 'all';       // 'near' = 最上兩列仍是未探索的暗區
   player: Vec2;
   autoSuspect?: true;         // 為真時，DEMO_PAIR 的 11 格自動標成存疑
@@ -193,4 +196,183 @@ export function checkCellAction(action: 'exclude' | 'wager', cell: Vec2): MsgKey
 
 export function checkMuteAction(clueIndex: number): MsgKey | null {
   return clueIndex === DECOY_INDEX ? null : 'demo.hint.mute';
+}
+
+// ── 第二課：會走的獵物 ──────────────────────────────────────────
+// 獵物走 W0 → W1 → W2 三個節點，每齡兩條線索反向錨定在「當時」所在的節點上，
+// 與真實關卡的 route.ts + generate.ts 是同一套幾何。無幌子：幌子由第一課教完，
+// 這一課要專心教齡別，兩件難事同時上等於兩件都沒教會。
+//
+// 這組資料由 scripts/find-quarry-lesson.mjs 窮舉找出，性質釘在
+// tests/demo-quarry.test.ts。動任何一個數字之前，先跑測試。
+//
+// 這是第三次重找。第一版三個節點與外推點全落在 y=0（貼著格線邊緣，
+// 讀不出「一條線」的方向感），而且線索位置跟別齡的節點重合（教學要講
+// 「線索標的是牠經過的地方，不是牠現在的位置」，結果線索畫在下一齡的
+// 節點正上方，混淆了正要教的區別）。第二版補了：
+//   ⑤ 任何線索位置都不得與「任何一個」節點重合——不只是自己那一齡的節點
+//   ⑥ 三個節點與外推點都離邊界至少 1 格（x、y 落在 1..size-2＝1..7）
+// 但第二版漏了一條：六條線索的位置本身互相之間可以重合。窮舉只拿「離節點
+// 多遠」當條件，是從 (0,0) 往外一格一格找，於是四條線索全疊在 (0,0)——
+// drawClueToken（src/scenes/paint.ts）畫的是不透明底盤，疊在一起時只有
+// 最後畫的那個看得見，玩家在畫面上數到的線索記號只有三個，卻聽旁白說
+// 「六條線索」「三組」「只剩兩條」，畫面與文案對不上。這一版再補一條：
+//   ⑦ 六條線索的位置必須兩兩相異
+// 並且加了一條非硬性的偏好：六個位置盡量互相拉開（兩兩 Chebyshev 距離
+// ≥ 2），讀起來才像散在地圖上的六個點，不是擠在同一個角落——這一版窮舉
+// 第一輪（只試對角線、不放寬任何參數）就同時滿足了硬約束與這條偏好，
+// 未曾放寬 SPREADS／RADII／混搭優先序，也未曾關掉對角線偏好。
+export const QUARRY_SIZE = 9;
+export const QUARRY_NODES: readonly [Vec2, Vec2, Vec2] = [
+  { x: 1, y: 1 },
+  { x: 3, y: 3 },
+  { x: 5, y: 5 },
+];
+export const QUARRY_TARGET: Vec2 = { x: 7, y: 7 };
+export const QUARRY_START: Vec2 = { x: 0, y: 8 }; // 左下角，離對角線路徑最遠的角落
+export const QUARRY_CLUES: readonly Clue[] = [
+  {
+    type: 'footprint', position: { x: 0, y: 0 }, isDecoy: false, age: 0,
+    data: { direction: 45, angleSpread: 20 },
+  },
+  {
+    type: 'scent', position: { x: 6, y: 4 }, isDecoy: false, age: 0,
+    data: { distance: 6, tolerance: 0.5, windBiasNeeded: false, biasDirection: 211 },
+  },
+  {
+    type: 'scent', position: { x: 2, y: 0 }, isDecoy: false, age: 1,
+    data: { distance: 3, tolerance: 0.5, windBiasNeeded: false, biasDirection: 72 },
+  },
+  {
+    type: 'footprint', position: { x: 2, y: 2 }, isDecoy: false, age: 1,
+    data: { direction: 45, angleSpread: 20 },
+  },
+  {
+    type: 'scent', position: { x: 4, y: 0 }, isDecoy: false, age: 2,
+    data: { distance: 5, tolerance: 0.5, windBiasNeeded: false, biasDirection: 79 },
+  },
+  {
+    type: 'footprint', position: { x: 5, y: 6 }, isDecoy: false, age: 2,
+    data: { direction: 270, angleSpread: 20 },
+  },
+];
+
+// 最新齡兩條的交集（＝W2 一格）。第二章的自動存疑標記讀它——單一來源，不手寫。
+export const QUARRY_PAIR: Set<string> = intersect(
+  QUARRY_CLUES.filter((c) => c.age === 2), QUARRY_SIZE,
+);
+
+const QUARRY_ALL_AGREE = intersect([...QUARRY_CLUES], QUARRY_SIZE).size; // 恆為 0，由測試釘死
+
+export const QUARRY_STEPS: readonly DemoStep[] = [
+  // 第一章：牠沒有待在原地
+  {
+    chapter: 1, narration: 'demo2.s1', vars: { n: QUARRY_ALL_AGREE },
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  {
+    chapter: 1, narration: 'demo2.s2',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  // 第二章：一次只看一齡
+  {
+    chapter: 2, narration: 'demo2.s3',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  {
+    chapter: 2, narration: 'demo2.s4',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: 2,
+    seen: 'all', player: QUARRY_START, action: 'pick-age',
+  },
+  {
+    chapter: 2, narration: 'demo2.s5',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: 2,
+    seen: 'all', player: QUARRY_START, autoSuspect: true,
+  },
+  // 第三章：往前帶
+  {
+    chapter: 3, narration: 'demo2.s6',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  {
+    chapter: 3, narration: 'demo2.s7',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: null,
+    seen: 'all', player: QUARRY_START, action: 'wager',
+  },
+  {
+    chapter: 3, narration: 'demo2.s8',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+];
+
+export type DemoScriptId = 'deduction' | 'quarry';
+export type DemoCellAction = 'exclude' | 'wager';
+
+export interface DemoScript {
+  id: DemoScriptId;
+  size: number;
+  start: Vec2;
+  target: Vec2;
+  clues: readonly Clue[];
+  steps: readonly DemoStep[];
+  fogRows: number;
+  titleKey: MsgKey;
+  // 各章節標題，依 DemoStep.chapter（1 起算）索引：chapterKeys[chapter - 1]。
+  // 兩套腳本的章節數與文案完全不同（第一課四章、第二課三章），過去用單一模組層級的
+  // CHAPTER_KEY（DemoScene.ts）把 1..4 寫死對應到 demo.ch1..4，導致第二課也套用
+  // 第一課的標題——「THE ODD ONE OUT IS LYING」出現在教「牠在走」的第三章上方（B1）。
+  // 標題現在由腳本自己的資料負責，兩套腳本天然不可能互相借用對方的文案。
+  chapterKeys: readonly MsgKey[];
+  // 第二章自動標存疑的那一組格子。第一課是「前兩條線索的交集」，
+  // 第二課是「最新齡兩條的交集」——語意不同，值由腳本自己算好交出來。
+  pair: Set<string>;
+  checkCell(action: DemoCellAction, cell: Vec2): MsgKey | null;
+  checkClue(clueIndex: number): MsgKey | null;
+  unseen(step: DemoStep): Set<string>;
+}
+
+export const DEDUCTION_SCRIPT: DemoScript = {
+  id: 'deduction',
+  size: DEMO_SIZE,
+  start: DEMO_START,
+  target: DEMO_TARGET,
+  clues: DEMO_CLUES,
+  steps: DEMO_STEPS,
+  fogRows: DEMO_FOG_ROWS,
+  titleKey: 'demo.title',
+  chapterKeys: ['demo.ch1', 'demo.ch2', 'demo.ch3', 'demo.ch4'],
+  pair: DEMO_PAIR,
+  checkCell: checkCellAction,
+  checkClue: checkMuteAction,
+  unseen: demoUnseen,
+};
+
+export const QUARRY_SCRIPT: DemoScript = {
+  id: 'quarry',
+  size: QUARRY_SIZE,
+  start: QUARRY_START,
+  target: QUARRY_TARGET,
+  clues: QUARRY_CLUES,
+  steps: QUARRY_STEPS,
+  fogRows: 0, // 這一課不教視野；迷霧只會分散注意力
+  titleKey: 'demo2.title',
+  chapterKeys: ['demo2.ch1', 'demo2.ch2', 'demo2.ch3'],
+  pair: QUARRY_PAIR,
+  // 只接受外推點。押在任何一個節點上，代表「牠還在走」這件事還沒學會——
+  // 此時給提示比給通過更有價值（同第一課 checkCellAction 的判準）。
+  checkCell: (_action, cell) =>
+    key(cell) === key(QUARRY_TARGET) ? null : 'demo2.hint.wager',
+  // 這一課沒有幌子，靜音不在課程內。玩家點線索時給的提示必須說明「為什麼不必靜音」，
+  // 不能沿用押注的提示——那句話對「點到線索」這個動作是文不對題的。
+  checkClue: () => 'demo2.hint.mute',
+  unseen: () => new Set<string>(),
+};
+
+export function demoScript(id: DemoScriptId): DemoScript {
+  return id === 'quarry' ? QUARRY_SCRIPT : DEDUCTION_SCRIPT;
 }

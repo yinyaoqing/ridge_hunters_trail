@@ -39,9 +39,23 @@ export type MsgKey =
   | 'demo.s8' | 'demo.s9' | 'demo.s10' | 'demo.s11' | 'demo.s12' | 'demo.s13' | 'demo.s14'
   | 'demo.hint.exclude' | 'demo.hint.mute' | 'demo.hint.wager'
   | 'btn.demo' | 'btn.next' | 'btn.prev'
+  | 'demo2.title' | 'demo2.ch1' | 'demo2.ch2' | 'demo2.ch3'
+  | 'demo2.s1' | 'demo2.s2' | 'demo2.s3' | 'demo2.s4' | 'demo2.s5'
+  | 'demo2.s6' | 'demo2.s7' | 'demo2.s8'
+  | 'demo2.hint.wager' | 'demo2.hint.mute' | 'btn.demo2'
   | 'age.fresh' | 'age.night' | 'age.older' | 'age.all'
   | 'reveal.route'
-  | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling';
+  | 'coach.event.startle' | 'coach.event.supply' | 'coach.event.oldtrail'
+  | 'coach.supply' | 'coach.age' | 'coach.bankpush' | 'coach.iris'
+  | 'coach.route' | 'coach.quality' | 'coach.infoAt'
+  | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling'
+  | 'help.sec.track' | 'help.sec.deduce' | 'help.sec.ground' | 'help.sec.longRun'
+  | 'help.quarry' | 'help.habit' | 'help.age' | 'help.score' | 'help.iris'
+  | 'help.events' | 'help.supply' | 'help.mute' | 'help.infoAt' | 'help.quirk'
+  | 'help.progress' | 'help.tools' | 'help.codex' | 'help.commission' | 'help.daily'
+  | 'help.wx.clear' | 'help.wx.mist' | 'help.wx.wind' | 'help.wx.drizzle'
+  | 'coach.tool.windstone' | 'coach.tool.glowbell'
+  | 'coach.codex' | 'coach.commission' | 'coach.daily';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -150,6 +164,10 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.vision': 'You only see the ground near you. High ground sees further; thickets close in.',
     'help.survey': 'Look costs stamina and sweeps the ground around you, uncovering clues you have not walked past.',
     'help.route': 'Click a distant cell to preview the route and its cost, then click again to walk it. Walking stops the moment you read something new.',
+    'help.sec.track': 'READING THE TRAIL',
+    'help.sec.deduce': 'WORKING IT OUT',
+    'help.sec.ground': 'GROUND & STAMINA',
+    'help.sec.longRun': 'THE LONG RUN',
     'demo.title': 'Deduction Walkthrough',
     'demo.progress': '{n} / {total}',
     'demo.fromResult': 'Not sure how to read the clues? Walk through a hunt step by step.',
@@ -177,6 +195,21 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '[ Walkthrough ]',
     'btn.next': '[ Next ]',
     'btn.prev': '[ Back ]',
+    'demo2.title': 'The Walking Quarry',
+    'demo2.ch1': 'It did not stay put',
+    'demo2.ch2': 'One age at a time',
+    'demo2.ch3': 'Lead it',
+    'demo2.s1': 'Six clues, all honest. Layer them all and {n} cells agree with everything — none.',
+    'demo2.s2': 'Nothing is lying. The clues disagree because it was walking: each one marks where it passed.',
+    'demo2.s3': 'Every clue carries a freshness. These six are three pairs — older, night, morning.',
+    'demo2.s4': 'Set the freshness chip to the newest age. Only two clues left.',
+    'demo2.s5': 'Those two agree on one cell. That is where it was this morning.',
+    'demo2.s6': 'Do the same for the other two ages and you get three cells — where it was, in order.',
+    'demo2.s7': 'Three cells in a line, evenly spaced. It is still walking. Call the next one.',
+    'demo2.s8': 'There it was. Clues say where it has been; freshness says when; together they say where it is going.',
+    'demo2.hint.wager': 'That is where it was, not where it is heading. Step one more along the line.',
+    'demo2.hint.mute': 'Nothing here is lying — all six clues are honest. They disagree because they belong to different moments.',
+    'btn.demo2': '[ Walkthrough: Moving Quarry ]',
     'age.fresh': 'Morning',
     'age.night': 'Night',
     'age.older': 'Older',
@@ -187,6 +220,40 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'rule.cover': 'Hugs the thickets',
     'rule.straight': 'Travels in a straight line',
     'rule.doubling': 'Doubles back on itself',
+    'coach.event.startle': 'Birds burst from cover — the direction they flew is roughly where it is.',
+    'coach.event.supply': 'Extra forage turned up nearby — walk over it and the stamina is yours.',
+    'coach.event.oldtrail': 'An old print underfoot. The bearing is rough — take it as a hint, not evidence.',
+    'coach.supply': 'Mistleaf and dewfruit restore stamina. Plan your route through them.',
+    'coach.age': 'These two clues are different ages. Only same-age clues can be crossed — use the freshness chip to pick one age at a time.',
+    'coach.bankpush': 'Bank to keep the haul and rest. Push on to multiply it — but lose it all if the next trail goes cold.',
+    'coach.iris': 'An iridescent one. Rare, and worth double.',
+    'coach.route': 'It was walking the whole time. Clues sit where it passed, not where it went — read the freshest and lead it.',
+    'coach.quality': 'Your call lands the record: dead on is gold, within two cells is silver, further is bronze.',
+    'coach.infoAt': 'That step is when your clues first pinned one cell. Everything after it was walking, not deducing.',
+    'help.quarry': 'It does not sit still. It walks a foraging route, so a clue marks where it passed — not where it went.',
+    'help.habit': 'Each species walks its own way: the valley floor, the ridgeline, the thickets, a straight line, or doubling back. The reveal names it.',
+    'help.age': 'Clues carry a freshness: morning, night, older. Only same-age clues can be crossed — the chip beside Layer picks which age you are reading.',
+    'help.score': 'A record banks points. Rest to keep them, or push on to multiply the next haul — a failed hunt scatters everything unbanked.',
+    'help.iris': 'Iridescent variants are rare and score double. You only know once you have recorded one.',
+    'help.events': 'The mountain moves around you. Startled birds fly off roughly in its direction, forage turns up nearby, and old prints give a rough bearing.',
+    'help.supply': 'Mistleaf and dewfruit restore stamina where they grow. Route through them on a long crossing.',
+    'help.mute': 'Marking a cell you already read mutes that clue — it drops out of Layer. Use it on a trail you believe is lying.',
+    'help.infoAt': 'The reveal names the step your clues first pinned one cell. Walking past it costs stamina and buys nothing.',
+    'help.quirk': 'Species differ in how they read: some scatter their scent, some leave a tighter print. The field guide records each habit.',
+    'help.progress': 'Ground widens as you go — 15 cells, then 20, then 25 — and from round 4 some trails lie.',
+    'help.tools': 'Records unlock tools. The windstone leans scent rings toward the source; the glowbell rings out one false trail per hunt.',
+    'help.codex': 'Every record adds field notes. Notes raise a research level, and traces you have found but not recorded show as rumors.',
+    'help.commission': 'Three commissions post each day — a species, a stamina margin, a record quality. Each one pays field notes.',
+    'help.daily': "Today's Trail is the same map for everyone. Finishing it builds a streak; every seventh day earns a rest token that covers a missed day.",
+    'help.wx.clear': 'Clear — clues read exactly as they are.',
+    'help.wx.mist': 'Mist — scent spreads and footprint cones widen. Everything reads looser.',
+    'help.wx.wind': 'Wind — scent scatters furthest of all, but disturbances tighten to a smaller circle.',
+    'help.wx.drizzle': 'Drizzle — prints press sharp and narrow, while scent smears a little.',
+    'coach.tool.windstone': 'You are carrying the windstone. Scent rings now lean toward the source — the gap in the ring marks the far side.',
+    'coach.tool.glowbell': 'You are carrying the glowbell. Tap its chip once a hunt to ring out one false trail.',
+    'coach.codex': 'Each record adds field notes, and notes raise a research level. Traces you have found but not recorded show as rumors.',
+    'coach.commission': 'Three commissions post each day. Meet one on any hunt and it pays field notes.',
+    'coach.daily': "Today's Trail is the same map for everyone. Finish it to build a streak — every seventh day earns a rest token that covers a missed day.",
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -291,6 +358,10 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.vision': '你只看得見身邊的地面。高處望得遠，密叢裡看不遠。',
     'help.survey': '「眺望」消耗體力，掃過身邊一圈地面，找出你還沒走過的線索。',
     'help.route': '點遠處的格子會先預覽路線與總花費，再點一次才會走。一讀到新東西就會立刻停下。',
+    'help.sec.track': '判讀蹤跡',
+    'help.sec.deduce': '推理工具',
+    'help.sec.ground': '地形與體力',
+    'help.sec.longRun': '收分與長線',
     'demo.title': '推理示範',
     'demo.progress': '{n} / {total}',
     'demo.fromResult': '不確定線索該怎麼讀？跟著走一遍完整的推理。',
@@ -318,6 +389,21 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '［看示範］',
     'btn.next': '［下一步］',
     'btn.prev': '［上一步］',
+    'demo2.title': '會走的獵物',
+    'demo2.ch1': '牠沒有待在原地',
+    'demo2.ch2': '一次只看一齡',
+    'demo2.ch3': '往前帶',
+    'demo2.s1': '六條線索，全是真的。全部疊起來，符合每一條的格子有 {n} 個——一個也沒有。',
+    'demo2.s2': '沒有人在說謊。線索彼此矛盾，是因為牠一路在走：每一條標的都是牠「經過」的地方。',
+    'demo2.s3': '每條線索都帶有新鮮度。這六條是三組——更早、夜間、晨間。',
+    'demo2.s4': '把新鮮度 chip 切到最新的一齡。只剩兩條了。',
+    'demo2.s5': '這兩條交在同一格。那是牠今天早上所在的位置。',
+    'demo2.s6': '另外兩齡照做，你會得到三個格子——牠依序待過的地方。',
+    'demo2.s7': '三格成一直線、間距相等。牠還在走。押下一格。',
+    'demo2.s8': '牠在這裡。線索說牠去過哪，新鮮度說那是什麼時候，合起來才知道牠要去哪。',
+    'demo2.hint.wager': '那是牠待過的地方，不是牠要去的地方。沿著這條線再往前一格。',
+    'demo2.hint.mute': '這裡沒有人在說謊——六條線索都是真的。它們彼此矛盾，是因為分屬不同的時刻。',
+    'btn.demo2': '［示範：會走的獵物］',
     'age.fresh': '今晨',
     'age.night': '昨夜',
     'age.older': '更早',
@@ -328,6 +414,40 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'rule.cover': '貼著密叢走',
     'rule.straight': '一路直行',
     'rule.doubling': '走出去再折返',
+    'coach.event.startle': '一群鳥被驚起——牠們飛離的方向，就是牠所在的大致方位。',
+    'coach.event.supply': '附近多冒出了一份補給——走過去，體力就會補回。',
+    'coach.event.oldtrail': '腳下有一道舊足跡，方向很粗略——當作參考，別當作證據。',
+    'coach.supply': '霧葉與露珠果可以回復體力。規劃路線時把它們算進去。',
+    'coach.age': '這兩條線索的齡別不同。只有同齡的線索能求交集——用新鮮度 chip 一次只看一齡。',
+    'coach.bankpush': '歇腳＝把收穫入袋收工。續追＝倍率疊高再走一局，但下一趟落空就全部散掉。',
+    'coach.iris': '異彩變種。少見，而且值兩倍。',
+    'coach.route': '牠一路都在走。線索留在牠經過的地方，不是牠去的地方——讀最新的那一齡，然後往前帶。',
+    'coach.quality': '押注決定記錄品質：正中是金，相距兩格內是銀，再遠是銅。',
+    'coach.infoAt': '那一步是你的線索第一次鎖定單一格。在那之後你都在走路，不是在推理。',
+    'help.quarry': '牠不會待在原地。牠沿覓食路線走，所以線索標的是牠「經過」的地方，不是牠去的地方。',
+    'help.habit': '每個物種走法不同：谷底、稜線、密叢、直線、或者折返。揭曉時會告訴你牠是哪一種。',
+    'help.age': '線索帶有新鮮度：晨間、夜間、更早。只有同齡的線索能求交集——「圖層」旁的 chip 決定你在讀哪一齡。',
+    'help.score': '記錄會累積分數。歇腳把它入袋收工，續追則把下一趟的倍率疊高——但落空一次，未入袋的全部散掉。',
+    'help.iris': '異彩變種少見，分數兩倍。要記錄到才會知道遇上了。',
+    'help.events': '山會在你身邊動。驚起的鳥飛離的方向大致指向牠、附近會冒出補給、舊足跡會給你一個粗略方位。',
+    'help.supply': '霧葉與露珠果長在原地、回復體力。長距離橫越時把路線繞過去。',
+    'help.mute': '標記一格你已判讀過的線索＝把那條線索靜音，它會退出「圖層」。用在你認為在說謊的那條蹤跡上。',
+    'help.infoAt': '揭曉會告訴你「第幾步就足以鎖定」。走過那一步之後的每一步都在花體力，換不到資訊。',
+    'help.quirk': '物種的判讀難度各不相同：有的氣味散得開，有的足跡收得緊。圖鑑會記下每一種的習性。',
+    'help.progress': '地圖會愈走愈大——15 格、20 格、25 格——而且從第 4 局起，有些蹤跡會說謊。',
+    'help.tools': '記錄會解鎖道具。風向石讓氣味環朝源頭偏心；輝鈴每局可以敲掉一條假蹤跡。',
+    'help.codex': '每筆記錄都會累積田野筆記。筆記推高研究度，而找到痕跡卻尚未記錄的物種會顯示為傳聞。',
+    'help.commission': '每天張貼三則委託——指定物種、體力餘裕、記錄品質。每完成一則都付田野筆記。',
+    'help.daily': '「今日行蹤」全世界同一張圖。完成會累積連勝；每滿七天贈一枚歇腳符，可以補一天沒跑的空缺。',
+    'help.wx.clear': '晴——線索如實呈現，不增不減。',
+    'help.wx.mist': '霧——氣味擴散、足跡錐形變寬。整體都讀得比較鬆。',
+    'help.wx.wind': '風——氣味散得最開，但擾動的圓域反而收得更小。',
+    'help.wx.drizzle': '細雨——足跡壓得又深又窄，氣味則稍微糊掉。',
+    'coach.tool.windstone': '你帶著風向石。氣味環現在會朝源頭偏心——弧線缺口的那一側就是較遠的那一側。',
+    'coach.tool.glowbell': '你帶著輝鈴。每局點它的 chip 一次，可以敲掉一條假蹤跡。',
+    'coach.codex': '每筆記錄都會累積田野筆記，筆記推高研究度。找到痕跡卻尚未記錄的物種會顯示為傳聞。',
+    'coach.commission': '每天張貼三則委託。任何一局達成都會付田野筆記。',
+    'coach.daily': '「今日行蹤」全世界同一張圖。完成會累積連勝——每滿七天贈一枚歇腳符，可以補一天沒跑的空缺。',
   },
 };
 

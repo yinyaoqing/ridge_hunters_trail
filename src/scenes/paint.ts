@@ -6,6 +6,14 @@ import type { MarkKind } from '../core/marks';
 
 type Gfx = Phaser.GameObjects.Graphics;
 
+// 線索新鮮度→alpha 係數，依 c.age（0=更早／1=昨夜／2=今晨）索引。1 為原始強度（最新一齡
+// 不淡化）；兩個較舊的係數挑得讓差異一眼可辨，但仍讀得出形狀——0.68 已明顯比滿強度淡，
+// 0.4 是更早蹤跡的下限，再更低會讓錐形／圓域的虛線邊在較暗色板下糊成看不出輪廓。
+// 由 MapScene 與 DemoScene 共用（S2）：兩者畫的是同一套線索型別、同一套 drawClueToken／
+// drawClueOverlay，新鮮度的視覺語言不能只有真實地圖有、示範沒有——第二課整章都在教
+// 「新鮮度」，卻是玩家在真實遊戲裡唯一會看到的新鮮度視覺線索，教學不能略過它。
+export const AGE_FADE: readonly [number, number, number] = [0.4, 0.68, 1];
+
 export const cssHex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
 
 export const cssRgba = (n: number, a: number): string => {
@@ -63,10 +71,12 @@ export function dashedLine(
 
 // 線索圖標：深色底盤＋手繪感字形（足跡/擾動漩渦/氣味波紋），取代 F/D/S 字母。
 // 真線索與干擾線索共用同一繪製（視覺完全相同）。
-// fade：新鮮度淡出係數（1＝原始強度），由 MapScene 依線索的 age 傳入；DemoScene 不分齡，
-// 沿用預設值 1 以維持既有外觀不變。舊版做法是在 token 上疊一層半透明底色圓——那層蓋在
-// 共用 graphics 上，會在熱區底色、其他線索的覆蓋層與同格供給圖示之上戳出一個深色破洞
-// （F-fade-1）。改成真正的 alpha 係數後，淡出只影響這個形狀自身的透明度，不再遮蓋別的東西。
+// fade：新鮮度淡出係數（1＝原始強度），由 MapScene 與 DemoScene 依線索的 age 傳入
+// （AGE_FADE[c.age]，S2）——第一課全部線索固定 age:2（AGE_FADE[2]=1），沿用預設值 1
+// 不影響外觀；第二課教的正是新鮮度，三個齡別各自淡出。舊版做法是在 token 上疊一層
+// 半透明底色圓——那層蓋在共用 graphics 上，會在熱區底色、其他線索的覆蓋層與同格供給
+// 圖示之上戳出一個深色破洞（F-fade-1）。改成真正的 alpha 係數後，淡出只影響這個形狀
+// 自身的透明度，不再遮蓋別的東西。
 export function drawClueToken(
   g: Gfx, cx: number, cy: number, radius: number, type: ClueType, pal: Palette, fade = 1,
 ): void {
@@ -123,7 +133,8 @@ export function drawSupply(
 // windstone 為真時，氣味的完整距離環收窄為 240° 偏心弧（風向石效果）。
 // fade：新鮮度淡出係數，同 drawClueToken——玩家實際據以推理的是這個覆蓋層（錐形／圓域／
 // 距離環），不是 token 本身；只淡化 token 而覆蓋層維持全強度，會讓「越舊越淡」只對點有效、
-// 對點所代表的範圍無效（F-fade-2）。DemoScene 不分齡，沿用預設值 1。
+// 對點所代表的範圍無效（F-fade-2）。由 MapScene 與 DemoScene 共用傳入，理由與作法同
+// drawClueToken 的 fade 參數（S2）。
 export function drawClueOverlay(
   g: Gfx, c: Clue, center: { x: number; y: number }, cell: number,
   pal: Palette, windstone: boolean, fade = 1,

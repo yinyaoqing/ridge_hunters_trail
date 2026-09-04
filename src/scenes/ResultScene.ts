@@ -9,7 +9,10 @@ import { wagerKey, parseKey } from '../core/marks';
 import { catchScore, MULTIPLIERS, type ScoreStore } from '../core/score';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
-import type { I18n } from '../core/i18n';
+import type { I18n, MsgKey } from '../core/i18n';
+import type { CoachId, CoachStore } from '../core/coach';
+import { infoCompleteStep, distinctReadAges } from '../core/deduction';
+import type { DemoScriptId } from '../core/demo';
 import { dailyKey, createDailySessionFromKey, type StreakStore } from '../core/daily';
 import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
@@ -33,9 +36,27 @@ export class ResultScene extends Phaser.Scene {
   private pal!: Palette;
   private audio!: AudioBus;
   private choiceMade = false;
+  // 首見提示的挑選結果，記在場景實例上（B2，同 CampScene.coachPick 的做法與理由）：
+  // undefined＝這次造訪還沒決定過，null／[id,key]＝已經決定。resize 觸發的 restart
+  // 經由 restartOnResize 的 beforeRestart 回呼把 pendingPreserveCoachPick 設成 true，
+  // 不會清掉這個欄位，因此不會在同一次造訪內因為 coach.seen 被上一輪標記過而改挑
+  // 下一個候選、把它也一併燒掉。
+  private coachPick: [CoachId, MsgKey] | null | undefined = undefined;
+  // 同 CampScene.pendingPreserveCoachPick：不透過 scene.restart(data) 傳遞，避免 Phaser
+  // 的 settings.data 在下一次不帶 data 的 scene.start('Result')（fadeToScene 等一般轉場）
+  // 繼續讀到舊值，讓 coachPick 從此再也不會在真正的新一局結算時重新挑——那正是本次要修的
+  // bug：異彩補獲那一局挑中的 coachPick，會被凍結並套用到往後每一局結算，包含失手與
+  // 平凡生物。
+  private pendingPreserveCoachPick = false;
 
   constructor() {
     super('Result');
+  }
+
+  init() {
+    const preserve = this.pendingPreserveCoachPick;
+    this.pendingPreserveCoachPick = false;
+    if (!preserve) this.coachPick = undefined;
   }
 
   create() {
@@ -133,7 +154,7 @@ export class ResultScene extends Phaser.Scene {
     const pal = this.pal;
     this.cameras.main.setBackgroundColor(pal.bg);
     fadeIn(this);
-    restartOnResize(this);
+    restartOnResize(this, () => { this.pendingPreserveCoachPick = true; });
     const cx = this.scale.width / 2;
     const h = this.scale.height;
     const showTools = (this.registry.get('lastUnlocks') as ToolId[] | undefined) ?? [];
@@ -186,6 +207,27 @@ export class ResultScene extends Phaser.Scene {
     // 版面改由 flowY 排定（見 src/core/layout.ts）。舊版自 y=336 起全是固定座標，
     // 只有按鈕列有 h-96 這類夾限，於是內容一長就從下方溢出撞進按鈕——實測截圖裡
     // 「研究度 n / m」正好被主鈕蓋掉一半（兩者都落在 y=526）。現在整疊同一套規則。
+    // 首見教學：一次最多教一則，依優先度挑。三則都成立時硬塞會把 Result 排爆，
+    // 且玩家一屏讀三段教學等於一段都沒讀。未顯示者不標記為已見，留到下一局再教。
+    const coach: CoachStore = this.registry.get('coach');
+    const wagerCell = wagerKey(s.marks);
+    const routeReady = caught;
+    const infoStep = infoCompleteStep(s.level, s.readLog);
+    // 挑選只在這次造訪第一次 create() 時做一次（見 this.coachPick 欄位註解與 init()）；
+    // 同一次造訪內的後續重啟（resize）一律沿用同一個結果，不重新評估 coach.seen——
+    // 否則上一輪標記過的候選會在重啟後被濾掉，換下一個候選頂上，那個候選卻從未
+    // 真正被玩家看過就已經被標記為已見（B2）。
+    if (this.coachPick === undefined) {
+      const candidates: [CoachId, MsgKey][] = [];
+      if (caught && s.level.iris) candidates.push(['iris', 'coach.iris']);
+      if (routeReady) candidates.push(['reveal.route', 'coach.route']);
+      if (wagerCell !== null) candidates.push(['quality', 'coach.quality']);
+      if (caught && s.mode === 'run') candidates.push(['bankpush', 'coach.bankpush']);
+      if (infoStep !== null && s.steps > infoStep) candidates.push(['reveal.infoAt', 'coach.infoAt']);
+      this.coachPick = candidates.find(([id]) => !coach.seen(id)) ?? null;
+    }
+    const coachPick = this.coachPick;
+
     const blocks: FlowBlock[] = [];
     const slot: Record<string, number> = {};
     const add = (name: string, b: FlowBlock) => { slot[name] = blocks.length; blocks.push(b); };
@@ -209,6 +251,8 @@ export class ResultScene extends Phaser.Scene {
     // 因此下方繪製時傳入的錨點要比區塊中心往上退 16。
     if (!caught) add('notes', { h: 62, gap: 18, minGap: 10 });
     if (s.mode === 'daily') add('streak', { h: 16, gap: 18, minGap: 10 });
+    // 教學行排在按鈕之前：玩家的視線在按下去之前會掃過它。h 取 34 容納兩行 12px 字。
+    if (coachPick) add('coach', { h: 34, gap: 16, minGap: 8 });
     add('primary', { h: 52, gap: 26, minGap: 16 });
     add('secondary', { h: 48, gap: 14, minGap: 12 });
     // 這個區塊只用來替示範連結預留尾端空間，位置並不會被讀取——連結實際錨在
@@ -293,6 +337,17 @@ export class ResultScene extends Phaser.Scene {
     // 本身沒有問題，出事的是整塊被放得太低
     if (!caught) this.showNotesDrop(cx, at('notes') - 16, creature.id, notes, codex, i18n);
 
+    if (coachPick) {
+      const [coachId, coachKey] = coachPick;
+      // markSeen 冪等：理由同 CampScene 的同款寫法（見 this.coachPick 欄位註解）——
+      // 這次造訪第一次顯示時才真的寫入，同一次造訪內的重啟重繪只是重覆同一個已寫過的值。
+      coach.markSeen(coachId);
+      this.add.text(cx, at('coach'), i18n.t(coachKey), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+        wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+      }).setOrigin(0.5);
+    }
+
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
     // 按鈕列座標由 flowY 排定，再由上方的 btnPrimaryY／btnSecondaryY 夾回畫面內——
     // 內容可以誠實地溢出，唯一的出口不行。
@@ -363,6 +418,14 @@ export class ResultScene extends Phaser.Scene {
       // 連結必須跟著上來，否則會疊在按鈕上
       const demoLinkY = btnSecondaryY + 44;
       if (demoLinkY + 18 <= h) {
+        // S3：這是玩家剛失手、最想知道「我到底該怎麼想」的那一刻，卻一律只指向第一課
+        // （辨識推理三招）。若這一局玩家自己讀過兩種以上齡別的線索，代表他已經碰到「同一格
+        // 卻讀出矛盾方位」這件事——那正是第二課（會走的獵物／新鮮度）要解的問題，此時比
+        // 第一課更貼近他剛剛卡住的地方。門檻訂在 2（而非 1）：讀過 1 種齡別在任何一局都
+        // 會成立（每個新落點的線索本來就同一齡），不構成訊號；讀到第 2 種齡別才代表玩家
+        // 真的撞見了「線索分齡」這件事。單一連結、單一規則，不加第二顆按鈕。
+        const scriptId: DemoScriptId =
+          distinctReadAges(s.level, s.readLog) >= 2 ? 'quarry' : 'deduction';
         this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
           fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
           wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
@@ -370,7 +433,7 @@ export class ResultScene extends Phaser.Scene {
         this.add.rectangle(cx, demoLinkY, 420, 36, 0, 0)
           .setInteractive({ useHandCursor: true })
           .on('pointerdown', () => {
-            this.scene.launch('Demo', { from: 'Result' });
+            this.scene.launch('Demo', { from: 'Result', scriptId });
             this.scene.pause();
           });
       }
