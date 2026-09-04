@@ -57,6 +57,28 @@ npm r --no-save @resvg/resvg-js
 要替換為其他來源（例如 AI 生成後手工簡化）的素材時，直接覆蓋 `public/assets/` 下對應檔案
 即可，無須理會上述腳本；腳本僅是內建這套向量素材的可重現產生路徑。
 
+### 生物剪影概念稿 · 第二波（40 種，尚未進入執行期）
+
+| 檔案 | 用途 |
+|---|---|
+| `scripts/bestiary-wave2.mjs` | 40 種剪影的向量母檔：id、中英名、地形、發光色、取材出處、造型註解 |
+| `scripts/build-bestiary-board.mjs` | 產生設計板 `docs/design/Bestiary2.dc.html` 與 `art/bestiary2/*.svg` |
+
+風格與 `src/data/silhouettes.ts` 完全一致（同一組 `viewBox -52 -44 104 84`、`INK`／`ACCENT` 兩個
+色票代換），造型以地球既有生命的**結構**為骨架（原生生物、細菌、病毒、真菌、植物、無脊椎與
+少數脊椎動物），一律抽象化改寫、命名虛構，符合 §2 / §8.2 的內容邊界；`tests/bestiary-wave2.test.ts`
+守住數量、地形分布、純內嵌向量與「發光色不得逼近線索金光」四項。
+
+這批**只是美術資產**：`CREATURES` 仍是 8 隻，圖鑑、關卡生成與可解性掃描都不受影響。要讓其中
+某一隻真正進遊戲，需要三步：把造型搬進 `src/data/silhouettes.ts` 的 `SHAPES`、在
+`src/data/creatures.ts` 補上雙語敘述與 `quirkHints`、再讓 `tests/solvability.test.ts` 的掃描通過。
+
+重新產生：
+
+```bash
+node scripts/build-bestiary-board.mjs
+```
+
 ### 路徑寫法（相對路徑，無前導斜線）
 
 `vite.config.ts` 設定 `base: './'`，代表建置產物以「相對於部署位置」的方式引用資源，
