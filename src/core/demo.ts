@@ -198,6 +198,53 @@ export function checkMuteAction(clueIndex: number): MsgKey | null {
   return clueIndex === DECOY_INDEX ? null : 'demo.hint.mute';
 }
 
+// ── 第二課：會走的獵物 ──────────────────────────────────────────
+// 獵物走 W0 → W1 → W2 三個節點，每齡兩條線索反向錨定在「當時」所在的節點上，
+// 與真實關卡的 route.ts + generate.ts 是同一套幾何。無幌子：幌子由第一課教完，
+// 這一課要專心教齡別，兩件難事同時上等於兩件都沒教會。
+//
+// 這組資料由 scripts/find-quarry-lesson.mjs 窮舉找出，九條性質釘在
+// tests/demo-quarry.test.ts。動任何一個數字之前，先跑測試。
+export const QUARRY_SIZE = 9;
+export const QUARRY_NODES: readonly [Vec2, Vec2, Vec2] = [
+  { x: 0, y: 0 },
+  { x: 2, y: 0 },
+  { x: 4, y: 0 },
+];
+export const QUARRY_TARGET: Vec2 = { x: 6, y: 0 };
+export const QUARRY_START: Vec2 = { x: 0, y: 8 }; // 左下角起步，離三個節點都夠遠
+export const QUARRY_CLUES: readonly Clue[] = [
+  {
+    type: 'footprint', position: { x: 1, y: 0 }, isDecoy: false, age: 0,
+    data: { direction: 180, angleSpread: 20 },
+  },
+  {
+    type: 'disturbance', position: { x: 1, y: 0 }, isDecoy: false, age: 0,
+    data: { radius: 2 },
+  },
+  {
+    type: 'footprint', position: { x: 0, y: 0 }, isDecoy: false, age: 1,
+    data: { direction: 0, angleSpread: 20 },
+  },
+  {
+    type: 'scent', position: { x: 0, y: 0 }, isDecoy: false, age: 1,
+    data: { distance: 2, tolerance: 0.5, windBiasNeeded: false, biasDirection: 0 },
+  },
+  {
+    type: 'scent', position: { x: 0, y: 0 }, isDecoy: false, age: 2,
+    data: { distance: 4, tolerance: 0.5, windBiasNeeded: false, biasDirection: 0 },
+  },
+  {
+    type: 'footprint', position: { x: 2, y: 0 }, isDecoy: false, age: 2,
+    data: { direction: 0, angleSpread: 20 },
+  },
+];
+
+// 最新齡兩條的交集（＝W2 一格）。第二章的自動存疑標記讀它——單一來源，不手寫。
+export const QUARRY_PAIR: Set<string> = intersect(
+  QUARRY_CLUES.filter((c) => c.age === 2), QUARRY_SIZE,
+);
+
 export type DemoScriptId = 'deduction' | 'quarry';
 export type DemoCellAction = 'exclude' | 'wager';
 
