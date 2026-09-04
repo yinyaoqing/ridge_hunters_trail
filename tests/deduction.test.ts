@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  unmutedReadClues, heatMap, maxHeat, infoCompleteStep, misleadingDecoy,
+  unmutedReadClues, heatMap, maxHeat, infoCompleteStep, misleadingDecoy, distinctReadAges,
 } from '../src/core/deduction';
 import type { Clue, Level, TerrainType } from '../src/core/types';
 import type { Vec2 } from '../src/core/geometry';
@@ -181,5 +181,40 @@ describe('misleadingDecoy', () => {
     const log = [{ clueIndex: 1, step: 3 }, { clueIndex: 0, step: 7 }]; // 判讀順序：index1先、index0後
     const found = misleadingDecoy(twoDecoys, log, { x: 1, y: 2 }, TARGET);
     expect(found?.position).toEqual({ x: 0, y: 3 }); // 判讀順序在前的那一條（index1）
+  });
+});
+
+describe('distinctReadAges', () => {
+  const lvl = (ages: number[]) => ({
+    clues: ages.map((age) => ({
+      type: 'disturbance' as const, position: { x: 0, y: 0 },
+      isDecoy: false, age: age as 0 | 1 | 2, data: { radius: 2 },
+    })),
+  });
+
+  it('counts nothing when nothing has been read', () => {
+    expect(distinctReadAges(lvl([2, 1, 0]) as never, [])).toBe(0);
+  });
+
+  it('counts one age when every read clue shares it', () => {
+    const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 1, step: 4 }];
+    expect(distinctReadAges(lvl([2, 2, 0]) as never, log)).toBe(1);
+  });
+
+  it('counts two once a second age is read', () => {
+    const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 2, step: 4 }];
+    expect(distinctReadAges(lvl([2, 2, 0]) as never, log)).toBe(2);
+  });
+
+  it('counts decoys too — the player cannot tell them apart yet', () => {
+    const level = lvl([2, 0]);
+    level.clues[1].isDecoy = true;
+    const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 1, step: 2 }];
+    expect(distinctReadAges(level as never, log)).toBe(2);
+  });
+
+  it('ignores a log entry pointing at no clue', () => {
+    const log = [{ clueIndex: 0, step: 1 }, { clueIndex: 99, step: 2 }];
+    expect(distinctReadAges(lvl([2, 1]) as never, log)).toBe(1);
   });
 });
