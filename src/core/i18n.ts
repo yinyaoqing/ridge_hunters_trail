@@ -41,6 +41,9 @@ export type MsgKey =
   | 'btn.demo' | 'btn.next' | 'btn.prev'
   | 'age.fresh' | 'age.night' | 'age.older' | 'age.all'
   | 'reveal.route'
+  | 'coach.event.startle' | 'coach.event.supply' | 'coach.event.oldtrail'
+  | 'coach.supply' | 'coach.age' | 'coach.bankpush' | 'coach.iris'
+  | 'coach.route' | 'coach.quality' | 'coach.infoAt'
   | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
@@ -187,6 +190,16 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'rule.cover': 'Hugs the thickets',
     'rule.straight': 'Travels in a straight line',
     'rule.doubling': 'Doubles back on itself',
+    'coach.event.startle': 'Birds burst from cover — they flew away from where it is.',
+    'coach.event.supply': 'You found extra forage at your feet. Stamina restored.',
+    'coach.event.oldtrail': 'An old print underfoot. The bearing is rough — take it as a hint, not evidence.',
+    'coach.supply': 'Mistleaf and dewfruit restore stamina. Plan your route through them.',
+    'coach.age': 'These two clues are different ages. Only same-age clues can be crossed — use the freshness chip to pick one age at a time.',
+    'coach.bankpush': 'Bank to keep the haul and rest. Push on to multiply it — but lose it all if the next trail goes cold.',
+    'coach.iris': 'An iridescent one. Rare, and worth double.',
+    'coach.route': 'It was walking the whole time. Clues sit where it passed, not where it went — read the freshest and lead it.',
+    'coach.quality': 'Your call lands the record: dead on is gold, within two cells is silver, further is bronze.',
+    'coach.infoAt': 'That step is when your clues first pinned one cell. Everything after it was walking, not deducing.',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -328,6 +341,16 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'rule.cover': '貼著密叢走',
     'rule.straight': '一路直行',
     'rule.doubling': '走出去再折返',
+    'coach.event.startle': '一群鳥被驚起——牠們飛離的方向，就是牠所在的大致方位。',
+    'coach.event.supply': '你在腳邊發現了額外的補給，體力已經補回。',
+    'coach.event.oldtrail': '腳下有一道舊足跡，方向很粗略——當作參考，別當作證據。',
+    'coach.supply': '霧葉與露珠果可以回復體力。規劃路線時把它們算進去。',
+    'coach.age': '這兩條線索的齡別不同。只有同齡的線索能求交集——用新鮮度 chip 一次只看一齡。',
+    'coach.bankpush': '歇腳＝把收穫入袋收工。續追＝倍率疊高再走一局，但下一趟落空就全部散掉。',
+    'coach.iris': '異彩變種。少見，而且值兩倍。',
+    'coach.route': '牠一路都在走。線索留在牠經過的地方，不是牠去的地方——讀最新的那一齡，然後往前帶。',
+    'coach.quality': '押注決定記錄品質：正中是金，相距兩格內是銀，再遠是銅。',
+    'coach.infoAt': '那一步是你的線索第一次鎖定單一格。在那之後你都在走路，不是在推理。',
   },
 };
 
