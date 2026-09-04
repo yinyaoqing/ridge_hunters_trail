@@ -53,7 +53,9 @@ export type MsgKey =
   | 'help.quarry' | 'help.habit' | 'help.age' | 'help.score' | 'help.iris'
   | 'help.events' | 'help.supply' | 'help.mute' | 'help.infoAt' | 'help.quirk'
   | 'help.progress' | 'help.tools' | 'help.codex' | 'help.commission' | 'help.daily'
-  | 'help.wx.clear' | 'help.wx.mist' | 'help.wx.wind' | 'help.wx.drizzle';
+  | 'help.wx.clear' | 'help.wx.mist' | 'help.wx.wind' | 'help.wx.drizzle'
+  | 'coach.tool.windstone' | 'coach.tool.glowbell'
+  | 'coach.codex' | 'coach.commission' | 'coach.daily';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -247,6 +249,11 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.wx.mist': 'Mist — scent spreads and footprint cones widen. Everything reads looser.',
     'help.wx.wind': 'Wind — scent scatters furthest of all, but disturbances tighten to a smaller circle.',
     'help.wx.drizzle': 'Drizzle — prints press sharp and narrow, while scent smears a little.',
+    'coach.tool.windstone': 'You are carrying the windstone. Scent rings now lean toward the source — the thick side of the arc is the near side.',
+    'coach.tool.glowbell': 'You are carrying the glowbell. Tap its chip once a hunt to ring out one false trail.',
+    'coach.codex': 'Each record adds field notes, and notes raise a research level. Traces you have found but not recorded show as rumors.',
+    'coach.commission': 'Three commissions post each day. Meet one on any hunt and it pays field notes.',
+    'coach.daily': "Today's Trail is the same map for everyone. Finish it to build a streak — every seventh day earns a rest token that covers a missed day.",
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -436,6 +443,11 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.wx.mist': '霧——氣味擴散、足跡錐形變寬。整體都讀得比較鬆。',
     'help.wx.wind': '風——氣味散得最開，但擾動的圓域反而收得更小。',
     'help.wx.drizzle': '細雨——足跡壓得又深又窄，氣味則稍微糊掉。',
+    'coach.tool.windstone': '你帶著風向石。氣味環現在會朝源頭偏心——弧線較厚的那一側就是靠近的那一側。',
+    'coach.tool.glowbell': '你帶著輝鈴。每局點它的 chip 一次，可以敲掉一條假蹤跡。',
+    'coach.codex': '每筆記錄都會累積田野筆記，筆記推高研究度。找到痕跡卻尚未記錄的物種會顯示為傳聞。',
+    'coach.commission': '每天張貼三則委託。任何一局達成都會付田野筆記。',
+    'coach.daily': '「今日行蹤」全世界同一張圖。完成會累積連勝——每滿七天贈一枚歇腳符，可以補一天沒跑的空缺。',
   },
 };
 
