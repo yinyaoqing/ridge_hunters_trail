@@ -322,6 +322,12 @@ export interface DemoScript {
   steps: readonly DemoStep[];
   fogRows: number;
   titleKey: MsgKey;
+  // 各章節標題，依 DemoStep.chapter（1 起算）索引：chapterKeys[chapter - 1]。
+  // 兩套腳本的章節數與文案完全不同（第一課四章、第二課三章），過去用單一模組層級的
+  // CHAPTER_KEY（DemoScene.ts）把 1..4 寫死對應到 demo.ch1..4，導致第二課也套用
+  // 第一課的標題——「THE ODD ONE OUT IS LYING」出現在教「牠在走」的第三章上方（B1）。
+  // 標題現在由腳本自己的資料負責，兩套腳本天然不可能互相借用對方的文案。
+  chapterKeys: readonly MsgKey[];
   // 第二章自動標存疑的那一組格子。第一課是「前兩條線索的交集」，
   // 第二課是「最新齡兩條的交集」——語意不同，值由腳本自己算好交出來。
   pair: Set<string>;
@@ -339,6 +345,7 @@ export const DEDUCTION_SCRIPT: DemoScript = {
   steps: DEMO_STEPS,
   fogRows: DEMO_FOG_ROWS,
   titleKey: 'demo.title',
+  chapterKeys: ['demo.ch1', 'demo.ch2', 'demo.ch3', 'demo.ch4'],
   pair: DEMO_PAIR,
   checkCell: checkCellAction,
   checkClue: checkMuteAction,
@@ -354,6 +361,7 @@ export const QUARRY_SCRIPT: DemoScript = {
   steps: QUARRY_STEPS,
   fogRows: 0, // 這一課不教視野；迷霧只會分散注意力
   titleKey: 'demo2.title',
+  chapterKeys: ['demo2.ch1', 'demo2.ch2', 'demo2.ch3'],
   pair: QUARRY_PAIR,
   // 只接受外推點。押在任何一個節點上，代表「牠還在走」這件事還沒學會——
   // 此時給提示比給通過更有價值（同第一課 checkCellAction 的判準）。

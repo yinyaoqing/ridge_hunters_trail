@@ -4,6 +4,7 @@ import { heatMap, maxHeat } from '../src/core/deduction';
 import {
   DEMO_SIZE, DEMO_START, DEMO_TARGET, DEMO_MID, DEMO_CLUES, DECOY_INDEX, DEMO_PAIR,
   DEMO_STEPS, type DemoStep, demoUnseen, checkCellAction, checkMuteAction, DEDUCTION_SCRIPT,
+  QUARRY_SCRIPT,
 } from '../src/core/demo';
 import { STRINGS } from '../src/core/i18n';
 import { parseKey } from '../src/core/marks';
@@ -286,5 +287,41 @@ describe('DEDUCTION_SCRIPT', () => {
     for (const step of DEDUCTION_SCRIPT.steps) {
       expect(step.heatAge ?? null).toBeNull();
     }
+  });
+});
+
+// B1：DemoScene 曾以一張模組層級的表把 1..4 寫死對應到 demo.ch1..4，兩套腳本共用一份
+// 標題，導致第二課的第 6–8 步顯示「THE ODD ONE OUT IS LYING」——那是第一課第三章的標題，
+// 內容跟「牠在走」的旁白直接矛盾。章節標題現在是每個腳本自己的資料（chapterKeys），
+// 這裡驗證：①索引數量剛好覆蓋腳本實際用到的章節、不多不少；②每個索引都指向一個
+// 兩語系皆非空字串的 MsgKey；③兩套腳本不會意外共用同一把標題鍵（若共用，代表又把
+// 第一課的表格複製貼上到第二課，而不是各自寫自己的文案）。
+describe('demo script chapter headings (B1)', () => {
+  const scripts = [
+    { name: 'DEDUCTION_SCRIPT', script: DEDUCTION_SCRIPT },
+    { name: 'QUARRY_SCRIPT', script: QUARRY_SCRIPT },
+  ];
+
+  it.each(scripts)('$name has exactly one heading per chapter its steps use', ({ script }) => {
+    const chapters = new Set(script.steps.map((s) => s.chapter));
+    expect(script.chapterKeys).toHaveLength(chapters.size);
+    for (const c of chapters) {
+      expect(c).toBeGreaterThanOrEqual(1);
+      expect(c).toBeLessThanOrEqual(script.chapterKeys.length);
+    }
+  });
+
+  it.each(scripts)('$name gives every chapter heading a non-empty string in both locales', ({ script }) => {
+    for (const msgKey of script.chapterKeys) {
+      for (const loc of ['en', 'zh-TW'] as const) {
+        expect(STRINGS[loc][msgKey].length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('does not let the two lessons share a chapter heading key', () => {
+    const a = new Set(DEDUCTION_SCRIPT.chapterKeys);
+    const b = new Set(QUARRY_SCRIPT.chapterKeys);
+    for (const k of a) expect(b.has(k)).toBe(false);
   });
 });

@@ -330,7 +330,7 @@ export class DemoScene extends Phaser.Scene {
       g.lineStyle(2.5, pal.gold, 1).strokeCircle(t.x, t.y, cs * 0.44);
     }
 
-    this.chapterText.setText(i18n.t(CHAPTER_KEY[step.chapter]));
+    this.chapterText.setText(i18n.t(this.script.chapterKeys[step.chapter - 1]));
     this.progressText.setText(
       i18n.t('demo.progress', { n: this.step + 1, total: this.script.steps.length }));
     this.narrationText.setText(i18n.t(step.narration, step.vars));
@@ -488,9 +488,3 @@ export class DemoScene extends Phaser.Scene {
     this.scene.resume(this.from);
   }
 }
-
-// 章節字串鍵映射：同 MapScene 的 WEATHER_KEY 手法，
-// 避免模板字面型別（`demo.ch${n}`）無法收斂為 MsgKey 聯集
-const CHAPTER_KEY: Record<1 | 2 | 3 | 4, MsgKey> = {
-  1: 'demo.ch1', 2: 'demo.ch2', 3: 'demo.ch3', 4: 'demo.ch4',
-};
