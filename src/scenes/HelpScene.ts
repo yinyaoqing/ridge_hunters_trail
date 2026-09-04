@@ -128,144 +128,201 @@ export class HelpScene extends Phaser.Scene {
       }
     };
 
-    // 13 列已超出固定面板的版面預算，比照 CodexScene 改為可捲動列表：
-    // 容器 y 起點在 py0+160（標題／簡介之下），列距維持 44px，
-    // y 值改為 i*44 + 22（半列高偏移），為遮罩上緣保留 7px 緩衝，避免首列圖示被裁剪。
-    const rows: { y: number; key: Parameters<I18n['t']>[0]; icon: (y: number) => void }[] = [
-      { y: 0 * 44 + 22, key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
-      { y: 1 * 44 + 22, key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
-      { y: 2 * 44 + 22, key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
+    // 13 列已超出固定面板的版面預算，比照 CodexScene 改為可捲動列表，
+    // 並依用途分成四組（各有金色標題列），組內列距維持 44px。
+    type HelpRow = { key: Parameters<I18n['t']>[0]; icon: (y: number) => void };
+    const sections: { titleKey: Parameters<I18n['t']>[0]; rows: HelpRow[] }[] = [
       {
-        y: 3 * 44 + 22, key: 'help.decoy',
-        icon: (y) => {
-          drawClueToken(icons, rowX, y, 15, 'footprint', pal);
-          icons.lineStyle(2, pal.mark, 0.9);
-          icons.lineBetween(rowX + 8, y - 12, rowX + 16, y - 4);
-          icons.lineBetween(rowX + 16, y - 12, rowX + 8, y - 4);
-        },
+        titleKey: 'help.sec.track',
+        rows: [
+          { key: 'help.footprint', icon: (y) => drawClueToken(icons, rowX, y, 15, 'footprint', pal) },
+          { key: 'help.disturbance', icon: (y) => drawClueToken(icons, rowX, y, 15, 'disturbance', pal) },
+          { key: 'help.scent', icon: (y) => drawClueToken(icons, rowX, y, 15, 'scent', pal) },
+          {
+            key: 'help.decoy',
+            icon: (y) => {
+              drawClueToken(icons, rowX, y, 15, 'footprint', pal);
+              icons.lineStyle(2, pal.mark, 0.9);
+              icons.lineBetween(rowX + 8, y - 12, rowX + 16, y - 4);
+              icons.lineBetween(rowX + 16, y - 12, rowX + 8, y - 4);
+            },
+          },
+          {
+            key: 'help.weather',
+            icon: (y) => {
+              const order: Weather[] = ['clear', 'mist', 'wind', 'drizzle'];
+              const gap = 20;
+              let x = rowX - (gap * (order.length - 1)) / 2;
+              for (const wtr of order) {
+                drawWeatherGlyph(x, y, wtr);
+                x += gap;
+              }
+            },
+          },
+        ],
       },
       {
-        y: 4 * 44 + 22, key: 'help.stamina',
-        icon: (y) => {
-          drawSupply(icons, rowX - 14, y, 34, 0, pal);
-          drawSupply(icons, rowX + 2, y, 34, 1, pal);
-          // 崖壁小方塊＋叉：與 HUD 圖例同一套語彙
-          icons.fillStyle(pal.terrain.cliff, 1).fillRect(rowX + 14, y - 5, 10, 10);
-          icons.lineStyle(1.4, pal.paperDim, 0.9);
-          icons.lineBetween(rowX + 16, y - 3, rowX + 22, y + 3);
-          icons.lineBetween(rowX + 22, y - 3, rowX + 16, y + 3);
-        },
+        titleKey: 'help.sec.deduce',
+        rows: [
+          {
+            key: 'help.marks',
+            icon: (y) => {
+              // 排除：紅 ✕
+              icons.lineStyle(2.4, pal.mark, 0.9);
+              icons.lineBetween(rowX - 20, y - 7, rowX - 8, y + 7);
+              icons.lineBetween(rowX - 8, y - 7, rowX - 20, y + 7);
+              // 存疑：黃圈＋點
+              icons.lineStyle(2, pal.supply, 0.9).strokeCircle(rowX, y - 1, 6);
+              icons.fillStyle(pal.supply, 0.9).fillCircle(rowX, y + 8, 1.6);
+              // 押注：金色雙環
+              icons.lineStyle(2.2, pal.gold, 1).strokeCircle(rowX + 18, y, 8);
+              icons.fillStyle(pal.gold, 1).fillCircle(rowX + 18, y, 2.4);
+            },
+          },
+          {
+            key: 'help.layer',
+            icon: (y) => {
+              // 三格由淡到濃的金色方塊，對應熱區的熱度分級
+              const sq = 9;
+              const gap = 3;
+              let x = rowX - (sq * 3 + gap * 2) / 2;
+              for (const a of [0.12, 0.24, 0.38]) {
+                icons.fillStyle(pal.gold, a).fillRect(x, y - sq / 2, sq, sq);
+                x += sq + gap;
+              }
+              icons.lineStyle(1, pal.gold, 0.5).strokeRect(rowX - 16.5, y - sq / 2, sq * 3 + gap * 2, sq);
+            },
+          },
+          {
+            key: 'help.reveal',
+            icon: (y) => {
+              // 揭曉：生物色實心點＋金色脈動環的靜態版（同 RevealScene 的真實位置圖示）
+              icons.fillStyle(pal.glow, 1).fillCircle(rowX, y, 4);
+              icons.lineStyle(2, pal.gold, 1).strokeCircle(rowX, y, 10);
+            },
+          },
+        ],
       },
       {
-        y: 5 * 44 + 22, key: 'help.marks',
-        icon: (y) => {
-          // 排除：紅 ✕
-          icons.lineStyle(2.4, pal.mark, 0.9);
-          icons.lineBetween(rowX - 20, y - 7, rowX - 8, y + 7);
-          icons.lineBetween(rowX - 8, y - 7, rowX - 20, y + 7);
-          // 存疑：黃圈＋點
-          icons.lineStyle(2, pal.supply, 0.9).strokeCircle(rowX, y - 1, 6);
-          icons.fillStyle(pal.supply, 0.9).fillCircle(rowX, y + 8, 1.6);
-          // 押注：金色雙環
-          icons.lineStyle(2.2, pal.gold, 1).strokeCircle(rowX + 18, y, 8);
-          icons.fillStyle(pal.gold, 1).fillCircle(rowX + 18, y, 2.4);
-        },
+        titleKey: 'help.sec.ground',
+        rows: [
+          {
+            key: 'help.stamina',
+            icon: (y) => {
+              drawSupply(icons, rowX - 14, y, 34, 0, pal);
+              drawSupply(icons, rowX + 2, y, 34, 1, pal);
+              // 崖壁小方塊＋叉：與 HUD 圖例同一套語彙
+              icons.fillStyle(pal.terrain.cliff, 1).fillRect(rowX + 14, y - 5, 10, 10);
+              icons.lineStyle(1.4, pal.paperDim, 0.9);
+              icons.lineBetween(rowX + 16, y - 3, rowX + 22, y + 3);
+              icons.lineBetween(rowX + 22, y - 3, rowX + 16, y + 3);
+            },
+          },
+          {
+            key: 'help.vision',
+            icon: (y) => {
+              // 由亮到暗的三格，對應「近處看得見、遠處是暗的」
+              const sq = 9;
+              let x = rowX - 16;
+              for (const a of [1, 0.45, 0.18]) {
+                icons.fillStyle(pal.paper, a).fillRect(x, y - sq / 2, sq, sq);
+                x += sq + 3;
+              }
+            },
+          },
+          {
+            key: 'help.survey',
+            icon: (y) => {
+              icons.fillStyle(pal.supply, 1).fillCircle(rowX, y, 3);
+              icons.lineStyle(1.6, pal.supply, 0.85).strokeCircle(rowX, y, 8);
+              icons.lineStyle(1.2, pal.supply, 0.45).strokeCircle(rowX, y, 13);
+            },
+          },
+          {
+            key: 'help.route',
+            icon: (y) => {
+              icons.lineStyle(2, pal.gold, 0.85);
+              icons.lineBetween(rowX - 14, y + 6, rowX - 4, y - 4);
+              icons.lineBetween(rowX - 4, y - 4, rowX + 6, y + 2);
+              icons.lineBetween(rowX + 6, y + 2, rowX + 14, y - 6);
+              icons.fillStyle(pal.gold, 1).fillCircle(rowX + 14, y - 6, 3);
+            },
+          },
+        ],
       },
       {
-        y: 6 * 44 + 22, key: 'help.qte',
-        icon: (y) => {
-          icons.lineStyle(2.5, 0x5c6b73, 1).strokeCircle(rowX, y, 14);
-          icons.lineStyle(4, pal.gold, 1);
-          icons.beginPath();
-          icons.arc(rowX, y, 14, -Math.PI * 0.45, Math.PI * 0.1);
-          icons.strokePath();
-          icons.lineStyle(2, pal.paper, 1).lineBetween(rowX, y, rowX + 10, y - 7);
-          icons.fillStyle(pal.paper, 1).fillCircle(rowX, y, 2.5);
-        },
-      },
-      {
-        y: 7 * 44 + 22, key: 'help.layer',
-        icon: (y) => {
-          // 三格由淡到濃的金色方塊，對應熱區的熱度分級
-          const sq = 9;
-          const gap = 3;
-          let x = rowX - (sq * 3 + gap * 2) / 2;
-          for (const a of [0.12, 0.24, 0.38]) {
-            icons.fillStyle(pal.gold, a).fillRect(x, y - sq / 2, sq, sq);
-            x += sq + gap;
-          }
-          icons.lineStyle(1, pal.gold, 0.5).strokeRect(rowX - 16.5, y - sq / 2, sq * 3 + gap * 2, sq);
-        },
-      },
-      {
-        y: 8 * 44 + 22, key: 'help.reveal',
-        icon: (y) => {
-          // 揭曉：生物色實心點＋金色脈動環的靜態版（同 RevealScene 的真實位置圖示）
-          icons.fillStyle(pal.glow, 1).fillCircle(rowX, y, 4);
-          icons.lineStyle(2, pal.gold, 1).strokeCircle(rowX, y, 10);
-        },
-      },
-      {
-        y: 9 * 44 + 22, key: 'help.weather',
-        icon: (y) => {
-          const order: Weather[] = ['clear', 'mist', 'wind', 'drizzle'];
-          const gap = 20;
-          let x = rowX - (gap * (order.length - 1)) / 2;
-          for (const wtr of order) {
-            drawWeatherGlyph(x, y, wtr);
-            x += gap;
-          }
-        },
-      },
-      {
-        y: 10 * 44 + 22, key: 'help.vision',
-        icon: (y) => {
-          // 由亮到暗的三格，對應「近處看得見、遠處是暗的」
-          const sq = 9;
-          let x = rowX - 16;
-          for (const a of [1, 0.45, 0.18]) {
-            icons.fillStyle(pal.paper, a).fillRect(x, y - sq / 2, sq, sq);
-            x += sq + 3;
-          }
-        },
-      },
-      {
-        y: 11 * 44 + 22, key: 'help.survey',
-        icon: (y) => {
-          icons.fillStyle(pal.supply, 1).fillCircle(rowX, y, 3);
-          icons.lineStyle(1.6, pal.supply, 0.85).strokeCircle(rowX, y, 8);
-          icons.lineStyle(1.2, pal.supply, 0.45).strokeCircle(rowX, y, 13);
-        },
-      },
-      {
-        y: 12 * 44 + 22, key: 'help.route',
-        icon: (y) => {
-          icons.lineStyle(2, pal.gold, 0.85);
-          icons.lineBetween(rowX - 14, y + 6, rowX - 4, y - 4);
-          icons.lineBetween(rowX - 4, y - 4, rowX + 6, y + 2);
-          icons.lineBetween(rowX + 6, y + 2, rowX + 14, y - 6);
-          icons.fillStyle(pal.gold, 1).fillCircle(rowX + 14, y - 6, 3);
-        },
+        titleKey: 'help.sec.longRun',
+        rows: [
+          {
+            key: 'help.qte',
+            icon: (y) => {
+              icons.lineStyle(2.5, 0x5c6b73, 1).strokeCircle(rowX, y, 14);
+              icons.lineStyle(4, pal.gold, 1);
+              icons.beginPath();
+              icons.arc(rowX, y, 14, -Math.PI * 0.45, Math.PI * 0.1);
+              icons.strokePath();
+              icons.lineStyle(2, pal.paper, 1).lineBetween(rowX, y, rowX + 10, y - 7);
+              icons.fillStyle(pal.paper, 1).fillCircle(rowX, y, 2.5);
+            },
+          },
+        ],
       },
     ];
 
     // 列表容器：y 起點 py0+208，與下方遮罩可視區上緣對齊
     // 示範按鈕佔用 py0+158 到 py0+194 一帶，列表起點讓出 48px。
     // viewH 與 minY 都由 listTop 推導，列表本來就可捲動，因此不需要調整 ph。
+    const TITLE_H = 30;
+    const ROW_H = 44;
     this.listTop = py0 + 208;
     this.list = this.add.container(0, this.listTop);
     this.list.add(icons);
-    for (const row of rows) {
-      row.icon(row.y);
-      this.list.add(this.add.text(textX, row.y, i18n.t(row.key), {
-        fontFamily: FONTS.body, fontSize: '13.5px', color: cssHex(pal.paperDim),
-        wordWrap: { width: pw - (textX - px0) - 40, useAdvancedWrap: true }, lineSpacing: 4,
-      }).setOrigin(0, 0.5));
-    }
 
-    // 可視區：py0+160 到 py0+ph-92，之下留給開始按鈕
+    // 可視區：py0+208 到 py0+ph-92，之下留給開始按鈕。這個高度只由面板版面決定，
+    // 與分組是否收合無關，所以只算一次；隨 cursor（內容總高）變動的只有 minY。
     const viewH = (py0 + ph - 92) - this.listTop;
-    this.minY = Math.min(0, viewH - (rows.length * 44 + 22)) + this.listTop;
+
+    // 分組預設全展開；點標題收合／展開該組，不落地保存（關閉面板重開就重置）。
+    const collapsed = sections.map(() => false);
+
+    const rebuildList = () => {
+      icons.clear();
+      for (const child of [...this.list.list]) {
+        if (child !== icons) child.destroy();
+      }
+      let cursor = 0;
+      sections.forEach((sec, i) => {
+        // 標題基線落在該區塊垂直中央，與圖例列同一套 origin(0, 0.5) 慣例
+        const titleY = cursor + TITLE_H / 2;
+        this.list.add(this.add.text(px0 + 30, titleY, i18n.t(sec.titleKey), {
+          fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(pal.gold),
+        }).setOrigin(0, 0.5).setLetterSpacing(1.5));
+        // 可點擊的整列命中區（比文字本身寬鬆，比照檔內其他按鈕的透明矩形慣例）
+        this.list.add(this.add.rectangle(px0 + pw / 2, titleY, pw, TITLE_H, 0, 0)
+          .setInteractive({ useHandCursor: true })
+          .on('pointerdown', () => {
+            collapsed[i] = !collapsed[i];
+            rebuildList();
+          }));
+        cursor += TITLE_H;
+        if (!collapsed[i]) {
+          for (const row of sec.rows) {
+            const y = cursor + ROW_H / 2;
+            row.icon(y);
+            this.list.add(this.add.text(textX, y, i18n.t(row.key), {
+              fontFamily: FONTS.body, fontSize: '13.5px', color: cssHex(pal.paperDim),
+              wordWrap: { width: pw - (textX - px0) - 40, useAdvancedWrap: true }, lineSpacing: 4,
+            }).setOrigin(0, 0.5));
+            cursor += ROW_H;
+          }
+        }
+      });
+      // 總高度改由 cursor 累加而來（標題 30 + 圖例 44），不再是 rows.length * 44 + 22——
+      // 新增列、新增分組或收合分組時這裡自動跟上，不必再動任何常數。
+      this.minY = Math.min(0, viewH - cursor) + this.listTop;
+      this.list.y = Phaser.Math.Clamp(this.list.y, this.minY, this.listTop);
+    };
+    rebuildList();
 
     // 遮罩：列表只在可視區內顯示，擋住捲出範圍的列
     const maskShape = this.make.graphics({}, false);

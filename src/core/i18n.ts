@@ -44,7 +44,8 @@ export type MsgKey =
   | 'coach.event.startle' | 'coach.event.supply' | 'coach.event.oldtrail'
   | 'coach.supply' | 'coach.age' | 'coach.bankpush' | 'coach.iris'
   | 'coach.route' | 'coach.quality' | 'coach.infoAt'
-  | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling';
+  | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling'
+  | 'help.sec.track' | 'help.sec.deduce' | 'help.sec.ground' | 'help.sec.longRun';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -153,6 +154,10 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.vision': 'You only see the ground near you. High ground sees further; thickets close in.',
     'help.survey': 'Look costs stamina and sweeps the ground around you, uncovering clues you have not walked past.',
     'help.route': 'Click a distant cell to preview the route and its cost, then click again to walk it. Walking stops the moment you read something new.',
+    'help.sec.track': 'READING THE TRAIL',
+    'help.sec.deduce': 'WORKING IT OUT',
+    'help.sec.ground': 'GROUND & STAMINA',
+    'help.sec.longRun': 'THE LONG RUN',
     'demo.title': 'Deduction Walkthrough',
     'demo.progress': '{n} / {total}',
     'demo.fromResult': 'Not sure how to read the clues? Walk through a hunt step by step.',
@@ -304,6 +309,10 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'help.vision': '你只看得見身邊的地面。高處望得遠，密叢裡看不遠。',
     'help.survey': '「眺望」消耗體力，掃過身邊一圈地面，找出你還沒走過的線索。',
     'help.route': '點遠處的格子會先預覽路線與總花費，再點一次才會走。一讀到新東西就會立刻停下。',
+    'help.sec.track': '判讀蹤跡',
+    'help.sec.deduce': '推理工具',
+    'help.sec.ground': '地形與體力',
+    'help.sec.longRun': '收分與長線',
     'demo.title': '推理示範',
     'demo.progress': '{n} / {total}',
     'demo.fromResult': '不確定線索該怎麼讀？跟著走一遍完整的推理。',
