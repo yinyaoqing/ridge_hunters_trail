@@ -3,7 +3,7 @@ import { candidates, intersect, key } from '../src/core/clues';
 import { heatMap, maxHeat } from '../src/core/deduction';
 import {
   DEMO_SIZE, DEMO_START, DEMO_TARGET, DEMO_MID, DEMO_CLUES, DECOY_INDEX, DEMO_PAIR,
-  DEMO_STEPS, type DemoStep, demoUnseen, checkCellAction, checkMuteAction,
+  DEMO_STEPS, type DemoStep, demoUnseen, checkCellAction, checkMuteAction, DEDUCTION_SCRIPT,
 } from '../src/core/demo';
 import { STRINGS } from '../src/core/i18n';
 import { parseKey } from '../src/core/marks';
@@ -252,6 +252,30 @@ describe('checkMuteAction', () => {
     for (let i = 0; i < DEMO_CLUES.length; i++) {
       if (i === DECOY_INDEX) continue;
       expect(checkMuteAction(i)).toBe('demo.hint.mute');
+    }
+  });
+});
+
+describe('DEDUCTION_SCRIPT', () => {
+  it('wraps the deduction lesson without changing it', () => {
+    expect(DEDUCTION_SCRIPT.id).toBe('deduction');
+    expect(DEDUCTION_SCRIPT.size).toBe(DEMO_SIZE);
+    expect(DEDUCTION_SCRIPT.start).toEqual(DEMO_START);
+    expect(DEDUCTION_SCRIPT.target).toEqual(DEMO_TARGET);
+    expect(DEDUCTION_SCRIPT.clues).toBe(DEMO_CLUES);
+    expect(DEDUCTION_SCRIPT.steps).toBe(DEMO_STEPS);
+    expect(DEDUCTION_SCRIPT.pair).toBe(DEMO_PAIR);
+  });
+
+  it('routes its checks to the same functions', () => {
+    expect(DEDUCTION_SCRIPT.checkCell('exclude', { x: 0, y: 0 }))
+      .toBe(checkCellAction('exclude', { x: 0, y: 0 }));
+    expect(DEDUCTION_SCRIPT.checkClue(DECOY_INDEX)).toBe(checkMuteAction(DECOY_INDEX));
+  });
+
+  it('leaves every deduction step on no particular age', () => {
+    for (const step of DEDUCTION_SCRIPT.steps) {
+      expect(step.heatAge ?? null).toBeNull();
     }
   });
 });

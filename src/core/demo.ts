@@ -64,7 +64,7 @@ export const DEMO_PAIR: Set<string> = intersect([DEMO_CLUES[0], DEMO_CLUES[1]], 
 // 三個動手點。它們各自對應遊戲裡最容易被完全錯過的功能：
 // 排除標記、線索靜音、押注。靜音尤其——它目前只存在於說明頁一行字裡，
 // 沒人教就永遠不會有人用。
-export type DemoAction = 'exclude' | 'mute' | 'wager';
+export type DemoAction = 'exclude' | 'mute' | 'wager' | 'pick-age';
 
 export interface DemoStep {
   chapter: 1 | 2 | 3 | 4;
@@ -75,6 +75,9 @@ export interface DemoStep {
   clues: readonly number[];   // 本步已判讀的線索索引
   muted: readonly number[];   // 本步已靜音的線索索引（必為 clues 的子集）
   overlay: 'none' | 'heat' | 'intersect';
+  // 本步的新鮮度 chip 選擇（null = 全部齡別）。第一課全部為 undefined，
+  // 渲染時視同 null，逐格結果與加這個欄位之前完全相同。
+  heatAge?: 0 | 1 | 2 | null;
   seen: 'near' | 'all';       // 'near' = 最上兩列仍是未探索的暗區
   player: Vec2;
   autoSuspect?: true;         // 為真時，DEMO_PAIR 的 11 格自動標成存疑
@@ -193,4 +196,45 @@ export function checkCellAction(action: 'exclude' | 'wager', cell: Vec2): MsgKey
 
 export function checkMuteAction(clueIndex: number): MsgKey | null {
   return clueIndex === DECOY_INDEX ? null : 'demo.hint.mute';
+}
+
+export type DemoScriptId = 'deduction' | 'quarry';
+export type DemoCellAction = 'exclude' | 'wager';
+
+export interface DemoScript {
+  id: DemoScriptId;
+  size: number;
+  start: Vec2;
+  target: Vec2;
+  clues: readonly Clue[];
+  steps: readonly DemoStep[];
+  fogRows: number;
+  titleKey: MsgKey;
+  // 第二章自動標存疑的那一組格子。第一課是「前兩條線索的交集」，
+  // 第二課是「最新齡兩條的交集」——語意不同，值由腳本自己算好交出來。
+  pair: Set<string>;
+  checkCell(action: DemoCellAction, cell: Vec2): MsgKey | null;
+  checkClue(clueIndex: number): MsgKey | null;
+  unseen(step: DemoStep): Set<string>;
+}
+
+export const DEDUCTION_SCRIPT: DemoScript = {
+  id: 'deduction',
+  size: DEMO_SIZE,
+  start: DEMO_START,
+  target: DEMO_TARGET,
+  clues: DEMO_CLUES,
+  steps: DEMO_STEPS,
+  fogRows: DEMO_FOG_ROWS,
+  titleKey: 'demo.title',
+  pair: DEMO_PAIR,
+  checkCell: checkCellAction,
+  checkClue: checkMuteAction,
+  unseen: demoUnseen,
+};
+
+export function demoScript(_id: DemoScriptId): DemoScript {
+  // 第二課於 Task 12 加入，屆時這裡才會依 id 分歧。在那之前只有一份腳本，
+  // 寫成「兩個分支回傳同一個東西」的三元式是死程式碼，不是預留。
+  return DEDUCTION_SCRIPT;
 }

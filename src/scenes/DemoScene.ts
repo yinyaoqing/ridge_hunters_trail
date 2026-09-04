@@ -354,6 +354,9 @@ export class DemoScene extends Phaser.Scene {
       return;
     }
 
+    // DemoAction 現在還多了 'pick-age'（Task 12 才會用到），DEMO_STEPS 目前
+    // 沒有任何一步用它，這裡純粹是型別窄化，不改變任何一步的實際行為。
+    if (step.action !== 'exclude' && step.action !== 'wager') return;
     this.resolve(checkCellAction(step.action, cell), cell);
   }
 
