@@ -192,7 +192,7 @@ export class ResultScene extends Phaser.Scene {
     // 且玩家一屏讀三段教學等於一段都沒讀。未顯示者不標記為已見，留到下一局再教。
     const coach: CoachStore = this.registry.get('coach');
     const wagerCell = wagerKey(s.marks);
-    const routeReady = caught && s.mode === 'run';
+    const routeReady = caught;
     const infoStep = infoCompleteStep(s.level, s.readLog);
     const candidates: [CoachId, MsgKey][] = [];
     if (caught && s.level.iris) candidates.push(['iris', 'coach.iris']);
