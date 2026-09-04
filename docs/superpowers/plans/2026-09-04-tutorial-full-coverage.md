@@ -1113,10 +1113,10 @@ export const DEDUCTION_SCRIPT: DemoScript = {
   unseen: demoUnseen,
 };
 
-export function demoScript(id: DemoScriptId): DemoScript {
-  // 第二課於 Task 12 加入；在那之前任何未知 id 一律退回第一課，
-  // 而不是丟例外——示範是教學入口，壞掉時應該退化成「教到一部分」而非白畫面。
-  return id === 'deduction' ? DEDUCTION_SCRIPT : DEDUCTION_SCRIPT;
+export function demoScript(_id: DemoScriptId): DemoScript {
+  // 第二課於 Task 12 加入，屆時這裡才會依 id 分歧。在那之前只有一份腳本，
+  // 寫成「兩個分支回傳同一個東西」的三元式是死程式碼，不是預留。
+  return DEDUCTION_SCRIPT;
 }
 ```
 
@@ -1550,7 +1550,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
   | 'demo2.title' | 'demo2.ch1' | 'demo2.ch2' | 'demo2.ch3'
   | 'demo2.s1' | 'demo2.s2' | 'demo2.s3' | 'demo2.s4' | 'demo2.s5'
   | 'demo2.s6' | 'demo2.s7' | 'demo2.s8'
-  | 'demo2.hint.wager' | 'btn.demo2'
+  | 'demo2.hint.wager' | 'demo2.hint.mute' | 'btn.demo2'
 ```
 
 `en` 表：
@@ -1569,6 +1569,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
     'demo2.s7': 'Three cells in a line, evenly spaced. It is still walking. Call the next one.',
     'demo2.s8': 'There it was. Clues say where it has been; freshness says when; together they say where it is going.',
     'demo2.hint.wager': 'That is where it was, not where it is heading. Step one more along the line.',
+    'demo2.hint.mute': 'Nothing here is lying — all six clues are honest. They disagree because they belong to different moments.',
     'btn.demo2': '[ Walkthrough: Moving Quarry ]',
 ```
 
@@ -1588,6 +1589,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
     'demo2.s7': '三格成一直線、間距相等。牠還在走。押下一格。',
     'demo2.s8': '牠在這裡。線索說牠去過哪，新鮮度說那是什麼時候，合起來才知道牠要去哪。',
     'demo2.hint.wager': '那是牠待過的地方，不是牠要去的地方。沿著這條線再往前一格。',
+    'demo2.hint.mute': '這裡沒有人在說謊——六條線索都是真的。它們彼此矛盾，是因為分屬不同的時刻。',
     'btn.demo2': '［示範：會走的獵物］',
 ```
 
@@ -1658,8 +1660,9 @@ export const QUARRY_SCRIPT: DemoScript = {
   // 此時給提示比給通過更有價值（同第一課 checkCellAction 的判準）。
   checkCell: (_action, cell) =>
     key(cell) === key(QUARRY_TARGET) ? null : 'demo2.hint.wager',
-  // 這一課沒有幌子，靜音不在課程內。保留介面完整性，一律回退提示。
-  checkClue: () => 'demo2.hint.wager',
+  // 這一課沒有幌子，靜音不在課程內。玩家點線索時給的提示必須說明「為什麼不必靜音」，
+  // 不能沿用押注的提示——那句話對「點到線索」這個動作是文不對題的。
+  checkClue: () => 'demo2.hint.mute',
   unseen: () => new Set<string>(),
 };
 ```
@@ -1697,6 +1700,10 @@ describe('quarry lesson script', () => {
         expect(placeholders).toEqual(Object.keys(step.vars ?? {}).sort());
       }
     }
+  });
+
+  it('explains that nothing is lying instead of reusing the wager hint', () => {
+    expect(QUARRY_SCRIPT.checkClue(0)).toBe('demo2.hint.mute');
   });
 
   it('only accepts the extrapolated cell as the call', () => {
@@ -1947,8 +1954,10 @@ location.reload();
 
 - [ ] **Step 6: Commit（若前面步驟有任何修補）**
 
+工作樹中有 owner 平行進行、與本計畫無關的未提交變更（`docs/ASSETS.md`、`docs/design/canvas.json`、`art/bestiary2/`、`scripts/bestiary-*.mjs`、`tests/bestiary-wave2.test.ts`）。**絕對不要用 `git add -A`**——逐一列出本次真正改到的檔案：
+
 ```bash
-git add -A
+git add <只列出這一步實際修補到的檔案>
 git commit -m "fix: close the gaps found in the tutorial's end-to-end pass
 
 Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
