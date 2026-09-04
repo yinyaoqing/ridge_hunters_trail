@@ -206,15 +206,22 @@ export function checkMuteAction(clueIndex: number): MsgKey | null {
 // 這組資料由 scripts/find-quarry-lesson.mjs 窮舉找出，性質釘在
 // tests/demo-quarry.test.ts。動任何一個數字之前，先跑測試。
 //
-// 這是第二次重找：第一版三個節點與外推點全落在 y=0（貼著格線邊緣，
+// 這是第三次重找。第一版三個節點與外推點全落在 y=0（貼著格線邊緣，
 // 讀不出「一條線」的方向感），而且線索位置跟別齡的節點重合（教學要講
 // 「線索標的是牠經過的地方，不是牠現在的位置」，結果線索畫在下一齡的
-// 節點正上方，混淆了正要教的區別）。這一版額外釘住兩條：
+// 節點正上方，混淆了正要教的區別）。第二版補了：
 //   ⑤ 任何線索位置都不得與「任何一個」節點重合——不只是自己那一齡的節點
 //   ⑥ 三個節點與外推點都離邊界至少 1 格（x、y 落在 1..size-2＝1..7）
-// 並且優先找對角線方向（而非沿格線的水平／垂直），讓連線清楚讀成方向、
-// 不會被誤認成格線本身的一整列或一整行。窮舉在只試對角線、不放寬任何
-// 參數的第一輪就找到解，未曾放寬 SPREADS／RADII／混搭優先序。
+// 但第二版漏了一條：六條線索的位置本身互相之間可以重合。窮舉只拿「離節點
+// 多遠」當條件，是從 (0,0) 往外一格一格找，於是四條線索全疊在 (0,0)——
+// drawClueToken（src/scenes/paint.ts）畫的是不透明底盤，疊在一起時只有
+// 最後畫的那個看得見，玩家在畫面上數到的線索記號只有三個，卻聽旁白說
+// 「六條線索」「三組」「只剩兩條」，畫面與文案對不上。這一版再補一條：
+//   ⑦ 六條線索的位置必須兩兩相異
+// 並且加了一條非硬性的偏好：六個位置盡量互相拉開（兩兩 Chebyshev 距離
+// ≥ 2），讀起來才像散在地圖上的六個點，不是擠在同一個角落——這一版窮舉
+// 第一輪（只試對角線、不放寬任何參數）就同時滿足了硬約束與這條偏好，
+// 未曾放寬 SPREADS／RADII／混搭優先序，也未曾關掉對角線偏好。
 export const QUARRY_SIZE = 9;
 export const QUARRY_NODES: readonly [Vec2, Vec2, Vec2] = [
   { x: 1, y: 1 },
@@ -229,24 +236,24 @@ export const QUARRY_CLUES: readonly Clue[] = [
     data: { direction: 45, angleSpread: 20 },
   },
   {
-    type: 'disturbance', position: { x: 0, y: 0 }, isDecoy: false, age: 0,
-    data: { radius: 2 },
+    type: 'scent', position: { x: 6, y: 4 }, isDecoy: false, age: 0,
+    data: { distance: 6, tolerance: 0.5, windBiasNeeded: false, biasDirection: 211 },
   },
   {
-    type: 'scent', position: { x: 0, y: 0 }, isDecoy: false, age: 1,
-    data: { distance: 4, tolerance: 0.5, windBiasNeeded: false, biasDirection: 45 },
+    type: 'scent', position: { x: 2, y: 0 }, isDecoy: false, age: 1,
+    data: { distance: 3, tolerance: 0.5, windBiasNeeded: false, biasDirection: 72 },
   },
   {
     type: 'footprint', position: { x: 2, y: 2 }, isDecoy: false, age: 1,
     data: { direction: 45, angleSpread: 20 },
   },
   {
-    type: 'scent', position: { x: 0, y: 0 }, isDecoy: false, age: 2,
-    data: { distance: 7, tolerance: 0.5, windBiasNeeded: false, biasDirection: 45 },
+    type: 'scent', position: { x: 4, y: 0 }, isDecoy: false, age: 2,
+    data: { distance: 5, tolerance: 0.5, windBiasNeeded: false, biasDirection: 79 },
   },
   {
-    type: 'footprint', position: { x: 4, y: 3 }, isDecoy: false, age: 2,
-    data: { direction: 63, angleSpread: 20 },
+    type: 'footprint', position: { x: 5, y: 6 }, isDecoy: false, age: 2,
+    data: { direction: 270, angleSpread: 20 },
   },
 ];
 

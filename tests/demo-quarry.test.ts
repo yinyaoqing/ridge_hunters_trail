@@ -81,6 +81,15 @@ describe('quarry lesson data', () => {
     }
   });
 
+  // drawClueToken 畫的是不透明底盤，疊在同一格的線索記號只有最後畫的那個看得見。
+  // 六個位置必須兩兩相異，否則玩家在畫面上數到的記號會少於旁白說的「六條」
+  // （這條約束原本只活在 scripts/find-quarry-lesson.mjs 的搜尋條件裡，沒人重跑
+  // 腳本就不會被驗到——這正是本測試要補的缺口）
+  it('never overlaps two clue positions on the same cell', () => {
+    const positions = QUARRY_CLUES.map((c) => key(c.position));
+    expect(new Set(positions).size).toBe(positions.length);
+  });
+
   // 三個節點與外推點都要離邊界至少 1 格，教學的「連線＝方向」才有畫面空間可讀
   it('keeps every waypoint and the target at least one cell inside the border', () => {
     for (const p of [...QUARRY_NODES, QUARRY_TARGET]) {
