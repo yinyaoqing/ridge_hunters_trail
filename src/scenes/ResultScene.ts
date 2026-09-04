@@ -9,7 +9,9 @@ import { wagerKey, parseKey } from '../core/marks';
 import { catchScore, MULTIPLIERS, type ScoreStore } from '../core/score';
 import { CREATURES } from '../data/creatures';
 import type { Rng } from '../core/rng';
-import type { I18n } from '../core/i18n';
+import type { I18n, MsgKey } from '../core/i18n';
+import { coachOnce, type CoachId, type CoachStore } from '../core/coach';
+import { infoCompleteStep } from '../core/deduction';
 import { dailyKey, createDailySessionFromKey, type StreakStore } from '../core/daily';
 import type { RunState } from '../core/runstate';
 import { shareText } from '../core/share';
@@ -186,6 +188,20 @@ export class ResultScene extends Phaser.Scene {
     // 版面改由 flowY 排定（見 src/core/layout.ts）。舊版自 y=336 起全是固定座標，
     // 只有按鈕列有 h-96 這類夾限，於是內容一長就從下方溢出撞進按鈕——實測截圖裡
     // 「研究度 n / m」正好被主鈕蓋掉一半（兩者都落在 y=526）。現在整疊同一套規則。
+    // 首見教學：一次最多教一則，依優先度挑。三則都成立時硬塞會把 Result 排爆，
+    // 且玩家一屏讀三段教學等於一段都沒讀。未顯示者不標記為已見，留到下一局再教。
+    const coach: CoachStore = this.registry.get('coach');
+    const wagerCell = wagerKey(s.marks);
+    const routeReady = caught && s.mode === 'run';
+    const infoStep = infoCompleteStep(s.level, s.readLog);
+    const candidates: [CoachId, MsgKey][] = [];
+    if (caught && s.level.iris) candidates.push(['iris', 'coach.iris']);
+    if (routeReady) candidates.push(['reveal.route', 'coach.route']);
+    if (wagerCell !== null) candidates.push(['quality', 'coach.quality']);
+    if (caught && s.mode === 'run') candidates.push(['bankpush', 'coach.bankpush']);
+    if (infoStep !== null && s.steps > infoStep) candidates.push(['reveal.infoAt', 'coach.infoAt']);
+    const coachPick = candidates.find(([id]) => !coach.seen(id)) ?? null;
+
     const blocks: FlowBlock[] = [];
     const slot: Record<string, number> = {};
     const add = (name: string, b: FlowBlock) => { slot[name] = blocks.length; blocks.push(b); };
@@ -209,6 +225,8 @@ export class ResultScene extends Phaser.Scene {
     // 因此下方繪製時傳入的錨點要比區塊中心往上退 16。
     if (!caught) add('notes', { h: 62, gap: 18, minGap: 10 });
     if (s.mode === 'daily') add('streak', { h: 16, gap: 18, minGap: 10 });
+    // 教學行排在按鈕之前：玩家的視線在按下去之前會掃過它。h 取 34 容納兩行 12px 字。
+    if (coachPick) add('coach', { h: 34, gap: 16, minGap: 8 });
     add('primary', { h: 52, gap: 26, minGap: 16 });
     add('secondary', { h: 48, gap: 14, minGap: 12 });
     // 這個區塊只用來替示範連結預留尾端空間，位置並不會被讀取——連結實際錨在
@@ -292,6 +310,16 @@ export class ResultScene extends Phaser.Scene {
     // 讓整塊以 flowY 給的中心對齊。不改 showNotesDrop 內部的相對位移——那組數字
     // 本身沒有問題，出事的是整塊被放得太低
     if (!caught) this.showNotesDrop(cx, at('notes') - 16, creature.id, notes, codex, i18n);
+
+    if (coachPick) {
+      const [coachId, coachKey] = coachPick;
+      coachOnce(coach, coachId, () => {
+        this.add.text(cx, at('coach'), i18n.t(coachKey), {
+          fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+          wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+        }).setOrigin(0.5);
+      });
+    }
 
     // 按鈕列：每日挑戰／主線成功／主線失敗三種分流，皆保底返回營地
     // 按鈕列座標由 flowY 排定，再由上方的 btnPrimaryY／btnSecondaryY 夾回畫面內——
