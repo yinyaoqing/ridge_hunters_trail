@@ -45,7 +45,11 @@ export type MsgKey =
   | 'coach.supply' | 'coach.age' | 'coach.bankpush' | 'coach.iris'
   | 'coach.route' | 'coach.quality' | 'coach.infoAt'
   | 'rule.lowland' | 'rule.highland' | 'rule.cover' | 'rule.straight' | 'rule.doubling'
-  | 'help.sec.track' | 'help.sec.deduce' | 'help.sec.ground' | 'help.sec.longRun';
+  | 'help.sec.track' | 'help.sec.deduce' | 'help.sec.ground' | 'help.sec.longRun'
+  | 'help.quarry' | 'help.habit' | 'help.age' | 'help.score' | 'help.iris'
+  | 'help.events' | 'help.supply' | 'help.mute' | 'help.infoAt' | 'help.quirk'
+  | 'help.progress' | 'help.tools' | 'help.codex' | 'help.commission' | 'help.daily'
+  | 'help.wx.clear' | 'help.wx.mist' | 'help.wx.wind' | 'help.wx.drizzle';
 
 export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
   en: {
@@ -205,6 +209,25 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'coach.route': 'It was walking the whole time. Clues sit where it passed, not where it went — read the freshest and lead it.',
     'coach.quality': 'Your call lands the record: dead on is gold, within two cells is silver, further is bronze.',
     'coach.infoAt': 'That step is when your clues first pinned one cell. Everything after it was walking, not deducing.',
+    'help.quarry': 'It does not sit still. It walks a foraging route, so a clue marks where it passed — not where it went.',
+    'help.habit': 'Each species walks its own way: the valley floor, the ridgeline, the thickets, a straight line, or doubling back. The reveal names it.',
+    'help.age': 'Clues carry a freshness: morning, night, older. Only same-age clues can be crossed — the chip beside Layer picks which age you are reading.',
+    'help.score': 'A record banks points. Rest to keep them, or push on to multiply the next haul — a failed hunt scatters everything unbanked.',
+    'help.iris': 'Iridescent variants are rare and score double. You only know once you have recorded one.',
+    'help.events': 'The mountain moves around you. Startled birds fly away from it, forage turns up underfoot, and old prints give a rough bearing.',
+    'help.supply': 'Mistleaf and dewfruit restore stamina where they grow. Route through them on a long crossing.',
+    'help.mute': 'Marking a cell you already read mutes that clue — it drops out of Layer. Use it on a trail you believe is lying.',
+    'help.infoAt': 'The reveal names the step your clues first pinned one cell. Walking past it costs stamina and buys nothing.',
+    'help.quirk': 'Species differ in how they read: some scatter their scent, some leave a tighter print. The field guide records each habit.',
+    'help.progress': 'Ground widens as you go — 15 cells, then 20, then 25 — and from round 4 some trails lie.',
+    'help.tools': 'Records unlock tools. The windstone leans scent rings toward the source; the glowbell rings out one false trail per hunt.',
+    'help.codex': 'Every record adds field notes. Notes raise a research level, and traces you have found but not recorded show as rumors.',
+    'help.commission': 'Three commissions post each day — a species, a stamina margin, a record quality. Each one pays field notes.',
+    'help.daily': "Today's Trail is the same map for everyone. Finishing it builds a streak; every seventh day earns a rest token that covers a missed day.",
+    'help.wx.clear': 'Clear — clues read exactly as they are.',
+    'help.wx.mist': 'Mist — scent spreads and footprint cones widen. Everything reads looser.',
+    'help.wx.wind': 'Wind — scent scatters furthest of all, but disturbances tighten to a smaller circle.',
+    'help.wx.drizzle': 'Drizzle — prints press sharp and narrow, while scent smears a little.',
   },
   'zh-TW': {
     'hud.round': '第 {n} 局',
@@ -360,6 +383,25 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'coach.route': '牠一路都在走。線索留在牠經過的地方，不是牠去的地方——讀最新的那一齡，然後往前帶。',
     'coach.quality': '押注決定記錄品質：正中是金，相距兩格內是銀，再遠是銅。',
     'coach.infoAt': '那一步是你的線索第一次鎖定單一格。在那之後你都在走路，不是在推理。',
+    'help.quarry': '牠不會待在原地。牠沿覓食路線走，所以線索標的是牠「經過」的地方，不是牠去的地方。',
+    'help.habit': '每個物種走法不同：谷底、稜線、密叢、直線、或者折返。揭曉時會告訴你牠是哪一種。',
+    'help.age': '線索帶有新鮮度：晨間、夜間、更早。只有同齡的線索能求交集——「圖層」旁的 chip 決定你在讀哪一齡。',
+    'help.score': '記錄會累積分數。歇腳把它入袋收工，續追則把下一趟的倍率疊高——但落空一次，未入袋的全部散掉。',
+    'help.iris': '異彩變種少見，分數兩倍。要記錄到才會知道遇上了。',
+    'help.events': '山會在你身邊動。驚起的鳥會朝反方向飛離牠、腳邊會冒出補給、舊足跡會給你一個粗略方位。',
+    'help.supply': '霧葉與露珠果長在原地、回復體力。長距離橫越時把路線繞過去。',
+    'help.mute': '標記一格你已判讀過的線索＝把那條線索靜音，它會退出「圖層」。用在你認為在說謊的那條蹤跡上。',
+    'help.infoAt': '揭曉會告訴你「第幾步就足以鎖定」。走過那一步之後的每一步都在花體力，換不到資訊。',
+    'help.quirk': '物種的判讀難度各不相同：有的氣味散得開，有的足跡收得緊。圖鑑會記下每一種的習性。',
+    'help.progress': '地圖會愈走愈大——15 格、20 格、25 格——而且從第 4 局起，有些蹤跡會說謊。',
+    'help.tools': '記錄會解鎖道具。風向石讓氣味環朝源頭偏心；輝鈴每局可以敲掉一條假蹤跡。',
+    'help.codex': '每筆記錄都會累積田野筆記。筆記推高研究度，而找到痕跡卻尚未記錄的物種會顯示為傳聞。',
+    'help.commission': '每天張貼三則委託——指定物種、體力餘裕、記錄品質。每完成一則都付田野筆記。',
+    'help.daily': '「今日行蹤」全世界同一張圖。完成會累積連勝；每滿七天贈一枚歇腳符，可以補一天沒跑的空缺。',
+    'help.wx.clear': '晴——線索如實呈現，不增不減。',
+    'help.wx.mist': '霧——氣味擴散、足跡錐形變寬。整體都讀得比較鬆。',
+    'help.wx.wind': '風——氣味散得最開，但擾動的圓域反而收得更小。',
+    'help.wx.drizzle': '細雨——足跡壓得又深又窄，氣味則稍微糊掉。',
   },
 };
 
