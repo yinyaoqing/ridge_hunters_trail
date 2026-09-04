@@ -409,6 +409,14 @@ export class ResultScene extends Phaser.Scene {
       // 連結必須跟著上來，否則會疊在按鈕上
       const demoLinkY = btnSecondaryY + 44;
       if (demoLinkY + 18 <= h) {
+        // S3：這是玩家剛失手、最想知道「我到底該怎麼想」的那一刻，卻一律只指向第一課
+        // （辨識推理三招）。若這一局玩家自己讀過兩種以上齡別的線索，代表他已經碰到「同一格
+        // 卻讀出矛盾方位」這件事——那正是第二課（會走的獵物／新鮮度）要解的問題，此時比
+        // 第一課更貼近他剛剛卡住的地方。門檻訂在 2（而非 1）：讀過 1 種齡別在任何一局都
+        // 會成立（每個新落點的線索本來就同一齡），不構成訊號；讀到第 2 種齡別才代表玩家
+        // 真的撞見了「線索分齡」這件事。單一連結、單一規則，不加第二顆按鈕。
+        const scriptId: DemoScriptId =
+          distinctReadAges(s.level, s.readLog) >= 2 ? 'quarry' : 'deduction';
         this.add.text(cx, demoLinkY, i18n.t('demo.fromResult'), {
           fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
           wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
@@ -416,7 +424,7 @@ export class ResultScene extends Phaser.Scene {
         this.add.rectangle(cx, demoLinkY, 420, 36, 0, 0)
           .setInteractive({ useHandCursor: true })
           .on('pointerdown', () => {
-            this.scene.launch('Demo', { from: 'Result' });
+            this.scene.launch('Demo', { from: 'Result', scriptId });
             this.scene.pause();
           });
       }
