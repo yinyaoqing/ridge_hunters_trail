@@ -255,6 +255,54 @@ export const QUARRY_PAIR: Set<string> = intersect(
   QUARRY_CLUES.filter((c) => c.age === 2), QUARRY_SIZE,
 );
 
+const QUARRY_ALL_AGREE = intersect([...QUARRY_CLUES], QUARRY_SIZE).size; // 恆為 0，由測試釘死
+
+export const QUARRY_STEPS: readonly DemoStep[] = [
+  // 第一章：牠沒有待在原地
+  {
+    chapter: 1, narration: 'demo2.s1', vars: { n: QUARRY_ALL_AGREE },
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  {
+    chapter: 1, narration: 'demo2.s2',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  // 第二章：一次只看一齡
+  {
+    chapter: 2, narration: 'demo2.s3',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  {
+    chapter: 2, narration: 'demo2.s4',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'heat', heatAge: 2,
+    seen: 'all', player: QUARRY_START, action: 'pick-age',
+  },
+  {
+    chapter: 2, narration: 'demo2.s5',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: 2,
+    seen: 'all', player: QUARRY_START, autoSuspect: true,
+  },
+  // 第三章：往前帶
+  {
+    chapter: 3, narration: 'demo2.s6',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+  {
+    chapter: 3, narration: 'demo2.s7',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: null,
+    seen: 'all', player: QUARRY_START, action: 'wager',
+  },
+  {
+    chapter: 3, narration: 'demo2.s8',
+    clues: [0, 1, 2, 3, 4, 5], muted: [], overlay: 'intersect', heatAge: null,
+    seen: 'all', player: QUARRY_START,
+  },
+];
+
 export type DemoScriptId = 'deduction' | 'quarry';
 export type DemoCellAction = 'exclude' | 'wager';
 
@@ -290,8 +338,26 @@ export const DEDUCTION_SCRIPT: DemoScript = {
   unseen: demoUnseen,
 };
 
-export function demoScript(_id: DemoScriptId): DemoScript {
-  // 第二課於 Task 12 加入，屆時這裡才會依 id 分歧。在那之前只有一份腳本，
-  // 寫成「兩個分支回傳同一個東西」的三元式是死程式碼，不是預留。
-  return DEDUCTION_SCRIPT;
+export const QUARRY_SCRIPT: DemoScript = {
+  id: 'quarry',
+  size: QUARRY_SIZE,
+  start: QUARRY_START,
+  target: QUARRY_TARGET,
+  clues: QUARRY_CLUES,
+  steps: QUARRY_STEPS,
+  fogRows: 0, // 這一課不教視野；迷霧只會分散注意力
+  titleKey: 'demo2.title',
+  pair: QUARRY_PAIR,
+  // 只接受外推點。押在任何一個節點上，代表「牠還在走」這件事還沒學會——
+  // 此時給提示比給通過更有價值（同第一課 checkCellAction 的判準）。
+  checkCell: (_action, cell) =>
+    key(cell) === key(QUARRY_TARGET) ? null : 'demo2.hint.wager',
+  // 這一課沒有幌子，靜音不在課程內。玩家點線索時給的提示必須說明「為什麼不必靜音」，
+  // 不能沿用押注的提示——那句話對「點到線索」這個動作是文不對題的。
+  checkClue: () => 'demo2.hint.mute',
+  unseen: () => new Set<string>(),
+};
+
+export function demoScript(id: DemoScriptId): DemoScript {
+  return id === 'quarry' ? QUARRY_SCRIPT : DEDUCTION_SCRIPT;
 }

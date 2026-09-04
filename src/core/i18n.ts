@@ -39,6 +39,10 @@ export type MsgKey =
   | 'demo.s8' | 'demo.s9' | 'demo.s10' | 'demo.s11' | 'demo.s12' | 'demo.s13' | 'demo.s14'
   | 'demo.hint.exclude' | 'demo.hint.mute' | 'demo.hint.wager'
   | 'btn.demo' | 'btn.next' | 'btn.prev'
+  | 'demo2.title' | 'demo2.ch1' | 'demo2.ch2' | 'demo2.ch3'
+  | 'demo2.s1' | 'demo2.s2' | 'demo2.s3' | 'demo2.s4' | 'demo2.s5'
+  | 'demo2.s6' | 'demo2.s7' | 'demo2.s8'
+  | 'demo2.hint.wager' | 'demo2.hint.mute' | 'btn.demo2'
   | 'age.fresh' | 'age.night' | 'age.older' | 'age.all'
   | 'reveal.route'
   | 'coach.event.startle' | 'coach.event.supply' | 'coach.event.oldtrail'
@@ -189,6 +193,21 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '[ Walkthrough ]',
     'btn.next': '[ Next ]',
     'btn.prev': '[ Back ]',
+    'demo2.title': 'The Walking Quarry',
+    'demo2.ch1': 'It did not stay put',
+    'demo2.ch2': 'One age at a time',
+    'demo2.ch3': 'Lead it',
+    'demo2.s1': 'Six clues, all honest. Layer them all and {n} cells agree with everything — none.',
+    'demo2.s2': 'Nothing is lying. The clues disagree because it was walking: each one marks where it passed.',
+    'demo2.s3': 'Every clue carries a freshness. These six are three pairs — older, night, morning.',
+    'demo2.s4': 'Set the freshness chip to the newest age. Only two clues left.',
+    'demo2.s5': 'Those two agree on one cell. That is where it was this morning.',
+    'demo2.s6': 'Do the same for the other two ages and you get three cells — where it was, in order.',
+    'demo2.s7': 'Three cells in a line, evenly spaced. It is still walking. Call the next one.',
+    'demo2.s8': 'There it was. Clues say where it has been; freshness says when; together they say where it is going.',
+    'demo2.hint.wager': 'That is where it was, not where it is heading. Step one more along the line.',
+    'demo2.hint.mute': 'Nothing here is lying — all six clues are honest. They disagree because they belong to different moments.',
+    'btn.demo2': '[ Walkthrough: Moving Quarry ]',
     'age.fresh': 'Morning',
     'age.night': 'Night',
     'age.older': 'Older',
@@ -363,6 +382,21 @@ export const STRINGS: Record<Locale, Record<MsgKey, string>> = {
     'btn.demo': '［看示範］',
     'btn.next': '［下一步］',
     'btn.prev': '［上一步］',
+    'demo2.title': '會走的獵物',
+    'demo2.ch1': '牠沒有待在原地',
+    'demo2.ch2': '一次只看一齡',
+    'demo2.ch3': '往前帶',
+    'demo2.s1': '六條線索，全是真的。全部疊起來，符合每一條的格子有 {n} 個——一個也沒有。',
+    'demo2.s2': '沒有人在說謊。線索彼此矛盾，是因為牠一路在走：每一條標的都是牠「經過」的地方。',
+    'demo2.s3': '每條線索都帶有新鮮度。這六條是三組——更早、夜間、晨間。',
+    'demo2.s4': '把新鮮度 chip 切到最新的一齡。只剩兩條了。',
+    'demo2.s5': '這兩條交在同一格。那是牠今天早上所在的位置。',
+    'demo2.s6': '另外兩齡照做，你會得到三個格子——牠依序待過的地方。',
+    'demo2.s7': '三格成一直線、間距相等。牠還在走。押下一格。',
+    'demo2.s8': '牠在這裡。線索說牠去過哪，新鮮度說那是什麼時候，合起來才知道牠要去哪。',
+    'demo2.hint.wager': '那是牠待過的地方，不是牠要去的地方。沿著這條線再往前一格。',
+    'demo2.hint.mute': '這裡沒有人在說謊——六條線索都是真的。它們彼此矛盾，是因為分屬不同的時刻。',
+    'btn.demo2': '［示範：會走的獵物］',
     'age.fresh': '今晨',
     'age.night': '昨夜',
     'age.older': '更早',

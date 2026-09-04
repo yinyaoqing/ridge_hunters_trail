@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { intersect, key } from '../src/core/clues';
 import {
   QUARRY_SIZE, QUARRY_NODES, QUARRY_CLUES, QUARRY_START, QUARRY_TARGET, QUARRY_PAIR,
+  QUARRY_SCRIPT,
 } from '../src/core/demo';
+import { STRINGS } from '../src/core/i18n';
 
 const byAge = (age: number) => QUARRY_CLUES.filter((c) => c.age === age);
 
@@ -104,5 +106,42 @@ describe('quarry lesson data', () => {
         expect(Number.isInteger(c.data.distance)).toBe(true);
       }
     }
+  });
+});
+
+describe('quarry lesson script', () => {
+  it('covers three chapters in order', () => {
+    const chapters = QUARRY_SCRIPT.steps.map((s) => s.chapter);
+    expect(chapters[0]).toBe(1);
+    expect(chapters[chapters.length - 1]).toBe(3);
+    for (let i = 1; i < chapters.length; i++) {
+      expect(chapters[i]).toBeGreaterThanOrEqual(chapters[i - 1]);
+    }
+  });
+
+  it('matches every narration placeholder to a var', () => {
+    for (const step of QUARRY_SCRIPT.steps) {
+      for (const table of Object.values(STRINGS)) {
+        const text = table[step.narration];
+        const placeholders = [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+        expect(placeholders).toEqual(Object.keys(step.vars ?? {}).sort());
+      }
+    }
+  });
+
+  it('explains that nothing is lying instead of reusing the wager hint', () => {
+    expect(QUARRY_SCRIPT.checkClue(0)).toBe('demo2.hint.mute');
+  });
+
+  it('only accepts the extrapolated cell as the call', () => {
+    expect(QUARRY_SCRIPT.checkCell('wager', QUARRY_TARGET)).toBeNull();
+    for (const node of QUARRY_NODES) {
+      expect(QUARRY_SCRIPT.checkCell('wager', node)).toBe('demo2.hint.wager');
+    }
+  });
+
+  it('asks the player to pick an age, then to call it', () => {
+    const actions = QUARRY_SCRIPT.steps.map((s) => s.action).filter(Boolean);
+    expect(actions).toEqual(['pick-age', 'wager']);
   });
 });

@@ -50,7 +50,7 @@ export class DemoScene extends Phaser.Scene {
   private ageChipY = 0;
   private ageChipW = 0;
   private ageChipH = 0;
-  private ageChoice: 0 | 1 | 2 | null = 2;
+  private ageChoice: 0 | 1 | 2 | null = null;
 
   constructor() {
     super('Demo');
@@ -64,7 +64,7 @@ export class DemoScene extends Phaser.Scene {
     this.step = 0;
     this.excluded = null;
     this.done = new Set();
-    this.ageChoice = 2;
+    this.ageChoice = null;
   }
 
   create() {
@@ -331,9 +331,9 @@ export class DemoScene extends Phaser.Scene {
 
     // 新鮮度 chip：只有本步 action 為 'pick-age' 且尚未過關時顯示與可點（pickAge 已在
     // 上面算過一次，這裡沿用同一個值，避免兩處各自判斷卻可能不同步）。
-    // 從 2（今晨）重新開始循環的歸零動作挪到 goto()（見下方）——因為 onAgeChipClick()
+    // 從 null（全部）重新開始循環的歸零動作挪到 goto()（見下方）——因為 onAgeChipClick()
     // 現在會在每次點擊後呼叫 render() 讓地圖跟著動，若歸零留在這裡，
-    // 同一步內的每一次點擊都會被這行打回 2，玩家永遠切不出第二個值。
+    // 同一步內的每一次點擊都會被這行打回 null，玩家永遠切不出第二個值。
     if (pickAge) {
       this.drawAgeChip();
     } else {
@@ -391,13 +391,16 @@ export class DemoScene extends Phaser.Scene {
     if (i < 0 || i >= this.script.steps.length) return;
     if (i > this.step && !this.canAdvance()) return;
     this.step = i;
-    // 進入一個「還沒過關的 pick-age 步驟」時，新鮮度 chip 一律從 2（今晨）重新開始循環——
+    // 進入一個「還沒過關的 pick-age 步驟」時，新鮮度 chip 一律從 null（全部）重新開始循環——
     // 這裡才是「進入這一步」唯一發生的地方（初始進場的第 0 步已由 init() 把 ageChoice
-    // 設回 2），render() 本身在同一步內會被 onAgeChipClick() 反覆呼叫，不能再兼職做歸零，
-    // 否則玩家切到一半就會被打回原點（見 render() 內對應的註解）。已過關的 pick-age 步驟
-    // 不歸零：往回看時要維持玩家切對的那個值，交由 render() 走 step.heatAge 那條路徑顯示。
+    // 設回 null），render() 本身在同一步內會被 onAgeChipClick() 反覆呼叫，不能再兼職做歸零，
+    // 否則玩家切到一半就會被打回原點（見 render() 內對應的註解）。從 null 起跳也是教學上
+    // 正確的起點：上一步剛讓玩家看完全部六條線索、交集是空的，那正是「全部」這個畫面，
+    // 這一步一開場維持上一步結束時的畫面，玩家只需點一次就會切到該步要求的齡別。
+    // 已過關的 pick-age 步驟不歸零：往回看時要維持玩家切對的那個值，交由 render() 走
+    // step.heatAge 那條路徑顯示。
     const next = this.script.steps[this.step];
-    if (next.action === 'pick-age' && !this.done.has(this.step)) this.ageChoice = 2;
+    if (next.action === 'pick-age' && !this.done.has(this.step)) this.ageChoice = null;
     this.render();
   }
 

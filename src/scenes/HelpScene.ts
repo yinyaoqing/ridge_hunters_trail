@@ -3,6 +3,7 @@ import type { SessionState } from '../core/session';
 import type { Weather } from '../core/weather';
 import { getPalette, type Palette } from '../core/palette';
 import type { I18n } from '../core/i18n';
+import type { DemoScriptId } from '../core/demo';
 import { cssHex, drawClueToken, drawSupply, BRUSH_RADIUS, FONTS, displayFont, stripBrackets } from './paint';
 
 // 玩法說明彈窗：以並行場景疊在暫停的地圖上（半透明遮罩＋面板卡片）。
@@ -96,24 +97,31 @@ export class HelpScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // 示範入口：說明頁只能「告訴」，示範才能「示範」。放在列表之上、簡介之下，
-    // 是進入這個畫面的人第一眼會看到的可點擊物件。
+    // 是進入這個畫面的人第一眼會看到的可點擊物件。上下兩顆：第一課教推理四步驟，
+    // 第二課教會走的獵物（新鮮度）；各高 32、間距 8，比舊版單顆多吃 40px，
+    // 下面的 listTop／viewH 已跟著往下 48px 讓出版面。
     const dbw = 210;
-    const dbh = 36;
-    const dby = py0 + 176;
-    const demoBtn = this.add.graphics();
-    demoBtn.lineStyle(1.5, pal.gold, 0.8).strokeRoundedRect(cx - dbw / 2, dby - dbh / 2, dbw, dbh, BRUSH_RADIUS);
-    this.add.text(cx, dby, stripBrackets(i18n.t('btn.demo')).toUpperCase(), {
-      fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.gold),
-    }).setOrigin(0.5).setLetterSpacing(2);
-    this.add.rectangle(cx, dby, dbw, Math.max(dbh, 44), 0, 0)
-      .setDepth(DEPTH_CHROME)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => {
-        // 先 launch 再 stop：兩者都是排進 SceneManager 的操作，
-        // 依序處理；反過來寫會在自己已被標記關閉之後才要求開啟新場景。
-        this.scene.launch('Demo', { from: this.from });
-        this.scene.stop();
-      });
+    const demoButtons: { key: Parameters<I18n['t']>[0]; scriptId: DemoScriptId }[] = [
+      { key: 'btn.demo', scriptId: 'deduction' },
+      { key: 'btn.demo2', scriptId: 'quarry' },
+    ];
+    demoButtons.forEach((b, i) => {
+      const by = py0 + 168 + i * 40;
+      const g = this.add.graphics();
+      g.lineStyle(1.5, pal.gold, 0.8).strokeRoundedRect(cx - dbw / 2, by - 16, dbw, 32, BRUSH_RADIUS);
+      this.add.text(cx, by, stripBrackets(i18n.t(b.key)).toUpperCase(), {
+        fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
+      }).setOrigin(0.5).setLetterSpacing(1.5);
+      this.add.rectangle(cx, by, dbw, Math.max(32, 44), 0, 0)
+        .setDepth(DEPTH_CHROME)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          // 先 launch 再 stop：兩者都是排進 SceneManager 的操作，
+          // 依序處理；反過來寫會在自己已被標記關閉之後才要求開啟新場景。
+          this.scene.launch('Demo', { from: this.from, scriptId: b.scriptId });
+          this.scene.stop();
+        });
+    });
 
     // 圖例列：用遊戲內實際圖形當說明
     const icons = this.add.graphics();
@@ -378,12 +386,12 @@ export class HelpScene extends Phaser.Scene {
       },
     ];
 
-    // 列表容器：y 起點 py0+208，與下方遮罩可視區上緣對齊
-    // 示範按鈕佔用 py0+158 到 py0+194 一帶，列表起點讓出 48px。
+    // 列表容器：y 起點 py0+248，與下方遮罩可視區上緣對齊
+    // 示範按鈕現在有上下兩顆，佔用 py0+152 到 py0+224 一帶，列表起點讓出 48px。
     // viewH 與 minY 都由 listTop 推導，列表本來就可捲動，因此不需要調整 ph。
     const TITLE_H = 30;
     const ROW_H = 44;
-    this.listTop = py0 + 208;
+    this.listTop = py0 + 248;
     this.list = this.add.container(0, this.listTop);
     // 明確標成 DEPTH_LIST（雖然數值等於預設值 0）：這是「捲動列表永遠墊在固定
     // UI 之下」這條規則的落地處，寫出來讓下一個在這個容器裡加互動物件的人
@@ -391,7 +399,7 @@ export class HelpScene extends Phaser.Scene {
     this.list.setDepth(DEPTH_LIST);
     this.list.add(icons);
 
-    // 可視區：py0+208 到 py0+ph-92，之下留給開始按鈕。這個高度只由面板版面決定，
+    // 可視區：py0+248 到 py0+ph-92，之下留給開始按鈕。這個高度只由面板版面決定，
     // 與分組是否收合無關，所以只算一次；隨 cursor（內容總高）變動的只有 minY。
     const viewH = (py0 + ph - 92) - this.listTop;
     this.viewH = viewH;
