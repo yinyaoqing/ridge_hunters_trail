@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { canMove, move, cycleMarkAt, toggleWagerAt, toggleMute, useBell, survey, currentTarget, isTargetVisible, TERRAIN_COST, isPassable, type SessionState } from '../core/session';
 import { visionRadius, SURVEY_COST, SURVEY_BONUS } from '../core/vision';
 import { unmutedReadClues, heatMap, maxHeat, distinctReadAges } from '../core/deduction';
-import { coachOnce, type CoachId, type CoachStore } from '../core/coach';
+import type { CoachId, CoachStore } from '../core/coach';
 import { getDifficulty } from '../core/difficulty';
 import { getPalette, type Palette } from '../core/palette';
 import { TERRAIN_TYPES } from '../core/types';
@@ -98,6 +98,12 @@ export class MapScene extends Phaser.Scene {
   private coach!: CoachStore;
   private tutText?: Phaser.GameObjects.Text;
   private tutBg?: Phaser.GameObjects.Graphics;
+  // 首見提示佇列：showTut 只有一組 Text/Graphics 可用，同一刻若有第二則提示要排，
+  // 不能覆蓋掉還在展示中的第一則——覆蓋會讓被蓋掉那則從未被玩家看見，卻已經 markSeen，
+  // 之後永遠不會再教（見 task-4-report.md）。coachActive 記著「正在展示中」的那個 id，
+  // 用來擋重覆排隊；coachQueue 存尚未展示、因此也尚未 markSeen 的候補提示。
+  private coachActive: CoachId | null = null;
+  private coachQueue: { id: CoachId; key: MsgKey }[] = [];
 
   // 候選熱區圖層（診斷 B-01）：預設開啟，玩家可用 HUD chip 關掉以看清底圖
   private heatOn = true;
@@ -168,6 +174,14 @@ export class MapScene extends Phaser.Scene {
     this.hintText = undefined;
     this.tutText = undefined;
     this.tutBg = undefined;
+    // coachActive/coachQueue 同一批殘留欄位：舊 Scene 實例上任何正在展示或候補中的首見
+    // 提示，其 delayedCall 已隨場景 shutdown 被銷毀（Phaser Clock#shutdown 會清空該場景
+    // 全部 timer），不會再有 advanceCoachQueue 補上場——但欄位值本身會存活，若不歸零，
+    // 候補佇列裡「尚未展示、因此也尚未 markSeen」的提示會被誤判成還在排隊，永遠等不到
+    // 補顯示的那次呼叫，形同資料卡死；歸零後它們就單純被捨棄、下次觸發時機再重新排隊，
+    // 因為未曾展示，也就從未 markSeen，不會有「教過但沒看到」的問題。
+    this.coachActive = null;
+    this.coachQueue = [];
     this.bellChipG = undefined;
     this.bellChipText = undefined;
     this.lowTween = undefined;
@@ -336,14 +350,45 @@ export class MapScene extends Phaser.Scene {
 
   // 首見教學提示：與新手引導共用底部橫條，但兩者絕不同時存在——
   // showTut 共用同一個 Text/Graphics 物件，引導期間再寫進去會把 tut.* 的文案蓋掉。
-  // 引導本身只跑第 1 局的前幾步，讓它先講完是正確的優先序。
+  // 引導本身只跑第 1 局的前幾步，讓它先講完是正確的優先序——引導期間請求的提示直接
+  // 捨棄、不進佇列：因為還沒展示就丟掉，coach 那邊也就從未 markSeen，之後任何一次
+  // 再命中同一個時機都還會照常重新請求，不會被這次的捨棄永久吃掉（見任務報告）。
+  //
+  // 佇列設計：doMove 的 onComplete 裡，同一步移動可能同時湊到 supply 與 age.second
+  // 兩則首見提示（撿到補給、又剛好讀滿第二種齡別）。showTut/hideTut 只有一組共用
+  // Text/Graphics，若兩則提示都直接呼叫 coachOnce→show，第二則會在同一 tick 內把第一則
+  // 蓋掉，而第一則先前已經 markSeen——玩家其實完全沒看到它，卻再也不會被教一次。
+  // 修法是「排隊，不覆蓋」：不是展示中就先進 coachQueue 候補，且只在真正呼叫 showTut
+  // 的那一刻才 markSeen（用 coach.markSeen 直接呼叫，不走 coachOnce 的「先標記再展示」
+  // 順序），確保「已標記＝已展示過」這個不變量成立。
   private coachTip(id: CoachId, key: MsgKey): void {
     if (this.tutStep >= 0) return;
-    coachOnce(this.coach, id, () => {
-      this.showTut(key);
-      // 提示不阻擋操作，也不需要玩家關掉——8 秒後自行淡出，讓畫面回到乾淨狀態
-      this.time.delayedCall(8000, () => this.hideTut());
-    });
+    if (this.coach.seen(id)) return;
+    // 已經在展示中或已排隊等展示——同一個 id 不必也不該重覆進佇列
+    if (this.coachActive === id || this.coachQueue.some((q) => q.id === id)) return;
+    if (this.coachActive === null) {
+      this.showCoachTip(id, key);
+    } else {
+      this.coachQueue.push({ id, key });
+    }
+  }
+
+  // 實際展示一則首見提示：markSeen 放在這裡（而非請求時）才能保證「標記＝玩家看過」。
+  private showCoachTip(id: CoachId, key: MsgKey): void {
+    this.coachActive = id;
+    this.coach.markSeen(id);
+    this.showTut(key);
+    // 每則提示各自擁有完整 8 秒展示時間——時間到才淡出並讓下一則候補提示（若有）補上，
+    // 而不是所有候補共用同一段 8 秒倒數。
+    this.time.delayedCall(8000, () => this.advanceCoachQueue());
+  }
+
+  // 目前這則的 8 秒到了：淡出、清狀態，若佇列還有候補就接著展示下一則。
+  private advanceCoachQueue(): void {
+    this.hideTut();
+    this.coachActive = null;
+    const next = this.coachQueue.shift();
+    if (next) this.showCoachTip(next.id, next.key);
   }
 
   // 引導完成：與玩法說明共用旗標寫入邏輯（? chip 之後仍可手動開啟 Help）
