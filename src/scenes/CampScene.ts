@@ -12,6 +12,7 @@ import {
   dailyCommissions, COMMISSION_REWARD_NOTES, type Commission, type CommissionStore,
 } from '../core/commissions';
 import type { ScoreStore } from '../core/score';
+import { coachOnce, type CoachId, type CoachStore } from '../core/coach';
 import { cssHex, BRUSH_RADIUS, FONTS, stripBrackets } from './paint';
 import {
   fadeIn, fadeToScene, restartOnResize, motionOK, ensureDotTexture, guardLowFps, PARTICLE_CAPS,
@@ -89,6 +90,25 @@ export class CampScene extends Phaser.Scene {
     // 版面改由 flowY 排定（見 src/core/layout.ts）。舊版標題釘在 0.16h、按鈕列從 0.42h
     // 起算，兩者之間因此恆有 26% 的高度是空的；而下半部又是流式累加，內容一長就撞進
     // 營火光暈。現在整疊由同一套規則排列，寬裕平均分給各道間距，不足時等比壓縮。
+    // 教學掛點所需的門檻資料在此提前算好（原本 today/dailyDone 在按鈕繪製處才算、
+    // commStore/comms/commStatus 在委託板繪製處才算）——純函式、無副作用，提前算不改變
+    // 語意，但 blocks 陣列組裝時必須已經知道 campPick 是否非 null 才能決定要不要插入
+    // 教學區塊，因此得先移到這裡。
+    const today = dailyKey(new Date());
+    const dailyDone = st.lastPlayed === today;
+    const commStore = this.registry.get('commissions') as CommissionStore;
+    const comms = dailyCommissions(today);
+    const commStatus = commStore.statusFor(today);
+    const doneCount = commStatus.filter(Boolean).length;
+
+    // 營地教學：委託／每日首見，一次只教一則——與 ResultScene 同款做法。候選未被選中者
+    // 保持未標記（coach.seen 不受影響），下次符合條件時仍會被重新列入候選。
+    const coach: CoachStore = this.registry.get('coach');
+    const campCandidates: [CoachId, MsgKey][] = [];
+    if (!dailyDone) campCandidates.push(['daily', 'coach.daily']);
+    if (doneCount < 3) campCandidates.push(['commission', 'coach.commission']);
+    const campPick = campCandidates.find(([id]) => !coach.seen(id)) ?? null;
+
     const showRows = h >= 692; // 委託板是否展開成三列（矮視窗收合為單行）
     const blocks: FlowBlock[] = [
       { h: 44, gap: 40, maxGap: 96 },          // 標題
@@ -103,6 +123,10 @@ export class CampScene extends Phaser.Scene {
           { h: 44, gap: 6, minGap: 6 } as FlowBlock,
         ]
         : [{ h: 16, gap: 34, minGap: 16 } as FlowBlock]), // 收合成單行「委託板 n/3」
+      // 教學行排在工具列之前（僅當有候選首見提示時才插入這個區塊）：工具列是唯一出口，
+      // 不能被推出畫面，見下方 by 的夾回註解；教學行本身不夾，讓它在極矮視窗誠實地
+      // 被壓縮／甚至被工具列蓋住，也不犧牲工具列的可點擊性。
+      ...(campPick ? [{ h: 32, gap: 14, minGap: 8 } as FlowBlock] : []),
       { h: 44, gap: 26, minGap: 16 },          // 工具列（命中區高 44）
     ];
     // 底界留 150px 給營火。光暈半徑 60，所以它的中心至少要離工具列底緣 72px
@@ -119,8 +143,6 @@ export class CampScene extends Phaser.Scene {
       fontFamily: FONTS.display, fontSize: '34px', color: cssHex(pal.paper),
     }).setOrigin(0.5).setLetterSpacing(3);
 
-    const today = dailyKey(new Date());
-    const dailyDone = st.lastPlayed === today;
     const bw = Math.min(320, w - 48);
 
     this.button(cx, ys[bi++], bw, 54, stripBrackets(i18n.t('camp.continue', { n: runRound })), true, () => {
@@ -151,11 +173,7 @@ export class CampScene extends Phaser.Scene {
 
     // 委託板：三則每日委託（同 dailyKey 種子，與 ResultScene 結算共用判定邏輯）；
     // 矮視窗（h<692，見 rowH=44 換算）已很擁擠，收合為單行「委託板 n/3」，避免與下方工具列相撞
-    const commStore = this.registry.get('commissions') as CommissionStore;
-    const comms = dailyCommissions(today);
-    const commStatus = commStore.statusFor(today);
     if (!showRows) {
-      const doneCount = commStatus.filter(Boolean).length;
       this.add.text(cx, ys[bi++], `${i18n.t('comm.title')} ${doneCount}/3`, {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
       }).setOrigin(0.5).setLetterSpacing(1);
@@ -168,6 +186,18 @@ export class CampScene extends Phaser.Scene {
       comms.forEach((c, i) => {
         // drawCommissionRow 的 y 是卡片「上緣」，flowY 回傳的是中心，故減去半高
         this.drawCommissionRow(cx, ys[bi++] - rowH / 2, bw, rowH, c, commStatus[i], i18n);
+      });
+    }
+
+    // 委託／每日首見教學：blocks 陣列已依 campPick 是否非 null 決定要不要留這個 ys 位，
+    // 這裡的消費必須嚴格對齊——只有 campPick 非 null 時才會呼叫 ys[bi++]。
+    if (campPick) {
+      const [id, msgKey] = campPick;
+      coachOnce(coach, id, () => {
+        this.add.text(cx, ys[bi++], i18n.t(msgKey), {
+          fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+          wordWrap: { width: 420, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+        }).setOrigin(0.5);
       });
     }
 

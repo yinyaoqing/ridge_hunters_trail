@@ -12,6 +12,7 @@ import {
   creatureScale,
 } from './paint';
 import { fadeIn, fadeToScene, restartOnResize } from './fx';
+import { coachOnce, type CoachStore } from '../core/coach';
 
 const ROW_H = 96;
 
@@ -72,6 +73,17 @@ export class CodexScene extends Phaser.Scene {
     this.input.on('pointerup', () => { dragY = null; });
 
     this.backButton(cx, h - 44, pal, i18n);
+
+    // 研究首見：底部說明退到返回鈕之上。backButton 以 (cx, h-44) 為中心、高 46，
+    // 上緣落在 h-67；用 origin(0.5, 1) 底部錨定於 h-77（上緣再退 10px 淨空），文字
+    // 不論折成幾行都只會往上長，底緣固定不變——不會壓到返回鈕，且不必依版面高度另行判斷。
+    const coach: CoachStore = this.registry.get('coach');
+    coachOnce(coach, 'codex', () => {
+      this.add.text(cx, h - 77, i18n.t('coach.codex'), {
+        fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
+        wordWrap: { width: 460, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
+      }).setOrigin(0.5, 1).setDepth(90);
+    });
   }
 
   private scrollBy(dy: number) {

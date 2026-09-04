@@ -259,6 +259,12 @@ export class MapScene extends Phaser.Scene {
     this.events.on(Phaser.Scenes.Events.RESUME, () => { this.clearHover(); this.redraw(); });
     this.redraw();
     restartOnResize(this);
+    // 道具首見：持有中且進到獵局時教一次。解鎖 toast 只說了「解鎖了」，
+    // 沒說它在這一局怎麼用——輝鈴尤其，玩家不會知道 HUD 上多出來的 chip 能點。
+    // 用 else if 而非兩個 if：coachTip 共用同一個底部橫條，同一幀寫兩次只有後者看得到，
+    // 前者卻已被標記為已見，等於永久漏教。兩者都持有時風向石先教，輝鈴留到下一局。
+    if (this.tools.has('windstone')) this.coachTip('tool.windstone', 'coach.tool.windstone');
+    else if (this.tools.has('glowbell')) this.coachTip('tool.glowbell', 'coach.tool.glowbell');
     fadeIn(this);
     if (this.tutStep === 0) this.startTutStep0(s);
     else this.maybeShowFirstRunHelp(); // 引導進行中時跳過彈窗，改由 ? chip 手動開啟
