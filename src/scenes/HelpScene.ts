@@ -106,7 +106,7 @@ export class HelpScene extends Phaser.Scene {
       { key: 'btn.demo2', scriptId: 'quarry' },
     ];
     demoButtons.forEach((b, i) => {
-      const by = py0 + 168 + i * 40;
+      const by = py0 + 168 + i * 48;
       const g = this.add.graphics();
       g.lineStyle(1.5, pal.gold, 0.8).strokeRoundedRect(cx - dbw / 2, by - 16, dbw, 32, BRUSH_RADIUS);
       this.add.text(cx, by, stripBrackets(i18n.t(b.key)).toUpperCase(), {
