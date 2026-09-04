@@ -69,6 +69,26 @@ describe('quarry lesson data', () => {
     }
   });
 
+  // 「線索標的是牠經過的地方，不是牠現在的位置」——不只自己那一齡，
+  // 任何一條線索都不准畫在任何一個節點正上方，否則這句話會被畫面自己推翻
+  it('never draws a clue on top of any waypoint, its own age or another', () => {
+    for (const clue of QUARRY_CLUES) {
+      for (const node of QUARRY_NODES) {
+        expect(key(clue.position)).not.toBe(key(node));
+      }
+    }
+  });
+
+  // 三個節點與外推點都要離邊界至少 1 格，教學的「連線＝方向」才有畫面空間可讀
+  it('keeps every waypoint and the target at least one cell inside the border', () => {
+    for (const p of [...QUARRY_NODES, QUARRY_TARGET]) {
+      expect(p.x).toBeGreaterThanOrEqual(1);
+      expect(p.x).toBeLessThanOrEqual(QUARRY_SIZE - 2);
+      expect(p.y).toBeGreaterThanOrEqual(1);
+      expect(p.y).toBeLessThanOrEqual(QUARRY_SIZE - 2);
+    }
+  });
+
   // 線索參數必須落在 getDifficulty() 真實使用的區間內，否則教的是特例不是這個遊戲
   it('uses parameters the real game actually produces', () => {
     for (const c of QUARRY_CLUES) {

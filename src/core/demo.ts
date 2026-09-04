@@ -203,40 +203,50 @@ export function checkMuteAction(clueIndex: number): MsgKey | null {
 // 與真實關卡的 route.ts + generate.ts 是同一套幾何。無幌子：幌子由第一課教完，
 // 這一課要專心教齡別，兩件難事同時上等於兩件都沒教會。
 //
-// 這組資料由 scripts/find-quarry-lesson.mjs 窮舉找出，九條性質釘在
+// 這組資料由 scripts/find-quarry-lesson.mjs 窮舉找出，性質釘在
 // tests/demo-quarry.test.ts。動任何一個數字之前，先跑測試。
+//
+// 這是第二次重找：第一版三個節點與外推點全落在 y=0（貼著格線邊緣，
+// 讀不出「一條線」的方向感），而且線索位置跟別齡的節點重合（教學要講
+// 「線索標的是牠經過的地方，不是牠現在的位置」，結果線索畫在下一齡的
+// 節點正上方，混淆了正要教的區別）。這一版額外釘住兩條：
+//   ⑤ 任何線索位置都不得與「任何一個」節點重合——不只是自己那一齡的節點
+//   ⑥ 三個節點與外推點都離邊界至少 1 格（x、y 落在 1..size-2＝1..7）
+// 並且優先找對角線方向（而非沿格線的水平／垂直），讓連線清楚讀成方向、
+// 不會被誤認成格線本身的一整列或一整行。窮舉在只試對角線、不放寬任何
+// 參數的第一輪就找到解，未曾放寬 SPREADS／RADII／混搭優先序。
 export const QUARRY_SIZE = 9;
 export const QUARRY_NODES: readonly [Vec2, Vec2, Vec2] = [
-  { x: 0, y: 0 },
-  { x: 2, y: 0 },
-  { x: 4, y: 0 },
+  { x: 1, y: 1 },
+  { x: 3, y: 3 },
+  { x: 5, y: 5 },
 ];
-export const QUARRY_TARGET: Vec2 = { x: 6, y: 0 };
-export const QUARRY_START: Vec2 = { x: 0, y: 8 }; // 左下角起步，離三個節點都夠遠
+export const QUARRY_TARGET: Vec2 = { x: 7, y: 7 };
+export const QUARRY_START: Vec2 = { x: 0, y: 8 }; // 左下角，離對角線路徑最遠的角落
 export const QUARRY_CLUES: readonly Clue[] = [
   {
-    type: 'footprint', position: { x: 1, y: 0 }, isDecoy: false, age: 0,
-    data: { direction: 180, angleSpread: 20 },
+    type: 'footprint', position: { x: 0, y: 0 }, isDecoy: false, age: 0,
+    data: { direction: 45, angleSpread: 20 },
   },
   {
-    type: 'disturbance', position: { x: 1, y: 0 }, isDecoy: false, age: 0,
+    type: 'disturbance', position: { x: 0, y: 0 }, isDecoy: false, age: 0,
     data: { radius: 2 },
   },
   {
-    type: 'footprint', position: { x: 0, y: 0 }, isDecoy: false, age: 1,
-    data: { direction: 0, angleSpread: 20 },
+    type: 'scent', position: { x: 0, y: 0 }, isDecoy: false, age: 1,
+    data: { distance: 4, tolerance: 0.5, windBiasNeeded: false, biasDirection: 45 },
   },
   {
-    type: 'scent', position: { x: 0, y: 0 }, isDecoy: false, age: 1,
-    data: { distance: 2, tolerance: 0.5, windBiasNeeded: false, biasDirection: 0 },
+    type: 'footprint', position: { x: 2, y: 2 }, isDecoy: false, age: 1,
+    data: { direction: 45, angleSpread: 20 },
   },
   {
     type: 'scent', position: { x: 0, y: 0 }, isDecoy: false, age: 2,
-    data: { distance: 4, tolerance: 0.5, windBiasNeeded: false, biasDirection: 0 },
+    data: { distance: 7, tolerance: 0.5, windBiasNeeded: false, biasDirection: 45 },
   },
   {
-    type: 'footprint', position: { x: 2, y: 0 }, isDecoy: false, age: 2,
-    data: { direction: 0, angleSpread: 20 },
+    type: 'footprint', position: { x: 4, y: 3 }, isDecoy: false, age: 2,
+    data: { direction: 63, angleSpread: 20 },
   },
 ];
 
