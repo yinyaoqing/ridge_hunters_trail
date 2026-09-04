@@ -25,19 +25,29 @@ export class CampScene extends Phaser.Scene {
   // 首見提示的挑選結果，記在場景實例上（B2）：undefined＝這次造訪還沒決定過，
   // null／[id,key]＝已經決定（含「這次沒有候選」的 null）。scene.restart() 沿用同一個
   // Scene 實例，欄位值會存活——只要呼叫端在「同一次造訪內的重啟」（靜音／語言切換、
-  // Help／Demo 關閉、resize）都經由 init() 帶入 preserveCoachPick:true，這個欄位就不會被
-  // 清空，campCandidates 也就不會在 coach.seen 被前一輪標記之後，於同一次造訪內改挑下一個
-  // 候選——那正是舊版的 bug：一次意圖之外的重啟會把下一則提示也一併燒掉，玩家卻從未
-  // 真正看過它。只有在真正離開營地、之後再重新 start('Camp') 的造訪，才會拿到全新的欄位
-  // （init() 沒收到旗標即歸零），依當時的 coach.seen 狀態重新挑一次。
+  // Help／Demo 關閉、resize）都在呼叫 this.scene.restart() 之前把 pendingPreserveCoachPick
+  // 設成 true，init() 就不會清空這個欄位，campCandidates 也就不會在 coach.seen 被前一輪
+  // 標記之後，於同一次造訪內改挑下一個候選——那正是舊版的 bug：一次意圖之外的重啟會把
+  // 下一則提示也一併燒掉，玩家卻從未真正看過它。只有在真正離開營地、之後再重新
+  // start('Camp') 的造訪，才會拿到全新的欄位（init() 讀到的 pendingPreserveCoachPick 是
+  // 預設值 false 而歸零），依當時的 coach.seen 狀態重新挑一次。
   private coachPick: [CoachId, MsgKey] | null | undefined = undefined;
+  // 「下一次 restart 是否算同一次造訪」的旗標。刻意不透過 scene.restart(data) 傳遞——
+  // Phaser 的 Systems#start 只在 data 為 truthy 時才覆寫 settings.data，往後任何一次不帶
+  // data 的 scene.start('Camp')（fadeToScene 等一般轉場皆是如此）都會讓 init() 繼續讀到
+  // 這次留下的舊 data，preserveCoachPick 因此會永久卡在 true，coachPick 從此再也不會被
+  // 真正離開又重新進場的造訪重新挑過。改用場景自己持有、自己在 init() 讀完立刻歸零的
+  // 實例欄位，就不會被 Phaser 那份不會清空的 settings.data 污染。
+  private pendingPreserveCoachPick = false;
 
   constructor() {
     super('Camp');
   }
 
-  init(data: { preserveCoachPick?: boolean }) {
-    if (!data?.preserveCoachPick) this.coachPick = undefined;
+  init() {
+    const preserve = this.pendingPreserveCoachPick;
+    this.pendingPreserveCoachPick = false;
+    if (!preserve) this.coachPick = undefined;
   }
 
   create() {
@@ -62,15 +72,18 @@ export class CampScene extends Phaser.Scene {
     // 一旦跨過 UTC 午夜就會用錯日期的委託/分享 dateKey（見 F2）
     this.registry.remove('dailyKey');
     fadeIn(this);
-    restartOnResize(this, { preserveCoachPick: true });
+    restartOnResize(this, () => { this.pendingPreserveCoachPick = true; });
     // F1 audio unlock hook：任何首次指標按下即視為使用者手勢，解除 AudioContext 靜音鎖
     // （unlock() 冪等，MapScene 亦掛同款 hook，兩邊皆可安全觸發）
     // 鍵盤 hook：MapScene 支援方向鍵移動，純鍵盤玩家永遠不會觸發 pointerdown，
     // 需另掛一次性 keydown 才能解鎖（keydown 同為瀏覽器認可的有效手勢）
     this.input.keyboard?.once('keydown', () => this.audio.unlock());
     this.input.once('pointerdown', () => this.audio.unlock());
-    // Help/Demo 關閉後刷新語言；帶 preserveCoachPick，理由同 restartOnResize 那一行
-    this.events.on(Phaser.Scenes.Events.RESUME, () => this.scene.restart({ preserveCoachPick: true }));
+    // Help/Demo 關閉後刷新語言；設 pendingPreserveCoachPick，理由同 restartOnResize 那一行
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      this.pendingPreserveCoachPick = true;
+      this.scene.restart();
+    });
 
     this.drawRidges(w, h);
 
@@ -239,8 +252,9 @@ export class CampScene extends Phaser.Scene {
       .on('pointerdown', () => {
         this.audio.unlock(); // 保險：確保這次手勢也算數（與 create() 的全域 hook 冪等共存）
         this.audio.toggle();
-        // 較簡單一致：與語言鈕相同，用 restart 取代局部重繪；preserveCoachPick 理由同上
-        this.scene.restart({ preserveCoachPick: true });
+        // 較簡單一致：與語言鈕相同，用 restart 取代局部重繪；pendingPreserveCoachPick 理由同上
+        this.pendingPreserveCoachPick = true;
+        this.scene.restart();
       });
     this.add.text(xHelp, by, '?', {
       fontFamily: FONTS.display, fontSize: '18px', color: cssHex(pal.gold),
@@ -269,7 +283,8 @@ export class CampScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
-        this.scene.restart({ preserveCoachPick: true }); // 理由同上：語言切換不算離開營地
+        this.pendingPreserveCoachPick = true; // 理由同上：語言切換不算離開營地
+        this.scene.restart();
       });
 
     // 營火最後畫：它的位置取決於工具列落在哪裡（見 drawCampfire）。

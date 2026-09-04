@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createCoach, coachOnce } from '../src/core/coach';
+import { createCoach } from '../src/core/coach';
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial));
@@ -77,31 +77,5 @@ describe('createCoach', () => {
     const coach = createCoach();
     coach.markSeen('daily');
     expect(coach.seen('daily')).toBe(true);
-  });
-});
-
-describe('coachOnce', () => {
-  it('runs show and marks seen the first time', () => {
-    const coach = createCoach(fakeStorage());
-    let calls = 0;
-    expect(coachOnce(coach, 'supply', () => { calls++; })).toBe(true);
-    expect(calls).toBe(1);
-    expect(coach.seen('supply')).toBe(true);
-  });
-
-  it('does nothing on later calls', () => {
-    const coach = createCoach(fakeStorage());
-    let calls = 0;
-    coachOnce(coach, 'supply', () => { calls++; });
-    expect(coachOnce(coach, 'supply', () => { calls++; })).toBe(false);
-    expect(calls).toBe(1);
-  });
-
-  it('keeps ids independent', () => {
-    const coach = createCoach(fakeStorage());
-    coachOnce(coach, 'supply', () => {});
-    let shown = false;
-    expect(coachOnce(coach, 'iris', () => { shown = true; })).toBe(true);
-    expect(shown).toBe(true);
   });
 });

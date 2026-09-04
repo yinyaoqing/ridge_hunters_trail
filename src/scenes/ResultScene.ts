@@ -38,16 +38,25 @@ export class ResultScene extends Phaser.Scene {
   private choiceMade = false;
   // 首見提示的挑選結果，記在場景實例上（B2，同 CampScene.coachPick 的做法與理由）：
   // undefined＝這次造訪還沒決定過，null／[id,key]＝已經決定。resize 觸發的 restart
-  // 經由 restartOnResize 帶入 preserveCoachPick，不會清掉這個欄位，因此不會在同一次
-  // 造訪內因為 coach.seen 被上一輪標記過而改挑下一個候選、把它也一併燒掉。
+  // 經由 restartOnResize 的 beforeRestart 回呼把 pendingPreserveCoachPick 設成 true，
+  // 不會清掉這個欄位，因此不會在同一次造訪內因為 coach.seen 被上一輪標記過而改挑
+  // 下一個候選、把它也一併燒掉。
   private coachPick: [CoachId, MsgKey] | null | undefined = undefined;
+  // 同 CampScene.pendingPreserveCoachPick：不透過 scene.restart(data) 傳遞，避免 Phaser
+  // 的 settings.data 在下一次不帶 data 的 scene.start('Result')（fadeToScene 等一般轉場）
+  // 繼續讀到舊值，讓 coachPick 從此再也不會在真正的新一局結算時重新挑——那正是本次要修的
+  // bug：異彩補獲那一局挑中的 coachPick，會被凍結並套用到往後每一局結算，包含失手與
+  // 平凡生物。
+  private pendingPreserveCoachPick = false;
 
   constructor() {
     super('Result');
   }
 
-  init(data: { preserveCoachPick?: boolean }) {
-    if (!data?.preserveCoachPick) this.coachPick = undefined;
+  init() {
+    const preserve = this.pendingPreserveCoachPick;
+    this.pendingPreserveCoachPick = false;
+    if (!preserve) this.coachPick = undefined;
   }
 
   create() {
@@ -145,7 +154,7 @@ export class ResultScene extends Phaser.Scene {
     const pal = this.pal;
     this.cameras.main.setBackgroundColor(pal.bg);
     fadeIn(this);
-    restartOnResize(this, { preserveCoachPick: true });
+    restartOnResize(this, () => { this.pendingPreserveCoachPick = true; });
     const cx = this.scale.width / 2;
     const h = this.scale.height;
     const showTools = (this.registry.get('lastUnlocks') as ToolId[] | undefined) ?? [];

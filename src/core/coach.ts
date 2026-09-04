@@ -66,12 +66,3 @@ export function createCoach(storage?: Store): CoachStore {
     },
   };
 }
-
-// 首見提示的唯一呼叫形狀。各場景的掛點一律是一行，不各自寫 if (!coach.seen(...))。
-// 回傳是否真的顯示了——呼叫端若要在同一幀決定「還要不要顯示第二則」會用到。
-export function coachOnce(coach: CoachStore, id: CoachId, show: () => void): boolean {
-  if (coach.seen(id)) return false;
-  coach.markSeen(id);
-  show();
-  return true;
-}

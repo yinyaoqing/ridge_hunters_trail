@@ -86,6 +86,14 @@ export class MapScene extends Phaser.Scene {
                             // （貼體力條那一列）文字比體力條本身高，置中會微幅探出體力條
                             // 上緣，這個值讓它知道副標題底下留了多少空間可以探，見 updateHud
   private skipFirstRunHelp = false;
+  // 「下一次 restart 是否要帶 skipFirstRunHelp」的旗標。刻意不透過 scene.restart(data) 傳遞
+  // ——Phaser 的 Systems#start 只在 data 為 truthy 時才覆寫 settings.data，往後任何一次不帶
+  // data 的 scene.start('Map')（fadeToScene 等一般轉場皆是如此）都會讓 init() 繼續讀到這次
+  // 留下的舊 data，skipFirstRunHelp 因此會永久卡在 true。改用場景自己持有、自己在 init()
+  // 讀完立刻歸零的實例欄位（同 CampScene.pendingPreserveCoachPick），語言 chip 在呼叫
+  // scene.restart() 之前把它設成 true；resize 觸發的 restartOnResize(this) 不帶回呼，
+  // 因此不會把它設成 true，維持與舊版相同的「resize 不算語言切換」語意。
+  private pendingSkipFirstRunHelp = false;
   private audio!: AudioBus;
   private tools!: ToolStore;
   // 互動式新手引導：-1=未啟動/已結束，0..3=引導步驟（見 startTutStep0 起各步驟方法）
@@ -135,10 +143,12 @@ export class MapScene extends Phaser.Scene {
     super('Map');
   }
 
-  // 語言切換造成的 restart 會帶入此旗標，避免在儲存降級（無法記憶 rht.help.v1）的
-  // 情境下，每次切換語言都重新觸發 maybeShowFirstRunHelp 彈出玩法說明並暫停地圖
-  init(data: { skipFirstRunHelp?: boolean }) {
-    this.skipFirstRunHelp = data?.skipFirstRunHelp === true;
+  // 語言切換造成的 restart 會把 pendingSkipFirstRunHelp 設成 true，避免在儲存降級
+  // （無法記憶 rht.help.v1）的情境下，每次切換語言都重新觸發 maybeShowFirstRunHelp
+  // 彈出玩法說明並暫停地圖。
+  init() {
+    this.skipFirstRunHelp = this.pendingSkipFirstRunHelp;
+    this.pendingSkipFirstRunHelp = false;
   }
 
   create() {
@@ -785,8 +795,9 @@ export class MapScene extends Phaser.Scene {
           i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
           // roundText 的展示字體隨語系而異且僅在 create() 時設定，
           // 用 restart（既有的 resize 重建機制）取代 redraw 以確保字體刷新；
-          // 帶入 skipFirstRunHelp 避免儲存降級時每次切語言都重新彈出玩法說明
-          this.scene.restart({ skipFirstRunHelp: true });
+          // 設 pendingSkipFirstRunHelp 避免儲存降級時每次切語言都重新彈出玩法說明
+          this.pendingSkipFirstRunHelp = true;
+          this.scene.restart();
         });
     }
     chip.strokeRoundedRect(xHelp, chipY, 32, chipH, { tl: 5, tr: 9, br: 4, bl: 8 });

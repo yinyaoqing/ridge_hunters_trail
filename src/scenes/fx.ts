@@ -2,15 +2,23 @@ import Phaser from 'phaser';
 import { FONTS } from './paint';
 
 // resize 後 debounce 重啟場景：所有狀態都在 registry，重啟即重排。
-// data（選用）會原樣轉交給 restart() 傳給下一次 init()——場景若需要分辨
+// beforeRestart（選用）在實際呼叫 scene.restart() 之前執行一次——場景若需要分辨
 // 「這次重啟是不是同一次造訪」（例如 coach 首見提示不該因為 resize 而被跳過或錯位，
-// 見 CampScene/ResultScene/CodexScene 的 preserveCoachPick），就靠這個管道傳旗標，
-// 不必另外監聽 resize 事件自己重複一份 debounce 邏輯。
-export function restartOnResize(scene: Phaser.Scene, data?: object): void {
+// 見 CampScene/ResultScene/CodexScene），就在這個回呼裡把自己的旗標欄位設成 true，
+// 該欄位再由場景的 init() 讀取並立刻歸零。刻意不透過 scene.restart(data) 傳資料——
+// Phaser 的 Systems#start 只在 data 為 truthy 時才覆寫 settings.data，之後任何一次
+// 不帶 data 的 scene.start(key)（本專案所有一般轉場都是如此）都會讓 init() 繼續讀到
+// 上一次留下的舊 data，欄位因此永久卡住，見開發紀錄裡的重啟旗標永久外洩問題。
+// 場景自身持有並讀寫的實例欄位不受這個問題影響：每個真正的新造訪都是
+// 新一輪「未經回呼設 true」的 init()，欄位自然是預設值。
+export function restartOnResize(scene: Phaser.Scene, beforeRestart?: () => void): void {
   let timer: Phaser.Time.TimerEvent | null = null;
   const handler = () => {
     timer?.remove();
-    timer = scene.time.delayedCall(150, () => scene.scene.restart(data));
+    timer = scene.time.delayedCall(150, () => {
+      beforeRestart?.();
+      scene.scene.restart();
+    });
   };
   scene.scale.on(Phaser.Scale.Events.RESIZE, handler);
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () =>
