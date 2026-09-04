@@ -335,21 +335,39 @@ export class MapScene extends Phaser.Scene {
     this.showTut('tut.cross');
   }
 
-  // 引導文字：底部置中，共用單一 Text/Graphics（切換文案時重繪底條），全程不攔截輸入
+  // 引導文字：底部置中，共用單一 Text/Graphics（切換文案時重繪底條），全程不攔截輸入。
+  // B3：這個橫條原本是為 tut.* 系列訂的（最長 84 字元、單行即可），沒有 wordWrap。
+  // 首見提示（coach.*）借用同一個橫條，但長得多——en 版 coach.age 122 字元、
+  // coach.tool.windstone 115 字元，13px Karla 下量得單行寬約 790px，超過 720×780 的
+  // 內嵌目標寬度，更是手機 390px 視窗的兩倍，會被畫面裁掉一半。wordWrap 寬度取
+  // 「螢幕寬度扣掉兩側各 32px 留白」與「340px 閱讀行寬上限」兩者較小值：桌機/內嵌
+  // （寬 ≥404px）都會頂到 340 這個上限，讓一行字維持好讀的寬度而不是被拉成一整排；
+  // 390px 手機則會收到 390-64=326px，仍在留白之內。bh 已經是 tutText.height + 12，
+  // wrap 後 height 會隨行數增加，這裡不必另外處理；bg 的 y 用 tutText 中心對齊，
+  // 兩到三行時橫條會跟著往上長高，底邊固定貼在 y=h-24 這條基準線上下對稱，不會探出螢幕
+  // ——螢幕最低高度遠大於三行橫條的高度（約 13*1.2*3+12≈59px），沒有頂到頂部的風險。
   private showTut(msgKey: MsgKey) {
     const pal = this.pal;
     if (!this.tutText) {
       this.tutBg = this.add.graphics().setDepth(80);
+      const wrapWidth = Math.min(340, this.scale.width - 64);
       this.tutText = this.add.text(0, 0, '', {
         fontFamily: FONTS.body, fontSize: '13px', color: cssHex(pal.paper),
+        wordWrap: { width: wrapWidth, useAdvancedWrap: true }, align: 'center', lineSpacing: 4,
       }).setOrigin(0.5).setDepth(81);
     }
     this.tutText.setText(this.i18n().t(msgKey));
     const w = this.scale.width;
-    const y = this.scale.height - 24;
-    this.tutText.setPosition(w / 2, y);
+    const h = this.scale.height;
+    // setText 必須先跑過，wordWrap 才會把行數／實際高度定下來，bh 才量得準——
+    // 這也是為什麼下面的夾限要在 setText 之後才算，不能沿用建立時的舊高度。
     const bw = this.tutText.width + 24;
     const bh = this.tutText.height + 12;
+    // 兩到三行時把中心點往上夾，讓底緣永遠不超出螢幕下緣再留 4px——單行訊息完全不受
+    // 影響（h-24 本來就比夾限值小，Math.min 選不到它），維持原本的視覺位置不變；
+    // 只有 wordWrap 真的折成多行時，橫條才會往上長而不是把底部裁出畫面外（B3）。
+    const y = Math.min(h - 24, h - 4 - bh / 2);
+    this.tutText.setPosition(w / 2, y);
     this.tutBg!.clear().fillStyle(pal.panel, 0.88)
       .fillRoundedRect(w / 2 - bw / 2, y - bh / 2, bw, bh, BRUSH_RADIUS);
   }
