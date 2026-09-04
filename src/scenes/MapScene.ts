@@ -397,11 +397,10 @@ export class MapScene extends Phaser.Scene {
   //
   // 佇列設計：doMove 的 onComplete 裡，同一步移動可能同時湊到 supply 與 age.second
   // 兩則首見提示（撿到補給、又剛好讀滿第二種齡別）。showTut/hideTut 只有一組共用
-  // Text/Graphics，若兩則提示都直接呼叫 coachOnce→show，第二則會在同一 tick 內把第一則
-  // 蓋掉，而第一則先前已經 markSeen——玩家其實完全沒看到它，卻再也不會被教一次。
+  // Text/Graphics，若兩則提示都「先標記再顯示」，第二則會在同一 tick 內把第一則蓋掉，
+  // 而第一則先前已經 markSeen——玩家其實完全沒看到它，卻再也不會被教一次。
   // 修法是「排隊，不覆蓋」：不是展示中就先進 coachQueue 候補，且只在真正呼叫 showTut
-  // 的那一刻才 markSeen（用 coach.markSeen 直接呼叫，不走 coachOnce 的「先標記再展示」
-  // 順序），確保「已標記＝已展示過」這個不變量成立。
+  // 的那一刻才 markSeen，確保「已標記＝已展示過」這個不變量成立。
   private coachTip(id: CoachId, key: MsgKey): void {
     if (this.tutStep >= 0) return;
     if (this.coach.seen(id)) return;

@@ -226,8 +226,9 @@ export class CampScene extends Phaser.Scene {
     if (campPick) {
       const [id, msgKey] = campPick;
       // markSeen 冪等：這次造訪第一次顯示時才真的寫入，同一次造訪內的重啟重繪
-      // 只是重覆一次已經寫過的值，不會被 coachOnce 的「已見過就跳過顯示」擋下來
-      // ——那正是舊版的 bug（見 this.coachPick 欄位註解）。
+      // 只是重覆一次已經寫過的值。刻意不在挑選時就標記——「先標記再顯示」會讓
+      // 重啟後的重挑跳過這一則、改燒掉下一則，玩家兩則都沒看到（見 this.coachPick
+      // 欄位註解）。這裡的不變量是「已標記＝玩家看過」。
       coach.markSeen(id);
       this.add.text(cx, ys[bi++], i18n.t(msgKey), {
         fontFamily: FONTS.body, fontSize: '12px', color: cssHex(pal.paperDim),
