@@ -243,8 +243,15 @@ export class DemoScene extends Phaser.Scene {
 
     const live = step.clues.filter((i) => !step.muted.includes(i)).map((i) => clues[i]);
 
-    // 新鮮度篩選：heatAge 為 null／undefined 時不篩（第一課全程如此，行為與加這段之前完全相同）
-    const age = step.heatAge ?? null;
+    // 新鮮度篩選：'pick-age' 步驟還沒過關時，這是玩家動手的那一步——熱區／交集必須
+    // 跟著玩家當下的 chip 選擇（this.ageChoice）即時變化，切一次動一次，這正是這步要教的
+    // 「六條線索各自誠實、但交集是空的，只有同齡才能疊」——玩家要親眼看見候選格從
+    // 「哪裡都不吻合」收斂到剩一格，不是看著標籤換字、地圖卻不動。
+    // 其餘步驟（含這一步已經過關、玩家往回看的情形）維持原樣：只吃 step.heatAge，
+    // 因為那些是已經寫死的教學畫面，不是互動——第一課全程 heatAge 皆為 undefined，
+    // 這個分支恆為 false，行為與加這段之前完全相同。
+    const pickAge = step.action === 'pick-age' && !this.done.has(this.step);
+    const age = pickAge ? this.ageChoice : (step.heatAge ?? null);
     const shown = age === null ? live : live.filter((c) => c.age === age);
 
     // 迷霧：畫在地形與格線之後、疊層之前——順序刻意與 MapScene 不同。真實地圖上迷霧
@@ -322,13 +329,12 @@ export class DemoScene extends Phaser.Scene {
     this.narrationText.setText(i18n.t(step.narration, step.vars));
     this.hintText.setText('');
 
-    // 新鮮度 chip：只有本步 action 為 'pick-age' 且尚未過關時顯示與可點。
-    // 每次進入這樣的一步都從 2（今晨）重新開始循環——render() 只在步驟切換時
-    // 整段重跑（見 goto()），同一步內的循環點擊只更新 chip 文字，不會再次
-    // 經過這裡，因此在此歸零不會抹掉玩家在同一步內已經做的選擇。
-    const pickAge = step.action === 'pick-age' && !this.done.has(this.step);
+    // 新鮮度 chip：只有本步 action 為 'pick-age' 且尚未過關時顯示與可點（pickAge 已在
+    // 上面算過一次，這裡沿用同一個值，避免兩處各自判斷卻可能不同步）。
+    // 從 2（今晨）重新開始循環的歸零動作挪到 goto()（見下方）——因為 onAgeChipClick()
+    // 現在會在每次點擊後呼叫 render() 讓地圖跟著動，若歸零留在這裡，
+    // 同一步內的每一次點擊都會被這行打回 2，玩家永遠切不出第二個值。
     if (pickAge) {
-      this.ageChoice = 2;
       this.drawAgeChip();
     } else {
       this.ageChipG.clear();
@@ -359,6 +365,8 @@ export class DemoScene extends Phaser.Scene {
 
   // 新鮮度 chip 點擊：依 2 → 1 → 0 → null → 2 循環。切錯不是答錯——只是還沒切到，
   // 不出提示、不阻擋，切到該步 heatAge 指定的值才視為通過並前進。
+  // 切錯時仍要整段 render()（而非只改 chip 文字）：地圖上的熱區／交集疊層是這一步
+  // 要教的東西，玩家每點一次都要親眼看到候選格跟著收斂，不能只有標籤換字。
   private onAgeChipClick() {
     const step = this.script.steps[this.step];
     if (step.action !== 'pick-age' || this.done.has(this.step)) return;
@@ -368,7 +376,7 @@ export class DemoScene extends Phaser.Scene {
       this.goto(this.step + 1);
       return;
     }
-    this.ageChipText.setText(this.ageLabel(this.ageChoice));
+    this.render();
   }
 
   // 動手步驟必須先完成才放行。做過一次之後(this.done 記著)，
@@ -383,6 +391,13 @@ export class DemoScene extends Phaser.Scene {
     if (i < 0 || i >= this.script.steps.length) return;
     if (i > this.step && !this.canAdvance()) return;
     this.step = i;
+    // 進入一個「還沒過關的 pick-age 步驟」時，新鮮度 chip 一律從 2（今晨）重新開始循環——
+    // 這裡才是「進入這一步」唯一發生的地方（初始進場的第 0 步已由 init() 把 ageChoice
+    // 設回 2），render() 本身在同一步內會被 onAgeChipClick() 反覆呼叫，不能再兼職做歸零，
+    // 否則玩家切到一半就會被打回原點（見 render() 內對應的註解）。已過關的 pick-age 步驟
+    // 不歸零：往回看時要維持玩家切對的那個值，交由 render() 走 step.heatAge 那條路徑顯示。
+    const next = this.script.steps[this.step];
+    if (next.action === 'pick-age' && !this.done.has(this.step)) this.ageChoice = 2;
     this.render();
   }
 
