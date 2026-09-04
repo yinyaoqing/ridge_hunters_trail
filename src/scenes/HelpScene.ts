@@ -15,6 +15,10 @@ export class HelpScene extends Phaser.Scene {
   private list!: Phaser.GameObjects.Container;
   private listTop = 0;
   private minY = 0;
+  private viewH = 0;
+  // 收合標題列的命中矩形（在 this.list 本地座標系的上下緣），捲動時用來判斷
+  // 是否捲出可視區、要不要停用互動——遮罩只擋畫面顯示，不擋輸入命中測試。
+  private titleHits: { rect: Phaser.GameObjects.Rectangle; top: number; bottom: number }[] = [];
 
   constructor() {
     super('Help');
@@ -35,6 +39,15 @@ export class HelpScene extends Phaser.Scene {
 
     // 遮罩：擋住下層地圖的點擊
     this.add.rectangle(cx, h / 2, w, h, 0x000000, 0.62).setInteractive();
+
+    // 固定面板 UI（關閉鈕、語言切換、示範鈕、開始鈕）在輸入判定上要永遠贏過
+    // this.list 這個會捲動的遮罩容器：Phaser 的幾何遮罩只擋「畫面顯示」，不擋
+    // 「命中測試」，捲出可視區、肉眼看不到的列表內容（例如收合標題列的命中矩形）
+    // 一樣會被點到。這裡明確排出 depth，不依賴「誰先加進場景」的隱性順序
+    // ——上一次就是這樣悄悄壞掉的：this.list 比關閉鈕／示範鈕晚加入，捲動時
+    // 標題列的命中矩形疊在它們上面，把點擊吃掉。
+    const DEPTH_LIST = 0;
+    const DEPTH_CHROME = 10;
 
     // 面板
     const pw = 580;
@@ -58,6 +71,7 @@ export class HelpScene extends Phaser.Scene {
     closeG.lineBetween(cxx - 8, cxy - 8, cxx + 8, cxy + 8);
     closeG.lineBetween(cxx + 8, cxy - 8, cxx - 8, cxy + 8);
     this.add.rectangle(cxx, cxy, 40, 40, 0, 0)
+      .setDepth(DEPTH_CHROME)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.close());
 
@@ -65,6 +79,7 @@ export class HelpScene extends Phaser.Scene {
     this.add.text(px0 + 30, py0 + 22, 'EN / 中', {
       fontFamily: FONTS.body, fontSize: '12.5px', color: cssHex(pal.gold),
     }).setLetterSpacing(1)
+      .setDepth(DEPTH_CHROME)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
         i18n.setLocale(i18n.locale() === 'en' ? 'zh-TW' : 'en');
@@ -91,6 +106,7 @@ export class HelpScene extends Phaser.Scene {
       fontFamily: FONTS.body, fontSize: '14px', color: cssHex(pal.gold),
     }).setOrigin(0.5).setLetterSpacing(2);
     this.add.rectangle(cx, dby, dbw, Math.max(dbh, 44), 0, 0)
+      .setDepth(DEPTH_CHROME)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
         // 先 launch 再 stop：兩者都是排進 SceneManager 的操作，
@@ -276,11 +292,16 @@ export class HelpScene extends Phaser.Scene {
     const ROW_H = 44;
     this.listTop = py0 + 208;
     this.list = this.add.container(0, this.listTop);
+    // 明確標成 DEPTH_LIST（雖然數值等於預設值 0）：這是「捲動列表永遠墊在固定
+    // UI 之下」這條規則的落地處，寫出來讓下一個在這個容器裡加互動物件的人
+    // 一眼看到這個約束，而不是要讀完整個檔案才發現。
+    this.list.setDepth(DEPTH_LIST);
     this.list.add(icons);
 
     // 可視區：py0+208 到 py0+ph-92，之下留給開始按鈕。這個高度只由面板版面決定，
     // 與分組是否收合無關，所以只算一次；隨 cursor（內容總高）變動的只有 minY。
     const viewH = (py0 + ph - 92) - this.listTop;
+    this.viewH = viewH;
 
     // 分組預設全展開；點標題收合／展開該組，不落地保存（關閉面板重開就重置）。
     const collapsed = sections.map(() => false);
@@ -290,6 +311,7 @@ export class HelpScene extends Phaser.Scene {
       for (const child of [...this.list.list]) {
         if (child !== icons) child.destroy();
       }
+      this.titleHits = [];
       let cursor = 0;
       sections.forEach((sec, i) => {
         // 標題基線落在該區塊垂直中央，與圖例列同一套 origin(0, 0.5) 慣例
@@ -297,13 +319,19 @@ export class HelpScene extends Phaser.Scene {
         this.list.add(this.add.text(px0 + 30, titleY, i18n.t(sec.titleKey), {
           fontFamily: FONTS.body, fontSize: '11.5px', color: cssHex(pal.gold),
         }).setOrigin(0, 0.5).setLetterSpacing(1.5));
-        // 可點擊的整列命中區（比文字本身寬鬆，比照檔內其他按鈕的透明矩形慣例）
-        this.list.add(this.add.rectangle(px0 + pw / 2, titleY, pw, TITLE_H, 0, 0)
+        // 可點擊的整列命中區（比文字本身寬鬆，比照檔內其他按鈕的透明矩形慣例）。
+        // 這個矩形掛在 this.list 底下，depth 排序拿它沒辦法（depth 只在同一層
+        // 容器內比較，贏不過容器外的固定 UI，但也讓它贏不了列表捲動本身）——
+        // 真正擋住它在捲出可視區時誤觸的是 rebuildList/scrollBy 都會呼叫的
+        // updateTitleInteractivity()，依 top/bottom 是否還落在可視窗內來停用互動。
+        const titleRect = this.add.rectangle(px0 + pw / 2, titleY, pw, TITLE_H, 0, 0)
           .setInteractive({ useHandCursor: true })
           .on('pointerdown', () => {
             collapsed[i] = !collapsed[i];
             rebuildList();
-          }));
+          });
+        this.list.add(titleRect);
+        this.titleHits.push({ rect: titleRect, top: cursor, bottom: cursor + TITLE_H });
         cursor += TITLE_H;
         if (!collapsed[i]) {
           for (const row of sec.rows) {
@@ -321,6 +349,9 @@ export class HelpScene extends Phaser.Scene {
       // 新增列、新增分組或收合分組時這裡自動跟上，不必再動任何常數。
       this.minY = Math.min(0, viewH - cursor) + this.listTop;
       this.list.y = Phaser.Math.Clamp(this.list.y, this.minY, this.listTop);
+      // 收合／展開會整批重建標題矩形，重建後（以及上面 clamp 完 list.y 後）
+      // 要立刻依新的 cursor 版面重算一次可見性，不然舊的停用狀態會殘留。
+      this.updateTitleInteractivity();
     };
     rebuildList();
 
@@ -353,6 +384,7 @@ export class HelpScene extends Phaser.Scene {
       fontFamily: FONTS.body, fontSize: '16px', color: cssHex(pal.bg), fontStyle: 'bold',
     }).setOrigin(0.5).setLetterSpacing(2);
     this.add.rectangle(cx, by, bw, bh, 0, 0)
+      .setDepth(DEPTH_CHROME)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.close());
 
@@ -367,5 +399,26 @@ export class HelpScene extends Phaser.Scene {
   // 捲動列表：夾限在 [minY, listTop]（同 CodexScene.scrollBy）
   private scrollBy(dy: number) {
     this.list.y = Phaser.Math.Clamp(this.list.y + dy, this.minY, this.listTop);
+    this.updateTitleInteractivity();
+  }
+
+  // 標題列的命中矩形捲出可視區 [listTop, listTop+viewH] 時停用互動，捲回來再復原。
+  // 遮罩（geometry mask）只影響畫面顯示，不影響輸入命中測試，Phaser 選中最上層
+  // 互動物件時完全不理會遮罩——這裡才是真正擋住「點到看不見的標題列」的地方，
+  // 跟上面 DEPTH_CHROME 的固定 UI 疊層是兩道獨立的防線，缺一不可：depth 只保證
+  // 固定 UI 贏過列表整體，這裡才管列表「自己」的哪一段當下算不算看得到。
+  private updateTitleInteractivity() {
+    const viewTop = this.listTop;
+    const viewBottom = this.listTop + this.viewH;
+    for (const { rect, top, bottom } of this.titleHits) {
+      const worldTop = this.list.y + top;
+      const worldBottom = this.list.y + bottom;
+      const visible = worldBottom > viewTop && worldTop < viewBottom;
+      if (visible) {
+        rect.setInteractive({ useHandCursor: true });
+      } else {
+        rect.disableInteractive();
+      }
+    }
   }
 }
